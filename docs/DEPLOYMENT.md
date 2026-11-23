@@ -51,6 +51,8 @@ Create a Proxy Host with:
 
 The Compose service is not published to the NAS host or LAN; it is reachable through the shared NPM Docker network. Keep API access behind NPM authentication/access controls as appropriate. Do not expose the import API publicly without an additional access-control decision.
 
+Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Compose default trusts loopback only, so rate limiting may see the proxy address until you set `MOVIEHUB_TRUSTED_PROXY_IPS` to the exact NPM container IP or its dedicated Docker subnet. Inspect the actual network first; do not set this to `*`, which would let any reachable container spoof client IP headers.
+
 ## Health and readiness
 
 - `GET /api/health`: process liveness.

@@ -226,10 +226,11 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Latest code validation
 
-- Latest full validation: [#286](https://github.com/daxiguaya/MovieHub/actions/runs/45141717599) — **success**.
-- Backend: **99 passed, 2 skipped** (the opt-in 10k/100k performance cases); frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
+- Latest full validation: [#291](https://github.com/daxiguaya/MovieHub/actions/runs/45142313907) — **success**.
+- Backend: **102 passed, 2 skipped** (the opt-in 10k/100k performance cases); frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
 - Compose validation, backend/frontend production builds and both container image builds passed.
 - The browser job starts a real FastAPI process against a fresh temporary SQLite database, seeds a test chart/movie and runs one unmocked chart → detail → search workflow. Three additional browser tests use isolated API fixtures for favorite and Xiaoya handoff interactions.
+- CI #291 also validates four separate 2025 annual chart definitions and confirms that an unpublished/unverified 2026 placeholder is not exposed.
 - All browser tests run on Ubuntu 24.04; no NAS services, live Scout database or production data are used.
 - Benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. The two performance cases remain opt-in and require a controlled execution to produce throughput measurements.
 

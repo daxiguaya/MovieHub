@@ -98,7 +98,9 @@ def restore_from_batch_receipts(
                 f"Batch receipt {receipt.batch_number} contains mismatched error identities"
             )
         previous_errors = receipt.errors
-        if error_records:
+        # A checkpoint is appended only after its full error manifest, so only
+        # receipts beyond the journal's committed prefix need error recovery.
+        if index >= len(journal_checkpoints) and error_records:
             append_import_errors(journal_path, error_records)
 
     for event in receipt_events[len(journal_checkpoints):]:

@@ -104,8 +104,9 @@ CREATE TABLE chart_snapshots (
     list_id INTEGER NOT NULL,
     snapshot_date VARCHAR(10) NOT NULL,
     imported_at DATETIME NOT NULL,
-    item_count INTEGER NOT NULL CHECK (item_count >= 0),
+    item_count INTEGER NOT NULL,
     CONSTRAINT uq_chart_snapshots_list_date UNIQUE (list_id, snapshot_date),
+    CONSTRAINT ck_chart_snapshots_item_count CHECK (item_count >= 0),
     FOREIGN KEY (list_id) REFERENCES lists(list_id) ON DELETE CASCADE
 );
 CREATE INDEX ix_chart_snapshots_list_id ON chart_snapshots(list_id);
@@ -114,10 +115,11 @@ CREATE INDEX ix_chart_snapshots_snapshot_date ON chart_snapshots(snapshot_date);
 CREATE TABLE list_items (
     snapshot_id INTEGER NOT NULL,
     movie_id INTEGER NOT NULL,
-    rank INTEGER NOT NULL CHECK (rank >= 1),
+    rank INTEGER NOT NULL,
     source_rating FLOAT,
     PRIMARY KEY (snapshot_id, movie_id),
     CONSTRAINT uq_list_items_snapshot_rank UNIQUE (snapshot_id, rank),
+    CONSTRAINT ck_list_items_rank CHECK (rank >= 1),
     CONSTRAINT ck_list_items_source_rating CHECK (
         source_rating IS NULL OR (source_rating >= 0 AND source_rating <= 10)
     ),

@@ -19,6 +19,7 @@ See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checkli
 - [Backend container deployment](docs/DEPLOYMENT.md)
 - [Database backup and restore](docs/BACKUP-RESTORE.md)
 - [Product scope and architecture](docs/PRODUCT-SCOPE.md)
+- [Chart snapshot import](docs/CHART-IMPORT.md)
 
 ## Safety model
 

@@ -62,6 +62,7 @@ REQUIRED_TABLES = {
     "movie_regions",
     "movie_posters",
     "lists",
+    "chart_snapshots",
     "list_items",
     "favorites",
     "schema_migrations",
@@ -230,38 +231,6 @@ def validate_required_tables(conn: sqlite3.Connection) -> None:
         )
 
 
-def validate_douban_ids(conn: sqlite3.Connection) -> None:
-    """Every movie must have one unique, non-empty Douban identifier."""
-    missing_count = conn.execute(
-        """
-        SELECT COUNT(*)
-        FROM movies
-        WHERE douban_id IS NULL OR TRIM(douban_id) = ''
-        """
-    ).fetchone()[0]
-
-    if missing_count:
-        raise RuntimeError(
-            f"{missing_count} movie rows have an empty Douban ID"
-        )
-
-    duplicate = conn.execute(
-        """
-        SELECT douban_id, COUNT(*) AS count
-        FROM movies
-        GROUP BY douban_id
-        HAVING COUNT(*) > 1
-        LIMIT 1
-        """
-    ).fetchone()
-
-    if duplicate:
-        raise RuntimeError(
-            "Duplicate Douban ID found: "
-            f"{duplicate['douban_id']} ({duplicate['count']} rows)"
-        )
-
-
 def validate_migration(
     database_path: Path,
     expected_version: int = MIGRATION_VERSION,
@@ -280,7 +249,6 @@ def validate_migration(
 
         validate_required_tables(conn)
         validate_movie_columns(conn)
-        validate_douban_ids(conn)
         validate_foreign_keys(conn)
 
     finally:

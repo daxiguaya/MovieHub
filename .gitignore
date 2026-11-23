@@ -41,3 +41,4 @@
 *.pre-migration-*
 *.restore.tmp
 *.initializing
+repair_phase*.py

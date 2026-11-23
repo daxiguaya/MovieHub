@@ -20,7 +20,7 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
     journal_path = Path(path)
     journal_path.parent.mkdir(parents=True, exist_ok=True)
     payload = (
-        json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+        json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\\n"
     ).encode("utf-8")
     descriptor = os.open(
         journal_path,
@@ -39,17 +39,38 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
 
 
 def read_import_events(path: str | Path) -> list[dict[str, Any]]:
-    """Read complete journal lines, ignoring a torn final line after a crash."""
+    """Read complete events; tolerate only an unterminated, torn final line."""
     journal_path = Path(path)
     if not journal_path.exists():
         return []
+
+    raw = journal_path.read_bytes()
+    if not raw:
+        return []
+
+    lines = raw.splitlines(keepends=True)
     events: list[dict[str, Any]] = []
-    with journal_path.open("r", encoding="utf-8") as source:
-        for line in source:
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                events.append(value)
+    for index, raw_line in enumerate(lines):
+        is_final = index == len(lines) - 1
+        is_terminated = raw_line.endswith((b"\\n", b"\\r"))
+        try:
+            line = raw_line.decode("utf-8")
+            value = json.loads(line)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if is_final and not is_terminated:
+                # os.write can be interrupted by process termination. Only an
+                # incomplete trailing record is recoverable; earlier damage
+                # must never be silently discarded because it may hide a
+                # committed-batch checkpoint and corrupt resume accounting.
+                break
+            raise ValueError(
+                f"Corrupt import journal at line {index + 1}"
+            ) from exc
+
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"Invalid import journal event at line {index + 1}: expected an object"
+            )
+        events.append(value)
+
     return events

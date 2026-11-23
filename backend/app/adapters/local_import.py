@@ -11,7 +11,7 @@ from app.schemas_chart_import import ChartSnapshotImport
 
 
 class LocalImportAdapter(ChartSourceAdapter):
-    source_name = "local"
+    source_name: str | None = None
     MAX_FILE_SIZE = 50 * 1024 * 1024
 
     def load_snapshot(
@@ -53,9 +53,9 @@ class LocalImportAdapter(ChartSourceAdapter):
                 "Snapshot data does not match the MovieHub import schema"
             ) from exc
 
-        return snapshot.model_copy(
-            update={"source": self.source_name}
-        )
+        if self.source_name is None:
+            return snapshot
+        return snapshot.model_copy(update={"source": self.source_name})
 
 
 class CinephileImportAdapter(LocalImportAdapter):

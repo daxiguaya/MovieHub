@@ -189,3 +189,81 @@ def test_explicit_initializer_creates_database_and_seeds_charts(tmp_path):
         assert mode.lower() == "wal"
     finally:
         conn.close()
+
+
+def test_migration_indexes_constraints_and_foreign_keys_match_orm(tmp_path):
+    db_path = tmp_path / "moviehub.db"
+    _migrated_database(db_path)
+
+    engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+    try:
+        inspector = inspect(engine)
+
+        for table_name, table in Base.metadata.tables.items():
+            expected_indexes = {
+                (
+                    index.name,
+                    tuple(column.name for column in index.columns),
+                    bool(index.unique),
+                )
+                for index in table.indexes
+            }
+            actual_indexes = {
+                (
+                    index["name"],
+                    tuple(index["column_names"]),
+                    bool(index["unique"]),
+                )
+                for index in inspector.get_indexes(table_name)
+            }
+            assert actual_indexes == expected_indexes, table_name
+
+            expected_unique_constraints = {
+                (
+                    constraint.name,
+                    tuple(column.name for column in constraint.columns),
+                )
+                for constraint in table.constraints
+                if constraint.__class__.__name__ == "UniqueConstraint"
+            }
+            actual_unique_constraints = {
+                (
+                    constraint["name"],
+                    tuple(constraint["column_names"]),
+                )
+                for constraint in inspector.get_unique_constraints(table_name)
+            }
+            assert actual_unique_constraints == expected_unique_constraints, table_name
+
+            expected_foreign_keys = {
+                (
+                    tuple(element.parent.name for element in constraint.elements),
+                    constraint.elements[0].column.table.name,
+                    tuple(element.column.name for element in constraint.elements),
+                    (constraint.elements[0].ondelete or "").upper(),
+                )
+                for constraint in table.foreign_key_constraints
+            }
+            actual_foreign_keys = {
+                (
+                    tuple(foreign_key["constrained_columns"]),
+                    foreign_key["referred_table"],
+                    tuple(foreign_key["referred_columns"]),
+                    (foreign_key.get("options", {}).get("ondelete") or "").upper(),
+                )
+                for foreign_key in inspector.get_foreign_keys(table_name)
+            }
+            assert actual_foreign_keys == expected_foreign_keys, table_name
+
+            expected_check_names = {
+                constraint.name
+                for constraint in table.constraints
+                if constraint.__class__.__name__ == "CheckConstraint"
+            }
+            actual_check_names = {
+                constraint["name"]
+                for constraint in inspector.get_check_constraints(table_name)
+            }
+            assert actual_check_names == expected_check_names, table_name
+    finally:
+        engine.dispose()

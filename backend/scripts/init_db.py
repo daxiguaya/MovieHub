@@ -7,7 +7,9 @@ Run from the backend directory:
 
 import argparse
 import logging
+import os
 import sqlite3
+import tempfile
 from pathlib import Path
 
 from sqlalchemy import create_engine, inspect
@@ -115,7 +117,22 @@ def validate_database(path: Path) -> None:
         engine.dispose()
 
 
+def _remove_sqlite_files(path: Path) -> None:
+    """Remove a temporary SQLite database and any WAL sidecars."""
+    for candidate in (
+        path,
+        Path(str(path) + "-wal"),
+        Path(str(path) + "-shm"),
+        Path(str(path) + "-journal"),
+    ):
+        try:
+            candidate.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not remove temporary database file: %s", candidate)
+
+
 def initialize(path: Path, migration_path: Path) -> None:
+    """Build and validate a temporary database, then atomically publish it."""
     path = path.expanduser().resolve()
     migration_path = migration_path.expanduser().resolve()
 
@@ -144,37 +161,55 @@ def initialize(path: Path, migration_path: Path) -> None:
     if not sql:
         raise RuntimeError("Initial schema SQL is empty")
 
-    conn = sqlite3.connect(str(path), timeout=30)
-    try:
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.executescript(sql)
-    finally:
-        conn.close()
-
-    validate_database(path)
-
-    # Enable WAL only after successful schema creation and validation.
-    conn = sqlite3.connect(str(path), timeout=30)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-    finally:
-        conn.close()
-
-    # Seed built-in chart definitions without overwriting existing settings.
-    engine = create_engine(
-        f"sqlite:///{path.as_posix()}",
-        connect_args={"check_same_thread": False, "timeout": 30},
+    fd, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".initializing",
+        dir=str(path.parent),
     )
-    try:
-        Session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-        with Session() as db:
-            result = initialize_chart_definitions(db)
-        logger.info("Built-in charts initialized: %s", result)
-    finally:
-        engine.dispose()
+    os.close(fd)
+    temporary_path = Path(temporary_name)
 
-    validate_database(path)
-    logger.info("MovieHub database initialized and validated: %s", path)
+    try:
+        conn = sqlite3.connect(str(temporary_path), timeout=30)
+        try:
+            conn.execute("PRAGMA foreign_keys=ON")
+            conn.executescript(sql)
+        finally:
+            conn.close()
+
+        validate_database(temporary_path)
+
+        # Enable WAL only after successful schema creation and validation.
+        conn = sqlite3.connect(str(temporary_path), timeout=30)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        finally:
+            conn.close()
+
+        # Seed built-in chart definitions without overwriting user settings.
+        engine = create_engine(
+            f"sqlite:///{temporary_path.as_posix()}",
+            connect_args={"check_same_thread": False, "timeout": 30},
+        )
+        try:
+            Session = sessionmaker(
+                bind=engine, autoflush=False, expire_on_commit=False
+            )
+            with Session() as db:
+                result = initialize_chart_definitions(db)
+            logger.info("Built-in charts initialized: %s", result)
+        finally:
+            engine.dispose()
+
+        validate_database(temporary_path)
+
+        # All SQLite/SQLAlchemy connections are closed before publication.
+        os.replace(temporary_path, path)
+        logger.info("MovieHub database initialized and validated: %s", path)
+
+    except Exception:
+        _remove_sqlite_files(temporary_path)
+        raise
 
 
 def main() -> int:

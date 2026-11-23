@@ -254,6 +254,24 @@ def test_incremental_import_skips_unchanged_rows_but_force_full_reprocesses(
         movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
         assert movie.overview == "Changed without a newer source timestamp"
 
+    # A strictly newer source timestamp must be picked up by an incremental run.
+    with sqlite3.connect(source_path) as conn:
+        row = conn.execute(
+            "SELECT raw_data FROM item WHERE douban_id = '1234567'"
+        ).fetchone()
+        payload = json.loads(row[0])
+        payload["detail"]["summary"] = "Changed with a newer source timestamp"
+        conn.execute(
+            "UPDATE item SET raw_data = ?, update_time = update_time + 1 "
+            "WHERE douban_id = '1234567'",
+            (json.dumps(payload, ensure_ascii=False),),
+        )
+
+    run(force_full=False)
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.overview == "Changed with a newer source timestamp"
+
     engine.dispose()
 
 

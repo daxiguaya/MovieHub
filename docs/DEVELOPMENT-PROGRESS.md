@@ -263,3 +263,11 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - No production database creation/migration, deployment, import, NPM proxy change, or service restart is part of this work.
 - Keep validation on temporary fixtures. Do not touch the user's live Scout database.
 - Do not commit credentials, tokens, private environment files, database files, or local repair backups.
+
+
+## Scout chart coverage audit hardening (2026-11-23)
+
+- The read-only Scout coverage audit now looks up all Scout media types for requested Douban IDs, so unexpected types are reported as mismatches rather than incorrectly classified as missing.
+- Duplicate Scout rows for one Douban ID are reported as ambiguous and excluded from metadata field-coverage calculations; the audit never chooses an arbitrary duplicate.
+- Added synthetic regression tests for unexpected Scout types and duplicate IDs. These tests are included in the normal backend pytest suite.
+- Validation status: these latest changes have been committed to the Phase 4 branch; a GitHub Actions run for the new head is still required before treating the changes as CI-verified.

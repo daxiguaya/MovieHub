@@ -159,4 +159,70 @@ describe("MovieHub frontend workflows", () => {
     expect(openedUrl.searchParams.get("box")).toBe("星际穿越");
     expect(openSpy.mock.calls[0][1]).toBe("_blank");
   });
+
+  it("compares historical chart snapshots and renders rank movement", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/charts/top250/snapshots") {
+        return [
+          { snapshot_date: "2026-11-23", item_count: 2 },
+          { snapshot_date: "2026-11-22", item_count: 2 }
+        ];
+      }
+      if (url === "/api/charts/top250") {
+        return { chart, items: [], next_cursor: null, total: 0 };
+      }
+      if (url.startsWith("/api/charts/top250/compare?")) {
+        return {
+          chart,
+          from_date: "2026-11-22",
+          to_date: "2026-11-23",
+          total_before: 2,
+          total_after: 2,
+          items: [
+            {
+              movie_id: 11,
+              douban_id: "1001",
+              title: "A Movie",
+              year: 2020,
+              type: "movie",
+              before_rank: 2,
+              after_rank: 1,
+              rank_change: 1,
+              status: "moved"
+            },
+            {
+              movie_id: 12,
+              douban_id: "1002",
+              title: "New Movie",
+              year: 2024,
+              type: "movie",
+              before_rank: null,
+              after_rank: 2,
+              rank_change: null,
+              status: "new"
+            }
+          ]
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/charts/top250"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { name: "豆瓣电影 Top 250" });
+    await userEvent.click(screen.getByRole("button", { name: "比较排名" }));
+
+    expect(await screen.findByText("A Movie")).toBeInTheDocument();
+    expect(screen.getByText("排名变动 · ↑1")).toBeInTheDocument();
+    expect(screen.getByText("新上榜")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("from_date=2026-11-22")
+    )).toBe(true);
+  });
+
 });

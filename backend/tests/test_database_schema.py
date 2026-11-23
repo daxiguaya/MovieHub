@@ -50,6 +50,22 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         engine.dispose()
 
 
+def test_movie_check_constraints_are_declared_once(tmp_path):
+    db_path = tmp_path / "moviehub.db"
+    _migrated_database(db_path)
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        movie_sql = conn.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='table' AND name='movies'"
+        ).fetchone()[0]
+        assert movie_sql.count("CHECK (rating_count >= 0)") == 1
+        assert movie_sql.count("CHECK (type IN ('movie', 'tv'))") == 1
+    finally:
+        conn.close()
+
+
 def test_snapshot_uses_internal_movie_id_and_restricts_movie_delete(tmp_path):
     db_path = tmp_path / "moviehub.db"
     _migrated_database(db_path)
@@ -155,7 +171,6 @@ def test_snapshot_date_and_rank_are_unique(tmp_path):
             raise AssertionError("Ranks must be unique within a snapshot")
     finally:
         conn.close()
-
 
 
 def test_explicit_initializer_creates_database_and_seeds_charts(tmp_path):

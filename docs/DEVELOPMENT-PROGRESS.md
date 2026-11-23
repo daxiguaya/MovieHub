@@ -73,11 +73,11 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
 | Scout import hardening | 100% of current implementation milestone; additional merge/performance validation pending |
-| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
+| Manual normalized chart snapshot import | Complete |\n| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 47%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 48%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -87,7 +87,7 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
 - [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
 
-**Import hardening milestone: implemented; 66-test CI passed including favorites API integration.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented and tested.** Remaining Phase B work is larger-fixture performance validation and an operator workflow. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
 ## Favorites API milestone
 
@@ -116,7 +116,7 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 - [x] Fix the latent adapter package import path discovered by exercising the CLI.
 - [x] Document snapshot format, date-scoped replacement, metadata precedence and explicit non-automation boundary.
 
-**Snapshot import workflow: implemented. This is a manual normalized-data import path, not an automated Douban collector.**
+**Snapshot import workflow: implemented and tested. This is a manual normalized-data import path, not an automated Douban collector.**
 
 ## Next work
 
@@ -133,9 +133,9 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#113](https://github.com/daxiguaya/MovieHub/actions/runs/45128900397)
-- Tested commit: `799a41796f7360ea557578bb9a619ad3dbf7b54d`
-- Result: **success** — backend compilation, **66 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#128](https://github.com/daxiguaya/MovieHub/actions/runs/45129554505)
+- Tested commit: `28d9a6379b448e9eb4916020b076ef7b201db42e`
+- Result: **success** — backend compilation, **70 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

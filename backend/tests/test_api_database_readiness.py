@@ -23,6 +23,7 @@ def test_data_api_returns_503_without_creating_database(
         response = client.get("/api/movies")
 
     assert response.status_code == 503
+    assert readiness.status_code == 503
     assert "python -m scripts.init_db" in response.json()["detail"]
     assert not missing_path.exists()
     assert not missing_path.parent.exists()

@@ -181,7 +181,7 @@ class ImportService:
                 timeout=30,
             )
             source_conn.row_factory = sqlite3.Row
-            self._validate_source(source_conn)
+            self._validate_source(source_conn, reject_duplicate_ids=True)
 
             total = source_conn.execute(
                 "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
@@ -294,7 +294,10 @@ class ImportService:
             self._run_lock.release()
 
     @staticmethod
-    def _validate_source(conn: sqlite3.Connection) -> None:
+    def _validate_source(
+        conn: sqlite3.Connection,
+        reject_duplicate_ids: bool = False,
+    ) -> None:
         """Check that the source database has the expected item table."""
         result = conn.execute(
             """
@@ -333,6 +336,9 @@ class ImportService:
         # A Scout export must identify each imported subject exactly once.
         # Duplicate IDs make the eventual upsert depend on SQLite row order
         # and can silently replace one record with another.
+        if not reject_duplicate_ids:
+            return
+
         duplicate = conn.execute(
             """
             SELECT douban_id, COUNT(*) AS row_count

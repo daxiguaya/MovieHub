@@ -4,9 +4,9 @@ Last reviewed: 2026-11-23
 
 ## Current state
 
-MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, a one-shot Top 250 HTML collector, and one-shot popular/high-rated collectors using Douban's undocumented web JSON endpoint.
+MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, one-shot Top 250 and popular/high-rated collectors, and a one-shot collector for the official 2025 annual roundup.
 
-**It does not run scheduled chart collection.** Top 250, popular and high-rated charts have opt-in, one-shot manual collectors that run only when robots.txt permits. The 2025 annual taxonomy is now represented as four separate built-in lists based on Douban's published categories, but annual collection is not implemented and no annual data is bundled. Built-in chart definitions are display metadata only; they are not evidence that chart data has been fetched.
+**It does not run scheduled chart collection.** Top 250, popular and high-rated charts have opt-in, one-shot manual collectors that run only when robots.txt permits. The 2025 annual taxonomy is represented as four separate built-in lists. A manual collector now parses the official roundup article into four normalized snapshots; no annual data is bundled. Built-in chart definitions are display metadata only; they are not evidence that chart data has been fetched.
 
 
 ## Annual chart taxonomy
@@ -22,7 +22,7 @@ Source: [Douban official 2025 annual roundup](https://blog.douban.com/douban/202
 
 MovieHub models these as four independent chart slugs under the `annual` category and period `2025`. They must not be merged into a single ranking: the source categories have different scopes, and the TV list is not a movie list. Their presence in the chart catalogue does not mean the ranking data has been collected or imported.
 
-As of the 2026-11-23 review, a 2026 annual movie/TV taxonomy and published ranking data had not been verified. MovieHub therefore does not expose a blank `annual-2026` placeholder. Add 2026 chart definitions only after the official categories are published and reviewed; import normalized data separately. No annual collector or scheduled refresh is enabled.
+As of the 2026-11-23 review, a 2026 annual movie/TV taxonomy and published ranking data had not been verified. MovieHub therefore does not expose a blank `annual-2026` placeholder. Add 2026 chart definitions only after the official categories are published and reviewed; import normalized data separately. The 2025 collector is manual and one-shot; no scheduled refresh is enabled.
 
 ## Reference projects
 

@@ -94,14 +94,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| 2025 annual chart taxonomy | Four official lists defined; ranking data import pending |
+| 2025 annual charts | Four official lists defined; official-source one-shot collector implemented and CI-tested; normalized data import pending |
 | Favorites API and frontend UI | Implemented; Chromium E2E passed |
 | Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 62%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; 2025 annual ranking-data import, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 64%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -171,11 +171,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add one-shot popular and high-rated collectors using the site's undocumented `/j/search_subjects` web endpoint, bounded to 100 items by default, with the same robots/rate-limit safeguards.
 - [x] Keep collection output as normalized JSON; validate with dry-run and import through the existing snapshot service.
 - [x] Verify Douban's official 2025 annual categories and model the four distinct chart definitions without combining movie and TV rankings.
-- [ ] Import the 2025 annual chart snapshots through the normalized JSON workflow after preparing and validating source data.
+- [x] Add a one-shot collector for the official 2025 Douban annual roundup; one article fetch produces four separate normalized snapshots, with robots.txt checks and fail-closed handling.
+- [x] Preserve the official rank numbers and empty positions; map the Chinese TV list to `tv` and the three film lists to `movie`.
+- [x] Add parser/collector regression tests for all four sections, ID/rank duplicates, untrusted subject hosts, robots denial and HTTP 429.
+- [ ] Run the collector where the official host permits it, dry-run all four JSON files, review the results and deliberately import them.
 - [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 
-**Top 250, popular and high-rated one-shot collection: implemented. 2025 annual chart categories are defined separately; annual data import, 2026 category verification and scheduling remain pending.**
+**Top 250, popular/high-rated and official 2025 annual one-shot collectors are implemented. Annual snapshots still require a successful robots-permitted collection, four dry-runs and explicit import; 2026 category verification and scheduling remain pending.**
 
 ## Phase E — React frontend baseline
 

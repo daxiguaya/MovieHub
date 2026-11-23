@@ -89,7 +89,26 @@ The official Douban 2025 annual roundup identifies four separate film/TV lists. 
 
 Source: [Douban official 2025 annual roundup](https://blog.douban.com/douban/2026/01/15/4382/).
 
-The collector writes four files named `<chart-slug>-<capture-date>.json`. Keep all four files together in one directory and use the same actual capture date for all four. The batch CLI validates the complete set before opening the database. It checks file presence, declared slug, source (`douban`), category (`annual`), period (`2025`), snapshot date, built-in movie/TV type, schema constraints, unique IDs/ranks and ascending rank order. It does not fetch the official page or invent missing movie metadata.\n\nRun from the backend directory. Validation-only is the default and does not inspect or open the database:\n\n```bash\npython -m scripts.import_annual_charts \\\n  --input-dir /imports/annual-2025 \\\n  --date 2026-11-23\n```\n\nAfter reviewing the preflight summary and confirming the four files are the intended normalized source data, explicitly apply all four in one all-or-nothing database transaction:\n\n```bash\npython -m scripts.import_annual_charts \\\n  --input-dir /imports/annual-2025 \\\n  --date 2026-11-23 \\\n  --apply\n```\n\nIf any chart fails validation or import, the batch is rejected; a database import failure rolls back all four charts together. This is a separate manual operation from collection and does not run automatically in CI or against the Scout database.
+The collector writes four files named `<chart-slug>-<capture-date>.json`. Keep all four files together in one directory and use the same actual capture date for all four. The batch CLI validates the complete set before opening the database. It checks file presence, declared slug, source (`douban`), category (`annual`), period (`2025`), snapshot date, built-in movie/TV type, schema constraints, unique IDs/ranks and ascending rank order. It does not fetch the official page or invent missing movie metadata.
+
+Run from the backend directory. Validation-only is the default and does not inspect or open the database:
+
+```bash
+python -m scripts.import_annual_charts \\
+  --input-dir /imports/annual-2025 \\
+  --date 2026-11-23
+```
+
+After reviewing the preflight summary and confirming the four files are the intended normalized source data, explicitly apply all four in one all-or-nothing database transaction:
+
+```bash
+python -m scripts.import_annual_charts \\
+  --input-dir /imports/annual-2025 \\
+  --date 2026-11-23 \\
+  --apply
+```
+
+If any chart fails validation or import, the batch is rejected; a database import failure rolls back all four charts together. This is a separate manual operation from collection and does not run automatically in CI or against the Scout database.
 
 The four categories must remain separate: Chinese films, international films, hidden gems and Chinese TV series are not one comparable ranking. The annual collector has been run successfully in CI: four normalized snapshots (8/10/10/10 entries) passed dry-run validation and were uploaded as a 14-day GitHub Actions artifact. The JSON is not committed to Git and has not been imported into any database. As of the 2026-11-23 review, the 2026 annual categories and ranking data had not been verified; no empty 2026 placeholder is seeded. Add 2026 definitions only after official publication.
 

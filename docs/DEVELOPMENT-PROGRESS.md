@@ -492,3 +492,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Keep the test fully isolated; no production Scout or NAS database is accessed.
 
 **The preview → import → reconciliation chain now has a single automated integration test; CI verification pending.**
+
+
+## Single-command Scout readiness package (2026-11-23)
+
+- [x] Add one command combining whole-catalogue audit, annual-chart coverage gate and target-aware preview.
+- [x] Run strict source/chart blockers before opening the target database for preview.
+- [x] Persist one versioned JSON report atomically with mode 0600.
+- [x] Distinguish ready-for-operator-review, no-changes and blocked outcomes with stable exit codes.
+- [x] Test successful readiness, early blocking without target access, read-only behavior and report permissions.
+
+**One-command readiness preparation implemented; CI verification pending.**

@@ -177,3 +177,19 @@ Add `--force-full` to the preview when the actual import uses forced-full mode. 
 ### Automated end-to-end acceptance coverage
 
 The backend integration suite now exercises the complete preview → real SQLite import → journal reconciliation path against an isolated target database. It verifies that preview and importer source fingerprints agree, both new records are imported, the completed journal is discoverable, and reconciliation reports zero counter drift. The fixture is temporary and does not touch a production database.
+
+
+## One-command readiness package
+
+For a single operator-facing report that combines the strict catalogue/chart gate and the target-aware preview, run:
+
+```sh
+cd backend
+python -m scripts.prepare_scout_import \
+  --scout-db /imports/staged-scout.sqlite \
+  --input /imports/annual-movies.json \
+  --input /imports/annual-tv.json \
+  --output /imports/scout-readiness.json
+```
+
+Repeat `--input` for every normalized annual chart snapshot. Add `--force-full` only when the intended import will also use forced-full mode. The command audits Scout identity and chart coverage first; if a strict blocker exists, it writes a blocked report and does not query the target database. Only a passing gate proceeds to the read-only target-aware preview. The JSON report is written atomically with mode 0600. Exit codes: 0 ready/no changes, 2 strict gate blocked, 1 execution failure. This command does not import or mutate either database.

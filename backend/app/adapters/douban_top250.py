@@ -280,7 +280,7 @@ class DoubanTop250Collector:
             raise DoubanCollectionError(f"Response exceeded {PAGE_MAX_BYTES} bytes")
         return response.text
 
-    def _check_robots(self, client) -> None:
+    def _check_robots(self, client) -> float:
         response = client.get(ROBOTS_URL)
         if response.status_code == 404:
             parser = RobotFileParser()
@@ -300,6 +300,8 @@ class DoubanTop250Collector:
             raise DoubanCollectionError(
                 "Douban robots.txt disallows Top 250 collection for MovieHub"
             )
+        crawl_delay = parser.crawl_delay(USER_AGENT) or 0.0
+        return max(REQUEST_DELAY_SECONDS, float(crawl_delay))
 
     def collect(self, snapshot_date: date) -> ChartSnapshotImport:
         owns_client = self.client is None
@@ -315,7 +317,8 @@ class DoubanTop250Collector:
         )
 
         try:
-            self._check_robots(client)
+            robots_delay = self._check_robots(client)
+            delay_seconds = max(self.request_delay, robots_delay)
             movies: list[ChartMovieImport] = []
 
             for page_index in range(PAGE_COUNT):
@@ -337,7 +340,7 @@ class DoubanTop250Collector:
 
                 movies.extend(page_movies)
                 if page_index < PAGE_COUNT - 1:
-                    self.sleeper(self.request_delay)
+                    self.sleeper(delay_seconds)
 
             if len({movie.douban_id for movie in movies}) != 250:
                 raise DoubanCollectionError(

@@ -439,6 +439,57 @@ def test_batched_import_keeps_committed_batches_and_retry_completes(
     engine.dispose()
 
 
+def test_scout_import_reports_record_errors_in_completed_status(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-record-error.sqlite"
+    target_path = tmp_path / "moviehub-record-error.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    original_upsert = service._upsert_source_row
+
+    def fail_one_record(db, row, genre_map, region_map, force_full=False):
+        if row["douban_id"] == "1234567":
+            raise RuntimeError("simulated malformed source record")
+        return original_upsert(db, row, genre_map, region_map, force_full)
+
+    monkeypatch.setattr(service, "_upsert_source_row", fail_one_record)
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        status = service.status
+        assert status.status == "completed"
+        assert status.errors == 1
+        assert "record errors 1" in status.message
+
+        with TargetSession() as db:
+            assert db.scalar(
+                select(Movie).where(Movie.douban_id == "1234567")
+            ) is None
+            assert db.scalar(
+                select(Movie).where(Movie.douban_id == "7654321")
+            ) is not None
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+        engine.dispose()
+
+
 def test_scout_import_processes_synthetic_catalogue_across_multiple_batches(
     tmp_path,
     monkeypatch,

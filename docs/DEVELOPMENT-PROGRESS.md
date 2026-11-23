@@ -19,8 +19,8 @@ Current phase: Application integration audit (after Phase 4)
 ## Application integration audit
 
 - [x] Prevent API database dependency from silently creating a missing SQLite file; missing DB now returns HTTP 503 with explicit initialization guidance.
-- [x] Verify an uninitialized database request returns HTTP 503 and leaves the database path and parent directory untouched.
-- [ ] Verify normal API requests against a temporary, explicitly initialized MovieHub database.
+- [x] Verify uninitialized database requests return HTTP 503 without creating the database path or parent directory.
+- [x] Verify chart and movie read APIs return successfully against a temporary database created by the explicit initializer.
 - [ ] Audit protected import endpoints, source-path confinement and error/status behavior.
 - [ ] Audit chart import/query/history API behavior and transaction ownership.
 - [ ] Review production-readiness concerns (configuration, CORS, health checks, logging and shutdown).
@@ -28,9 +28,9 @@ Current phase: Application integration audit (after Phase 4)
 ## Latest code validation
 
 - Workflow: Backend tests
-- Run: [#33](https://github.com/daxiguaya/MovieHub/actions/runs/45123931572)
-- Tested commit: `d51df1605891811da194f3eac7cd1d5ec6b8ade6`
-- Result: **success** — backend compilation passed; **27 tests passed**. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#35](https://github.com/daxiguaya/MovieHub/actions/runs/45124109443)
+- Tested commit: `42cf58730add1fb8f4cc05d2ad56f516bdc4abc6`
+- Result: **success** — backend compilation passed; **28 tests passed**. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

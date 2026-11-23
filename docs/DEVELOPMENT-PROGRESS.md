@@ -56,6 +56,17 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Backup/restore baseline: complete. Poster cache is intentionally excluded because it is rebuildable.**
 
+## Poster fetch security hardening
+
+- [x] Restrict poster source URLs to HTTPS Douban image CDN hosts and reject credentials, non-standard ports and arbitrary hosts.
+- [x] Resolve every initial/redirect host and reject private, loopback, link-local, reserved or mixed DNS answers.
+- [x] Validate every redirect hop independently; cap redirects at three and disable automatic redirect following.
+- [x] Enforce 8 MiB response limits, image content-type allowlist and JPEG/PNG/GIF/WebP/AVIF file-signature matching.
+- [x] Add `X-Content-Type-Options: nosniff` to poster responses.
+- [x] Add regression tests for allowed/blocked URLs, DNS answers, image signatures and MIME mismatch.
+
+**Poster fetch security baseline: complete.**
+
 ## Product scope and architecture
 
 - [x] Record the agreed first-release user journey: chart discovery → movie details → Xiaoya search.
@@ -197,9 +208,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#251](https://github.com/daxiguaya/MovieHub/actions/runs/45133687636)
-- Tested commit: `1d0b995f5767b1d440b82dca8fedbe0a39da1d65`
-- Result: **success** — **85 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#261](https://github.com/daxiguaya/MovieHub/actions/runs/45136554707)
+- Tested commit: `34744e0783772ce4dfe01aa99cb63f9f41b4ef06`
+- Result: **success** — **98 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

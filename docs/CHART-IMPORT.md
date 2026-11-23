@@ -25,6 +25,30 @@ python -m scripts.import_chart --input /imports/charts/cinephile-top250.json --a
 
 The Cinephile adapter accepts an already normalized MovieHub snapshot. It does not scrape, clone, or execute Cinephile code.
 
+## Collect a fresh Douban Top 250 snapshot
+
+The repository includes a one-shot public-page collector. It checks `robots.txt`, requests the ten Top 250 pages sequentially with at least a two-second delay, disables redirects, uses no cookies or proxy rotation, and stops on access denial or HTTP 429. It does not bypass login, challenges or rate limits.
+
+Run inside the backend container (write to `/tmp`, because the Scout import mount is read-only):
+
+```sh
+docker compose exec moviehub python -m scripts.collect_douban_top250 \
+  --date 2026-11-23 \
+  --output /tmp/moviehub-top250-2026-11-23.json
+```
+
+Validate and then import into the independent MovieHub database:
+
+```sh
+docker compose exec moviehub python -m scripts.import_chart \
+  --input /tmp/moviehub-top250-2026-11-23.json --dry-run
+
+docker compose exec moviehub python -m scripts.import_chart \
+  --input /tmp/moviehub-top250-2026-11-23.json
+```
+
+If robots.txt disallows the path, Douban returns 403/429, a redirect occurs, or page markup/ranks are incomplete, collection stops without producing a partial snapshot. Do not work around those restrictions. The collector has no scheduler and is not run automatically.
+
 ## Snapshot format
 
 The file must be UTF-8 JSON and conform to `ChartSnapshotImport`. Minimal example:

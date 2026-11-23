@@ -67,3 +67,19 @@ The import validates unique Douban IDs and ranks. It uses Douban IDs only as ext
 ## Acquisition status
 
 This is a safe, repeatable persistence/import workflow, not an automated chart collector. Douban Top 250, real-time popular, high-rated and annual chart acquisition/update scheduling remain separate work. Do not treat seeded chart definitions as proof that chart data has been collected.
+
+## Historical rank comparison
+
+When at least two snapshots exist for a chart, the API can compare them:
+
+```http
+GET /api/charts/{slug}/compare?from_date=2026-11-22&to_date=2026-11-23
+```
+
+The result matches entries by MovieHub's internal `movie_id` and reports:
+
+- `before_rank` and `after_rank`
+- `rank_change`: positive means the movie moved up; negative means it moved down
+- `new`, `removed`, `moved` and `unchanged` status
+
+The chart detail page exposes the same comparison with date selectors. A missing snapshot returns 404; comparing a date with itself returns 400.

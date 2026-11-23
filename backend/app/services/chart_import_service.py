@@ -86,7 +86,9 @@ class ChartImportService:
 
     @staticmethod
     def _safe_int(value: Any) -> int | None:
-        if value is None or value == "":
+        # bool is an int subclass in Python, but it is never a valid
+        # year/rating count/rank in an imported catalogue.
+        if value is None or value == "" or isinstance(value, bool):
             return None
 
         try:
@@ -337,6 +339,26 @@ class ChartImportService:
                 raise ChartImportError(
                     "snapshot_date must use YYYY-MM-DD format"
                 ) from exc
+
+            # Validate rank shape and uniqueness before opening the write
+            # transaction. The Pydantic schema normally guarantees this, but
+            # the service also accepts mapping-like inputs from internal tools.
+            ranks: list[int] = []
+            for item in items:
+                douban_id = self._clean_string(
+                    self._value(item, "douban_id")
+                )
+                rank = self._safe_int(self._value(item, "rank"))
+                if rank is None or rank < 1:
+                    raise ChartImportError(
+                        f"Movie {douban_id} has an invalid rank"
+                    )
+                ranks.append(rank)
+
+            if len(ranks) != len(set(ranks)):
+                raise ChartImportError(
+                    "The snapshot contains duplicate ranks"
+                )
 
             if db.in_transaction():
                 raise ChartImportError(

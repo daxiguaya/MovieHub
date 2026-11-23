@@ -472,6 +472,8 @@ class ImportService:
             if total <= 0:
                 raise ValueError("Source database contains no movie or TV records")
 
+            source_fingerprint = self._fingerprint_source(source_conn)
+
             with SessionLocal() as db:
                 # This path deliberately performs SELECTs only. It never calls
                 # the upsert routine or flushes/commits target changes.
@@ -517,8 +519,11 @@ class ImportService:
                     invalid_ratings += 1
 
             return {
+                "report_version": 1,
+                "generated_at": datetime.now().isoformat(),
                 "read_only": True,
                 "source_database": str(path),
+                "source_fingerprint": source_fingerprint,
                 "force_full": force_full,
                 "source_snapshot_consistent": True,
                 "summary": {

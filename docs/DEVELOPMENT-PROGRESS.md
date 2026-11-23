@@ -470,3 +470,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Extend the real importer integration test to verify exact record failure details survive in the manifest.
 
 **Record-level failure reporting implemented.** This makes import errors actionable across restarts; it does not claim that real Scout data has been validated.
+
+
+## Scout preview-to-import reconciliation (2026-11-23)
+
+- [x] Include a SHA-256 fingerprint of the exact ordered Scout row projection in every preview report.
+- [x] Allow preview JSON to be saved atomically with owner-only permissions for later audit.
+- [x] Add a read-only reconciliation command linking the saved preview to a specific completed import run.
+- [x] Block reconciliation when run status, source path, import mode or source fingerprint differs.
+- [x] Reconcile source totals, processed rows, imported rows plus per-record failures, unchanged skips and the durable error manifest.
+- [x] Add regression tests for matching imports with record errors, changed sources, incomplete runs, counter drift and malformed preview reports.
+
+**Preview → import accounting reconciliation: implemented; CI verification pending.**

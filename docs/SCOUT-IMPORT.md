@@ -159,3 +159,16 @@ python -m scripts.import_errors --run-id <run-id>
 ```
 
 The report is read-only. A completed import can still contain record-level failures; use this manifest to identify exact rows and causes before considering the run clean.
+
+
+## Persisted preview and post-import reconciliation
+
+Save the read-only preview before importing so its source fingerprint and expected counters can be compared later:
+
+```sh
+cd backend
+python -m scripts.preview_scout_import --scout-db /imports/staged-scout.sqlite --output /imports/scout-preview.json
+python -m scripts.reconcile_scout_import --preview /imports/scout-preview.json --run-id <completed-run-id>
+```
+
+Add `--force-full` to the preview when the actual import uses forced-full mode. Preview JSON is versioned and written atomically with owner-only permissions (0600). Preview and importer fingerprint the same ordered Scout row projection inside a read-only SQLite snapshot. Reconciliation refuses a missing/incomplete run, different source path, different mode or different fingerprint. It checks source totals, processed rows, imported rows plus record failures, unchanged skips after excluding failures, and the durable per-record error manifest. Exit code 0 means counters reconcile; exit code 2 means blocked or mismatched. The command is read-only and opens neither SQLite database. A match validates accounting and source identity, not metadata correctness or target stability between preview and import.

@@ -75,6 +75,24 @@ The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or
 
 Then use the same `import_chart --dry-run` and import commands above. Annual charts are not covered by this collector yet.
 
+
+## Import 2025 annual charts
+
+The official Douban 2025 annual roundup identifies four separate film/TV lists. MovieHub has matching built-in chart slugs; keep each category in its own normalized snapshot:
+
+| Chart slug | Official list |
+| --- | --- |
+| `annual-2025-chinese-movies` | 2025 评分最高华语电影 |
+| `annual-2025-international-movies` | 2025 评分最高外语电影 |
+| `annual-2025-hidden-gems` | 2025 年度冷门佳片 |
+| `annual-2025-chinese-tv` | 2025 评分最高华语剧集 |
+
+Source: [Douban official 2025 annual roundup](https://blog.douban.com/douban/2026/01/15/4382/).
+
+Prepare one JSON file per list using the same [snapshot format](#snapshot-format), with `source: "douban"`, `category: "annual"`, and the matching slug/name above. Use the actual date on which the source list was captured as `snapshot_date`; the `period` is already part of each built-in chart definition. Validate each file with `--dry-run` before importing. The normalized import path does not fetch the official page or invent missing movie metadata.
+
+The four categories must remain separate: Chinese films, international films, hidden gems and Chinese TV series are not one comparable ranking. MovieHub does not bundle the annual list dataset in Git. As of the 2026-11-23 review, the 2026 annual categories and ranking data had not been verified; no empty 2026 placeholder is seeded. Add 2026 definitions only after official publication.
+
 ## Snapshot format
 
 The file must be UTF-8 JSON and conform to `ChartSnapshotImport`. Minimal example:
@@ -116,7 +134,7 @@ The import validates unique Douban IDs and ranks. It uses Douban IDs only as ext
 
 ## Acquisition status
 
-This is a safe, repeatable persistence/import workflow, not an automated chart collector. Douban Top 250, real-time popular, high-rated and annual chart acquisition/update scheduling remain separate work. Do not treat seeded chart definitions as proof that chart data has been collected.
+This is a safe, repeatable persistence/import workflow, not an automated chart collector. Douban Top 250, real-time popular and high-rated have opt-in one-shot collectors. The 2025 annual categories have built-in definitions but require separate validated normalized data imports; annual collection and update scheduling remain unimplemented. Do not treat seeded chart definitions as proof that chart data has been collected.
 
 ## Historical rank comparison
 

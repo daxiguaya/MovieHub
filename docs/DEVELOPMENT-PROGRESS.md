@@ -56,10 +56,22 @@ Current phase: First-release product architecture agreed; feature implementation
 
 **Backup/restore baseline: complete. Poster cache is intentionally excluded because it is rebuildable.**
 
+## Product scope and architecture
+
+- [x] Record the agreed first-release user journey: chart discovery → movie details → Xiaoya search.
+- [x] Record first-release charts, search/filter, detail, poster, favorites and Xiaoya handoff requirements.
+- [x] Explicitly exclude downloading, playback and media-library management; preserve Xiaoya/Jellyfin/SmartStrm responsibilities.
+- [x] Confirm React + TypeScript + Vite frontend in a separate container, FastAPI backend, SQLite/FTS5, local poster cache, and no Redis/MySQL/Elasticsearch.
+- [x] Map current backend coverage and identify FTS5, favorites API, frontend and frontend container as remaining work.
+
+**Product scope and architecture baseline: complete.**
+
 ## Next work
 
-- [ ] Finalize frontend architecture and decide whether frontend is served by the API image or a separate service.
-- [ ] Review product/API requirements against the existing MovieHub and Scout workflows before adding new feature endpoints.
+- [ ] Implement FTS5 as a versioned MovieHub migration, with a tested LIKE fallback where FTS5 is unavailable.
+- [ ] Add favorites list/add/remove API endpoints and integration tests.
+- [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
+- [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.

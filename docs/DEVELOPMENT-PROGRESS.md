@@ -229,14 +229,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Latest code validation
 
-- Latest full validation: [#305](https://github.com/daxiguaya/MovieHub/actions/runs/45144886551) — **success**.
-- Backend: **110 passed, 2 skipped** (the opt-in 10k/100k performance cases); frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
+- Latest full validation: [#311](https://github.com/daxiguaya/MovieHub/actions/runs/45150639886) — **success**, on commit `bda64179`.
+- Backend: **110 passed, 4 skipped**; the four skips are the opt-in 10k/100k search and Scout-import benchmark cases. Frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
 - Compose validation, backend/frontend production builds and both container image builds passed.
 - The browser job starts a real FastAPI process against a fresh temporary SQLite database, seeds a test chart/movie and runs one unmocked chart → detail → search workflow. Three additional browser tests use isolated API fixtures for favorite and Xiaoya handoff interactions.
-- CI #291 validates the four separate 2025 annual chart definitions; CI #305 additionally validates category/period/media-type preflight, including rejecting TV/movie mismatches before database access, and confirms the popular collector supplies its required realtime period. No unverified 2026 placeholder is exposed.
+- The built-in chart preflight rejects category/period/media-type mismatches before database access; the popular collector supplies its required realtime period. The four 2025 annual categories remain separate, and no unverified 2026 placeholder is exposed.
 - All browser tests run on Ubuntu 24.04; no NAS services, live Scout database or production data are used.
-- CI #305 backend validation includes the new built-in chart preflight tests; all three CI jobs (backend, frontend and frontend-e2e) completed successfully.
-- Scout import benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. Added the complementary SQLite LIKE-search benchmark and a manual `workflow_dispatch` job to execute both suites together. Ordinary push CI intentionally skips the hardware-sensitive benchmarks; actual 10k/100k measurements are still pending.
+- The performance job was **skipped** in CI #311 because this run was triggered by a push. It is guarded for manual `workflow_dispatch`; therefore no 10k/100k timing or query-plan measurements have yet been produced.
+- Scout import benchmark harness commit: [`ecd9f9f`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. The complementary SQLite LIKE-search benchmark and manual workflow are in place. Ordinary push CI intentionally skips hardware-sensitive benchmarks; actual 10k/100k measurements remain pending.
 
 ## Scope and safety boundaries
 

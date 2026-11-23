@@ -20,10 +20,11 @@ The source mount is read-only at the container boundary. Keep the MovieHub datab
 2. Set `MOVIEHUB_IMPORT_PATH` to the host directory containing the Scout SQLite source. Do not point it at the MovieHub data directory.
 3. Generate a unique long `MOVIEHUB_API_KEY`.
 4. Confirm the external Docker network `chatgpt-browser_default` exists. It is the shared network currently used by NPM in this NAS setup.
-5. Create the data directory and grant the configured container UID/GID write access. Defaults are UID/GID 10001:
+5. Create the data and backup directories and grant the configured container UID/GID write access. Defaults are UID/GID 10001:
    ```sh
    mkdir -p /volume1/docker/moviehub/data
-   chown -R 10001:10001 /volume1/docker/moviehub/data
+   mkdir -p /volume1/backup/moviehub
+   chown -R 10001:10001 /volume1/docker/moviehub/data /volume1/backup/moviehub
    ```
 6. Ensure the import directory and Scout database are readable by UID/GID 10001. Do not change Scout ownership or permissions broadly just for MovieHub; use a dedicated read-only export/copy directory if required.
 
@@ -58,6 +59,7 @@ Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Com
 
 - `GET /api/health`: process liveness.
 - `GET /api/ready`: database readiness. The container health check uses this endpoint, so the container remains unhealthy until the explicit database initialization has succeeded.
+- Database backup and restore commands are documented in [BACKUP-RESTORE.md](BACKUP-RESTORE.md); backups are stored on the dedicated `/backups` mount.
 - Logs are written to stdout/stderr for Docker log collection.
 
 The container runs as a non-root UID, drops Linux capabilities, uses a read-only root filesystem, and has CPU, memory and PID limits. The database and poster cache are writable only through the dedicated `/data` mount.

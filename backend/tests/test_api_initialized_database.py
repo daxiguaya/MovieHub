@@ -72,6 +72,6 @@ def test_data_apis_work_with_explicitly_initialized_database(
         assert health_response.status_code == 200
         assert health_response.json() == {"status": "healthy"}
         assert readiness_response.status_code == 200
-        assert readiness_response.json() == {"status": "ready", "schema_version": 1}
+        assert readiness_response.json() == {"status": "ready", "schema_version": 2}
     finally:
         engine.dispose()

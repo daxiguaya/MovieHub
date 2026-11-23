@@ -4,6 +4,8 @@ import hashlib
 import json
 import sqlite3
 
+import pytest
+
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -576,3 +578,31 @@ def test_scout_integer_normalization_rejects_booleans_and_fractional_values():
     assert service._safe_int(2020.5, default=7) == 7
     assert service._safe_int("2020", default=7) == 2020
 
+
+
+def test_scout_import_rejects_duplicate_douban_ids_before_writing(tmp_path):
+    source_path = tmp_path / "scout-duplicate-ids.sqlite"
+    _create_scout_fixture(source_path)
+
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "1234567",
+                None,
+                "Conflicting duplicate record",
+                2021,
+                7.0,
+                "{}",
+                "movie",
+                1790000200,
+            ),
+        )
+
+    source = sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True)
+    source.row_factory = sqlite3.Row
+    try:
+        with pytest.raises(ValueError, match="duplicate Douban IDs: 1234567"):
+            import_service_module.ImportService._validate_source(source)
+    finally:
+        source.close()

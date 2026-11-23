@@ -90,7 +90,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
-| Scout import hardening | Implementation and merge/partial-retry tests complete; 1,000-row fixture passed; 10k/100k and NAS benchmark pending |
+| Scout import hardening | Implementation and merge/partial-retry tests complete; 1k/10k/100k synthetic fixtures passed; NAS-hardware benchmark pending |
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
@@ -217,26 +217,35 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [x] Add opt-in 10k/100k SQLite LIKE-search benchmarks covering sparse Chinese-title matches, original-title matches, no-match scans and multi-term searches; report count/page latency and SQLite query plans without hardware-specific pass thresholds.
 - [x] Add a manually triggered GitHub Actions performance job that runs both the existing 10k/100k Scout import benchmarks and the new search benchmarks on isolated temporary SQLite databases.
-- [ ] Execute the manual performance workflow and record 10k/100k search/import timings; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
+- [x] Execute the isolated 10k/100k search and Scout import benchmarks in GitHub Actions; record timings and query plans. Keep FTS5 optional rather than a hard runtime dependency.
 - [x] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff using Playwright Chromium and isolated API fixtures.
 - [x] Add a live browser integration test against a running FastAPI backend and a temporary initialized/seeded SQLite database.
 - [ ] Verify the complete deployment path through the user's NPM reverse proxy after deployment is separately authorized.
 - [x] Add reproducible opt-in 10k/100k synthetic import throughput benchmarks against temporary SQLite databases.
-- [ ] Execute the manual 10k/100k search and Scout import benchmark workflow and record timings/query plans; repeat on the target NAS only during an authorized pre-deployment test.
+- [x] Execute the isolated 10k/100k search and Scout import benchmark workflow and record timings/query plans; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
 
+## SQLite search and Scout import performance results
+
+- Benchmark run: [#314](https://github.com/daxiguaya/MovieHub/actions/runs/45152308824) — **success**; all four parameterized benchmark cases passed on GitHub Actions Ubuntu 24.04 using isolated temporary SQLite databases.
+- LIKE search, 10k rows (COUNT / page): Chinese title 5.3 / 2.2 ms; original title 1.1 / 1.0 ms; no match 0.9 / 0.9 ms; multi-term 3.1 / 2.4 ms.
+- LIKE search, 100k rows (COUNT / page): Chinese title 14.2 / 3.8 ms; original title 9.5 / 2.4 ms; no match 9.3 / 10.2 ms; multi-term 19.1 / 5.0 ms.
+- SQLite reported `SCAN movies` for every tested LIKE scenario. This confirms leading-wildcard LIKE is not using a conventional index. Observed latency at 100k rows remains in the 2.4–19.1 ms range on the CI runner; do not add FTS5 solely on the basis of the query plan. Revisit if real catalogue size, concurrent use or measured user-facing latency warrants it.
+- Scout synthetic import: 10k rows in 20.85 s (479.7 rows/s); 100k rows in 178.92 s (558.9 rows/s); configured batch size 500. These timings cover the import service run, not source fixture generation.
+- Resource caveat: current benchmark harness does not record process RSS/peak memory or database file size, so no memory-footprint conclusion can be drawn. CI runner results are comparative baseline only; a NAS-hardware benchmark remains a separate, explicitly authorized pre-deployment task.
+
 ## Latest code validation
 
-- Latest full validation: [#311](https://github.com/daxiguaya/MovieHub/actions/runs/45150639886) — **success**, on commit `bda64179`.
+- Latest full validation: [#314](https://github.com/daxiguaya/MovieHub/actions/runs/45152308824) — **success**, on commit `535900b5`.
 - Backend: **110 passed, 4 skipped**; the four skips are the opt-in 10k/100k search and Scout-import benchmark cases. Frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
 - Compose validation, backend/frontend production builds and both container image builds passed.
 - The browser job starts a real FastAPI process against a fresh temporary SQLite database, seeds a test chart/movie and runs one unmocked chart → detail → search workflow. Three additional browser tests use isolated API fixtures for favorite and Xiaoya handoff interactions.
 - The built-in chart preflight rejects category/period/media-type mismatches before database access; the popular collector supplies its required realtime period. The four 2025 annual categories remain separate, and no unverified 2026 placeholder is exposed.
 - All browser tests run on Ubuntu 24.04; no NAS services, live Scout database or production data are used.
-- The performance job was **skipped** in CI #311 because this run was triggered by a push. It is guarded for manual `workflow_dispatch`; therefore no 10k/100k timing or query-plan measurements have yet been produced.
-- Scout import benchmark harness commit: [`ecd9f9f`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. The complementary SQLite LIKE-search benchmark and manual workflow are in place. Ordinary push CI intentionally skips hardware-sensitive benchmarks; actual 10k/100k measurements remain pending.
+- CI #314 explicitly ran the opt-in performance job on a marked push; the measured 10k/100k search and import results are recorded above.
+- Scout import benchmark harness commit: [`ecd9f9f`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI #314 now supplies the first combined 10k/100k import and LIKE-search measurements. Ordinary unmarked push CI continues to skip these hardware-sensitive benchmarks.
 
 ## Scope and safety boundaries
 

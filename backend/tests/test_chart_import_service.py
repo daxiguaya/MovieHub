@@ -94,6 +94,10 @@ def test_chart_import_replaces_only_the_requested_date_and_preserves_scout_data(
         assert original_snapshot.item_count == 2
         original_snapshot_id = original_snapshot.id
 
+        # End the read transaction before invoking the importer again;
+        # the importer intentionally owns a fresh transaction per call.
+        db.commit()
+
         # Re-importing the same date replaces its complete contents.
         replacement = _snapshot(
             date(2026, 11, 23),
@@ -117,6 +121,7 @@ def test_chart_import_replaces_only_the_requested_date_and_preserves_scout_data(
         ) == 1
 
         # A different date creates a second history record.
+        db.commit()
         next_day = _snapshot(
             date(2026, 11, 24),
             [

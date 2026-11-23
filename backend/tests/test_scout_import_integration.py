@@ -1118,3 +1118,66 @@ def test_preview_import_and_reconciliation_form_one_end_to_end_flow(
     # The preview, import and reconciliation must never modify the source DB.
     assert _sha256(source_path) == source_hash_before
     engine.dispose()
+
+
+
+def test_resume_rejects_a_forged_checkpoint_before_target_writes(tmp_path, monkeypatch):
+    from app.services.import_journal import append_import_event, get_import_journal_path
+
+    source_path = tmp_path / "scout-forged-checkpoint.sqlite"
+    target_path = tmp_path / "moviehub-forged-checkpoint.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    preview = service.preview_import(source_path)
+    run_id = "forged-checkpoint-run"
+    journal_path = get_import_journal_path(TargetSession)
+    append_import_event(journal_path, {
+        "event": "run_started",
+        "run_id": run_id,
+        "source_path": str(source_path.resolve()),
+        "force_full": False,
+        "source_fingerprint": preview["source_fingerprint"],
+        "total": 2,
+        "started_at": "2026-11-23T00:00:00",
+    })
+    # Counters are arithmetically valid, but this ID is not the first
+    # source row at the claimed processed offset.
+    append_import_event(journal_path, {
+        "event": "batch_committed",
+        "run_id": run_id,
+        "batch": 1,
+        "processed": 1,
+        "total": 2,
+        "last_douban_id": "9999999",
+        "imported": 1,
+        "skipped": 0,
+        "errors": 0,
+        "committed_at": "2026-11-23T00:00:01",
+    })
+
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(
+            source_path,
+            force_full=False,
+            run_id=run_id,
+            resume_run_id=run_id,
+        )
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "failed"
+    with TargetSession() as db:
+        assert db.query(Movie).count() == 0
+    engine.dispose()

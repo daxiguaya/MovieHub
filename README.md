@@ -16,6 +16,7 @@ See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checkli
 - [Database design](docs/phase4-database-design.md)
 - [Configuration and database lifecycle](docs/CONFIGURATION.md)
 - [Backend container deployment](docs/DEPLOYMENT.md)
+- [Database backup and restore](docs/BACKUP-RESTORE.md)
 
 ## Safety model
 

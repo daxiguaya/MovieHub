@@ -309,8 +309,22 @@ def execute_migration(
 
     with open_database(database_path) as conn:
         current_version = get_schema_version(conn)
+        existing_tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+        }
 
     logger.info("Current schema version: %s", current_version)
+
+    if current_version == 0 and existing_tables:
+        raise RuntimeError(
+            "Refusing to run the initial MovieHub schema on a non-empty "
+            "database. This schema is for a new, empty MovieHub database "
+            "only; it does not migrate or alter Douban Scout."
+        )
     logger.info("Target schema version: %s", MIGRATION_VERSION)
 
     if current_version > MIGRATION_VERSION:

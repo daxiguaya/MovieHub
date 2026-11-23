@@ -468,13 +468,6 @@ def _execute_migration_locked(
 
     with open_database(database_path) as conn:
         current_version = get_schema_version(conn)
-        existing_tables = {
-            row["name"]
-            for row in conn.execute(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            )
-        }
 
     logger.info("Current schema version: %s", current_version)
 

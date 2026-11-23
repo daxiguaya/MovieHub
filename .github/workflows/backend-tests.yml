@@ -36,5 +36,22 @@ jobs:
         env:
           MOVIEHUB_IMPORT_PATH: /tmp/scout-import
           MOVIEHUB_API_KEY: ci-placeholder-only
+          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
       - name: Build backend container image
         run: docker build --tag moviehub-backend:ci ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Type-check and build frontend
+        run: npm run build
+        working-directory: frontend
+      - name: Build frontend container image
+        run: docker build --tag moviehub-frontend:ci ./frontend

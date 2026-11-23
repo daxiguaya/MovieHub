@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base, ChartSnapshot, ChartItem, Movie
+from app.database import Base, Chart, ChartSnapshot, ChartItem, Movie
 from app.schemas_chart_import import ChartMovieImport, ChartSnapshotImport
 from app.services.chart_import_service import ChartImportError, ChartImportService
 

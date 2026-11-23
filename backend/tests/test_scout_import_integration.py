@@ -1072,6 +1072,7 @@ def test_preview_import_and_reconciliation_form_one_end_to_end_flow(
     source_path = tmp_path / "scout-preview-e2e.sqlite"
     target_path = tmp_path / "moviehub-preview-e2e.sqlite"
     _create_scout_fixture(source_path)
+    source_hash_before = _sha256(source_path)
 
     engine = create_engine(
         f"sqlite:///{target_path.as_posix()}",

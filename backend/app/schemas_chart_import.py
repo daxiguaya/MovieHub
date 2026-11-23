@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.chart_definitions import get_chart_definition
+
 
 class ChartMovieImport(BaseModel):
     """One movie entry in a normalized chart snapshot."""
@@ -111,6 +113,23 @@ class ChartSnapshotImport(BaseModel):
 
         if len(ranks) != len(set(ranks)):
             raise ValueError("duplicate rank in chart snapshot")
+
+        # Built-in chart slugs have a stable taxonomy. Reject cross-period,
+        # cross-category and movie/TV mismatches before database access.
+        definition = get_chart_definition(self.slug)
+        if definition is not None:
+            if self.category != definition.category:
+                raise ValueError(
+                    f"chart {self.slug} requires category={definition.category!r}"
+                )
+            if self.period != definition.period:
+                raise ValueError(
+                    f"chart {self.slug} requires period={definition.period!r}"
+                )
+            if any(movie.type != definition.media_type for movie in self.movies):
+                raise ValueError(
+                    f"chart {self.slug} accepts only {definition.media_type!r} entries"
+                )
 
         return self
 

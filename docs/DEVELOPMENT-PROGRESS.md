@@ -71,7 +71,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 | Workstream | Status |
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
-| Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
+| Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
 | Scout import hardening | Implementation and merge/partial-retry tests complete; large-fixture performance pending |
 | Manual normalized chart snapshot import | Complete |\n| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
 | Container packaging and backup/restore preparation | 100% |
@@ -95,7 +95,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 - [x] Add integration tests for authentication, duplicate writes, note updates, internal-ID enforcement and removal.
 - [x] Document that the browser must not embed the API key; the reverse proxy must inject it server-side.
 
-**Favorites API: complete. Frontend favorites UI remains outstanding.**
+**Favorites API and frontend favorites workflow: implemented. Browser E2E validation remains outstanding.**
 
 ## Phase D — poster-fetch security hardening
 
@@ -158,9 +158,9 @@ Current phase: Frontend workflow implementation and chart acquisition
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#160](https://github.com/daxiguaya/MovieHub/actions/runs/45130608585)
-- Tested commit: `155f7064a6b541ae3e2576d8b9a277b146244c37`
-- Result: **success** — backend compilation, **70 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#174](https://github.com/daxiguaya/MovieHub/actions/runs/45131148396)
+- Tested commit: `f44e831d3f7a6168ef0a311dc88eb4528967c831`
+- Result: **success** — backend compilation and tests, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. The latest backend suite contains 70 tests; one non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

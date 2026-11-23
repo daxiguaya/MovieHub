@@ -20,7 +20,7 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
     journal_path = Path(path)
     journal_path.parent.mkdir(parents=True, exist_ok=True)
     payload = (
-        json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\\n"
+        json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
     ).encode("utf-8")
     descriptor = os.open(
         journal_path,
@@ -52,7 +52,7 @@ def read_import_events(path: str | Path) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for index, raw_line in enumerate(lines):
         is_final = index == len(lines) - 1
-        is_terminated = raw_line.endswith((b"\\n", b"\\r"))
+        is_terminated = raw_line.endswith((b"\n", b"\r"))
         try:
             line = raw_line.decode("utf-8")
             value = json.loads(line)

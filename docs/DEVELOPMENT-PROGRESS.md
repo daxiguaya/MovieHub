@@ -317,7 +317,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Duplicate Scout rows for one Douban ID are reported as ambiguous and excluded from metadata field-coverage calculations; the audit never chooses an arbitrary duplicate.
 - Metadata field coverage now uses only unique ID matches whose Scout media type agrees with the chart item. Wrong-type rows remain visible as ID matches and explicit mismatches, but cannot inflate the field-coverage numerator or denominator.
 - Added synthetic regression assertions for wrong-type records being excluded from field coverage, in addition to the unexpected-type and duplicate-ID cases.
-- Validation status: implementation and regression tests are committed; a GitHub Actions run for the latest head is still required before treating these changes as CI-verified.
+- Validation status: implementation and regression tests are verified by latest-head GitHub Actions run `45211235970` (`c3c28fc`); backend pytest passed with 224 passed and 4 skipped.
 
 
 
@@ -330,7 +330,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Added finite 0–10 rating normalization and a conservative year acceptance range (1870–2200). Invalid source values are treated as absent, preserving an existing valid MovieHub value and leaving a new record field unset.
 - Hardened the importer's integer normalizer so booleans and fractional floats are not silently coerced to integers; this also protects rating-count and source timestamp parsing.
 - Added integration coverage for out-of-range/infinite ratings, implausible years, preservation of existing valid metadata, and boolean/fractional integer inputs.
-- CI status: pending for the new Scout importer changes. The preceding full CI run #350 passed all executed jobs.
+- CI status: verified on branch head `c3c28fc`; backend suite passed (224 passed, 4 skipped), alongside frontend regression/build and browser E2E jobs. NAS-hardware benchmarking remains pending.
 
 ## Chart import raw-input integrity hardening (2026-11-23)
 
@@ -338,7 +338,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Integer normalization rejects booleans and fractional numeric values instead of silently treating `True` as rank 1 or truncating 1.5 to rank 1.
 - Rating normalization rejects booleans, NaN and positive/negative infinity; invalid raw values are stored as absent rather than contaminating movie or chart-item rating columns.
 - Added regression coverage for duplicate ranks, boolean/fractional ranks, and non-finite movie/source ratings. These cases also exercise the service's lower-level mapping input path.
-- Validation status: implementation and tests are committed; a marked CI run is requested from the current branch head.
+- Validation status: latest-head GitHub Actions run `45211235970` passed backend, frontend and browser E2E jobs; backend pytest reported 224 passed and 4 skipped.
 - Commits: service preflight `431b6fb`, integer normalization `f8d7763`, non-finite rating guard `575261a`, regression tests `ddd7d32` / `4e3e95b` / `e17b980`.
 
 ## Chart import identity/type integrity hardening (2026-11-23)
@@ -346,7 +346,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - The chart importer now preflights every existing MovieHub movie referenced by an incoming snapshot and rejects a movie/TV type conflict before updating movie metadata or replacing the chart/date snapshot.
 - The importer does not silently rewrite an existing Scout-owned movie's media type to satisfy a chart. The failed import rolls back the entire transaction, preserving the previous snapshot.
 - Added a regression test that first imports a valid snapshot, then attempts a conflicting movie-to-TV replacement and verifies the original MovieHub type and chart snapshot remain intact.
-- Validation status: code and regression test are committed; latest-head GitHub Actions validation is pending. No production database was accessed.
+- Validation status: latest-head GitHub Actions run `45211235970` passed all executed jobs, including backend pytest (224 passed, 4 skipped). No production database was accessed.
 
 
 ## Scout coverage strict quality gate (2026-11-23)
@@ -481,7 +481,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Reconcile source totals, processed rows, imported rows plus per-record failures, unchanged skips and the durable error manifest.
 - [x] Add regression tests for matching imports with record errors, changed sources, incomplete runs, counter drift and malformed preview reports.
 
-**Preview → import accounting reconciliation: implemented; CI verification pending.**
+**Preview → import accounting reconciliation: implemented; backend CI verified on `c3c28fc` (224 passed, 4 skipped).**
 
 
 ## Preview/import/reconciliation end-to-end acceptance (2026-11-23)
@@ -491,7 +491,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Verify source fingerprint continuity, expected-vs-actual import counters and zero reconciliation mismatches.
 - [x] Keep the test fully isolated; no production Scout or NAS database is accessed.
 
-**The preview → import → reconciliation chain now has a single automated integration test; CI verification pending.**
+**The preview → import → reconciliation chain now has a single automated integration test; included in the passing backend CI run `45211235970`.**
 
 
 ## Single-command Scout readiness package (2026-11-23)
@@ -502,7 +502,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Distinguish ready-for-operator-review, no-changes and blocked outcomes with stable exit codes.
 - [x] Test successful readiness, early blocking without target access, read-only behavior and report permissions.
 
-**One-command readiness preparation implemented; CI verification pending.**
+**One-command readiness preparation implemented; included in the passing backend CI run `45211235970`.**
 
 
 ## Scout import transactionally durable receipts (2026-11-23)
@@ -514,9 +514,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Recover from database receipts, validate source fingerprint/cursor/counters, reject journal-only or conflicting checkpoints, and repair missing journal/error-manifest appends.
 - [x] Serialize journal writers and safely repair torn final records before append, while preserving complete JSON events that only lack a trailing newline.
 - [x] Add regression tests for the lost-journal-checkpoint crash window, transaction rollback atomicity and duplicate receipt rejection.
-- [ ] Execute the new and existing backend suites in GitHub Actions and review the migration against a real v1 fixture before any deployment.
+- [x] Execute the new and existing backend suites in GitHub Actions against an isolated schema-v1 fixture generated from migration 001 (224 passed, 4 skipped).
 
-**Atomic receipt recovery: implementation and regression tests committed; CI execution and migration acceptance remain pending. No NAS database, Scout source or production service was accessed.**
+**Atomic receipt recovery: implementation, regression tests and latest-head backend CI are verified. Acceptance against a copy of an actual deployed v1 database remains pending before migration/deployment. No NAS database, Scout source or production service was accessed.**
 
 ## Backend CI failure remediation — schema v2 migration contract (2026-11-23)
 
@@ -525,6 +525,19 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Align migration-runner tests with the actual supported v1 → v2 upgrade path; schema-v1 fixtures are now created explicitly from migration 001 and migration 002 is tested independently.
 - [x] Keep check-only behavior read-only for an empty, uninitialized database, and preserve a hard refusal for non-empty databases without a recognized MovieHub schema version.
 - [x] Update schema contract, initializer safety, and API readiness expectations to schema version 2; validate the full schema through the explicit initializer.
-- [ ] Re-run GitHub Actions on the updated branch head and resolve any remaining failures before marking this remediation CI-verified.
+- [x] Re-run GitHub Actions on the updated branch head; backend, frontend and browser E2E jobs all completed successfully.
 
 **Root cause:** tests still treated the version-2 migration runner as an initial schema creator and asserted schema version 1, while production initialization had already moved to migration 001 + migration 002. No production database or Scout source was accessed.
+
+
+## Latest full CI verification — schema v2 remediation (2026-11-23)
+
+- [x] Backend job: compileall, pytest, Compose validation and backend image build all passed.
+- [x] Backend pytest: **224 passed, 4 skipped, 1 warning**.
+- [x] Frontend job: **5 tests passed**, TypeScript/build and frontend image build passed.
+- [x] Browser E2E job: **4 Playwright tests passed**, including live FastAPI + isolated SQLite integration.
+- [x] All three executed jobs passed on branch head `c3c28fc36369a8494abf428b0455d8306eb3f4cc`; run: [45211235970](https://github.com/daxiguaya/MovieHub/actions/runs/45211235970).
+- [ ] Annual-chart collection and performance-benchmark jobs were skipped by workflow conditions; they are not counted as passing validations.
+- [ ] Validate migration against a copy of a real existing schema-v1 database before any production migration.
+
+**CI remediation milestone: complete.** The prior backend failure (12 failed, 212 passed, 4 skipped) is resolved on the latest branch head. This verifies CI only; no real Scout source, NAS database or production service was accessed.

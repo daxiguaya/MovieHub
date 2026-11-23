@@ -147,11 +147,12 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 - [x] Add a CLI to validate and import normalized local JSON chart snapshots into the independent MovieHub database.
 - [x] Add a dry-run mode that validates the input without opening or modifying the database.
+- [x] Validate built-in chart slug/category/period consistency and enforce movie-versus-TV type before any database readiness check; keep custom chart slugs generic.
 - [x] Support a generic local adapter that preserves the declared chart provider and a Cinephile adapter that labels its normalized export.
 - [x] Fix the latent adapter package import path discovered by exercising the CLI.
 - [x] Document snapshot format, date-scoped replacement, metadata precedence and explicit non-automation boundary.
 
-**Snapshot import workflow: implemented and tested. This is a manual normalized-data import path, not an automated Douban collector.**
+**Snapshot import workflow: implemented and tested. Built-in annual chart taxonomy and movie/TV mismatches are rejected during dry-run before database access. This is a manual normalized-data import path, not an automated Douban collector.**
 
 ## Phase C — historical rank comparison
 
@@ -210,7 +211,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Next work
 
-- [ ] Import the four 2025 annual categories from validated normalized source data; do not merge Chinese, international, hidden-gem and TV rankings.
+- [ ] Prepare and import the four 2025 annual categories from verified normalized source data; do not merge Chinese, international, hidden-gem and TV rankings. The local dry-run now enforces each built-in chart's category, period and media type.
 - [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
 - [ ] Implement an annual chart collector only if a stable public source and permitted acquisition path can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.

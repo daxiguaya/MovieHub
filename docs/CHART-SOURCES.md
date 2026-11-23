@@ -6,7 +6,7 @@ Last reviewed: 2026-11-23
 
 MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, a one-shot Top 250 HTML collector, and one-shot popular/high-rated collectors using Douban's undocumented web JSON endpoint.
 
-**It does not yet run scheduled chart collection.** Top 250, popular and high-rated charts can be collected manually when robots.txt permits. Annual chart collection remains unimplemented. Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
+**It does not run scheduled chart collection.** Top 250, popular and high-rated charts have opt-in, one-shot manual collectors that run only when robots.txt permits. Annual chart collection remains unimplemented. Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
 
 ## Reference projects
 
@@ -52,7 +52,8 @@ Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout 
 - Do not scrape at high frequency, bypass login/challenges, rotate identities, or evade rate limits.
 - Do not commit scraped chart dumps or copyrighted poster/data archives to Git.
 - If an authorized provider or user-controlled export becomes available, implement it as a separate `ChartSourceAdapter` that emits the existing `ChartSnapshotImport` schema.
-- If a future web collector is explicitly approved, it must have conservative request pacing, bounded retries, conditional caching, clear source attribution and a kill switch. It must not run as an unbounded background loop.
+- Existing web collectors are opt-in/manual only; they check robots.txt, apply conservative pacing and stop on access denial/rate limiting. They do not use retries, login, proxy rotation or challenge bypass.
+- Any expansion to new chart types or scheduled collection requires a separate source/permission review. It must have conservative request pacing, bounded retries only where permitted, conditional caching, clear source attribution and a kill switch. It must not run as an unbounded background loop.
 
 ## Current operator workflow
 
@@ -60,4 +61,4 @@ Prepare a UTF-8 JSON snapshot in the documented normalized format, validate it w
 
 ## Decision
 
-Keep automatic chart acquisition as an explicit pending milestone until the data source, authorization, reliability and request policy are settled. This is preferable to building a brittle collector around a deprecated API or an undocumented third-party proxy.
+Keep scheduled chart acquisition as an explicit pending milestone until the data source, authorization, reliability and request policy are settled. The current one-shot collectors are experimental, operator-invoked tools around public pages/endpoints, not a guarantee of stable or officially supported access.

@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Frontend workflow implementation and chart acquisition
+Current phase: Frontend validation, chart acquisition and pre-deployment hardening
 
 ## Phase 4 — independent database foundation
 
@@ -139,7 +139,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 - [x] Validate same-date and missing-snapshot requests.
 - [x] Add comparison controls and rank movement display to the chart detail page.
 
-**Historical rank comparison: implemented; backend and frontend CI validation in progress.**
+**Historical rank comparison: implemented; backend and frontend CI passed.**
 
 ## Phase E — React frontend baseline
 
@@ -181,9 +181,9 @@ Current phase: Frontend workflow implementation and chart acquisition
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#174](https://github.com/daxiguaya/MovieHub/actions/runs/45131148396)
-- Tested commit: `f44e831d3f7a6168ef0a311dc88eb4528967c831`
-- Result: **success** — backend compilation and tests, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. The latest backend suite contains 70 tests; one non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#193](https://github.com/daxiguaya/MovieHub/actions/runs/45131712957)
+- Tested commit: `0ddf5dccc7aaa53bde8d68460f4584880db0ee53`
+- Result: **success** — backend compilation, **72 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

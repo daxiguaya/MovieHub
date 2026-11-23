@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: First-release product architecture agreed; feature implementation next
+Current phase: First-release product architecture agreed; FTS5 and feature APIs next
 
 ## Phase 4 — independent database foundation
 
@@ -66,6 +66,19 @@ Current phase: First-release product architecture agreed; feature implementation
 
 **Product scope and architecture baseline: complete.**
 
+## Overall first-release progress (estimate)
+
+| Workstream | Status |
+|---|---:|
+| Database foundation and Scout-safe import boundary | 100% |
+| Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
+| Product feature completion (FTS5, favorites API, Xiaoya handoff) | 0% of remaining items |
+| React frontend and user workflows | 0% |
+| Container packaging and backup/restore preparation | 100% |
+| Actual NAS deployment and end-to-end production verification | 0% |
+
+**Estimated first-release implementation progress: about 40%.** This is a planning estimate, not a test metric: backend foundations and packaging are complete, but the user-facing frontend and several product workflows have not been built. Production deployment is intentionally excluded until separately authorized.
+
 ## Next work
 
 - [ ] Implement FTS5 as a versioned MovieHub migration, with a tested LIKE fallback where FTS5 is unavailable.
@@ -79,9 +92,9 @@ Current phase: First-release product architecture agreed; feature implementation
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#91](https://github.com/daxiguaya/MovieHub/actions/runs/45127099982)
-- Tested commit: `a9a108e047780a2e12d9d4dcbcbb95b777e651d6`
-- Result: **success** — backend compilation passed, **37 tests passed**, Compose configuration validated, and backend Docker image built successfully. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#96](https://github.com/daxiguaya/MovieHub/actions/runs/45127748257)
+- Tested commit: `a94302f6ecaa367d6a5d92a8a7868c11b4d8341c`
+- Result: **success** — backend compilation, all 37 tests, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

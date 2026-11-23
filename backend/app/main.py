@@ -7,14 +7,18 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
-from app.database import DatabaseNotInitializedError, get_db_path
+from app.database import (
+    DatabaseNotInitializedError,
+    database_is_ready,
+    get_db_path,
+)
 from app.limiter import limiter
 from app.logging_config import setup_logging
 from app.routers.chart_import import router as chart_import_router
@@ -157,6 +161,20 @@ app.include_router(import_router, prefix="/api")
 def health_check() -> dict[str, str]:
     """Basic application liveness check."""
     return {"status": "healthy"}
+
+
+@app.get("/api/ready")
+def readiness_check() -> dict[str, str | int]:
+    """Check that the MovieHub-owned schema is initialized and readable."""
+    if not database_is_ready():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MovieHub database is not ready. Initialize it with "
+                "'python -m scripts.init_db' and apply pending migrations."
+            ),
+        )
+    return {"status": "ready", "schema_version": 1}
 
 
 if __name__ == "__main__":

@@ -111,6 +111,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
 - [x] Add regression coverage proving incremental skip, newer-timestamp updates and forced full reprocessing behavior.
 - [x] Exercise a 1,000-record synthetic Scout catalogue across six bounded batches.
+- [x] Add opt-in 10k/100k synthetic throughput benchmarks using temporary source and target SQLite databases; normal CI skips these hardware-sensitive runs.
 
 **Import hardening milestone: implemented and tested, including a 1,000-row synthetic catalogue processed across multiple batches.** A larger 10k/100k and NAS-hardware benchmark remains. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
@@ -207,17 +208,17 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [ ] Add full-stack browser end-to-end tests against a running frontend/backend stack for chart navigation, search, detail, favorites and Xiaoya handoff.
-- [ ] Run 10k/100k synthetic import throughput, memory and batch-lock measurements; repeat on the target NAS only during an authorized pre-deployment test.
+- [x] Add reproducible opt-in 10k/100k synthetic import throughput benchmarks against temporary SQLite databases.
+- [ ] Execute 10k/100k throughput and memory measurements in a controlled environment; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
 
 ## Latest code validation
 
-- Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#266](https://github.com/daxiguaya/MovieHub/actions/runs/45137001518)
-- Tested commit: `f531d6e2e3e7dec8528aaf4b7a08ee19799f5f32`
-- Result: **success** — **99 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Previous completed full validation: [#266](https://github.com/daxiguaya/MovieHub/actions/runs/45137001518) — 99 backend tests, 5 frontend UI tests, Compose validation and both container image builds passed.
+- Latest documentation validation before the benchmark harness: [#268](https://github.com/daxiguaya/MovieHub/actions/runs/45137187054) — success.
+- The opt-in 10k/100k benchmark harness is newly committed; its CI run is pending. The performance cases are intentionally skipped in ordinary CI because results depend on runner and storage hardware.
 
 ## Scope and safety boundaries
 

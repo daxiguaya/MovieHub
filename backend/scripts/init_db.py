@@ -20,7 +20,7 @@ from app.database import Base
 from app.services.chart_init_service import initialize_chart_definitions
 
 logger = logging.getLogger("moviehub.init_db")
-MIGRATION_VERSION = 1
+MIGRATION_VERSION = 2
 REQUIRED_TABLES = {
     "schema_migrations",
     "movies",
@@ -33,6 +33,7 @@ REQUIRED_TABLES = {
     "chart_snapshots",
     "list_items",
     "favorites",
+    "import_batch_receipts",
 }
 
 
@@ -170,10 +171,24 @@ def initialize(path: Path, migration_path: Path) -> None:
     temporary_path = Path(temporary_name)
 
     try:
+        followup_migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "002_durable_import_batch_receipts.sql"
+        )
+        if not followup_migration.is_file():
+            raise FileNotFoundError(
+                f"Required follow-up migration not found: {followup_migration}"
+            )
+        followup_sql = followup_migration.read_text(encoding="utf-8").strip()
+        if not followup_sql:
+            raise RuntimeError("Follow-up migration SQL is empty")
+
         conn = sqlite3.connect(str(temporary_path), timeout=30)
         try:
             conn.execute("PRAGMA foreign_keys=ON")
             conn.executescript(sql)
+            conn.executescript(followup_sql)
         finally:
             conn.close()
 

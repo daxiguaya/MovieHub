@@ -61,6 +61,7 @@ def test_append_repairs_a_torn_final_line_before_writing_next_event(tmp_path):
         (json.dumps(first) + "\n").encode("utf-8")
         + b'{"event":"batch_committed","run_id":'
     )
+    path.chmod(0o600)
 
     append_import_event(path, recovered)
 

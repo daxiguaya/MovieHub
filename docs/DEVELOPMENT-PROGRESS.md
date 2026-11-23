@@ -512,6 +512,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Write each batch receipt in the same target-database transaction as its movie and metadata changes.
 - [x] Advance in-memory counters only after the batch transaction commits, preventing rolled-back work from leaking into run totals.
 - [x] Recover from database receipts, validate source fingerprint/cursor/counters, reject journal-only or conflicting checkpoints, and repair missing journal/error-manifest appends.
+- [x] Serialize journal writers and safely repair torn final records before append, while preserving complete JSON events that only lack a trailing newline.
 - [x] Add regression tests for the lost-journal-checkpoint crash window, transaction rollback atomicity and duplicate receipt rejection.
 - [ ] Execute the new and existing backend suites in GitHub Actions and review the migration against a real v1 fixture before any deployment.
 

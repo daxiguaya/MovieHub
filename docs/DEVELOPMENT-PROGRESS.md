@@ -133,6 +133,16 @@ Current phase: Frontend workflow implementation and chart acquisition
 
 **Frontend baseline: implemented and build-validated.** Browser end-to-end tests, real chart data, final visual tuning and actual NPM integration remain outstanding.
 
+## Chart source review and acquisition policy
+
+- [x] Review Cinéphile's chart taxonomy and scheduled-refresh concept without copying code or datasets.
+- [x] Review Douban iDatabase's multi-source metadata and ID-translation concepts without copying unlicensed code.
+- [x] Record that Scout is a read-only metadata source, not a chart collector.
+- [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
+- [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
+
+**Source review: complete. Automatic chart acquisition remains pending an authorized, reliable provider decision.**
+
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.

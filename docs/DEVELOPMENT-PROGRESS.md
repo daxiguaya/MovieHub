@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Post-Phase-4 application integration audit
+Current phase: Backend container packaging (pre-deployment)
 
 ## Phase 4 — independent database foundation
 
@@ -31,23 +31,37 @@ Current phase: Post-Phase-4 application integration audit
 
 **Application integration audit: complete.**
 
+## Backend container packaging
+
+- [x] Add a Python 3.11 slim backend Dockerfile; run as a non-root UID.
+- [x] Add a Compose service with read-only root filesystem, dropped capabilities, no-new-privileges, resource/PID limits and writable data volume only.
+- [x] Keep MovieHub data and Scout source paths separate; mount Scout import source read-only.
+- [x] Connect API only to the existing NPM Docker network and Compose bridge; do not publish a NAS/LAN host port.
+- [x] Add explicit one-shot database initialization instructions; container startup never initializes or migrates a database.
+- [x] Add liveness/readiness health-check wiring and document proxy-header trust boundaries.
+- [x] Extend CI to validate Compose configuration and build the backend image.
+- [x] Document NAS preparation, directory permissions, NPM upstream and operational safety boundaries.
+
+**Backend packaging baseline: complete. Not deployed.**
+
 ## Next work
 
-- [ ] Decide and implement deployment packaging (Dockerfile/Compose, mounts, health checks and reverse-proxy assumptions) after the runtime/frontend layout is finalized.
-- [ ] Continue feature/API work on the independent MovieHub database; keep all development validation on temporary fixtures.
-- [ ] Keep production database creation, migration, import and deployment as a separately reviewed operation.
+- [ ] Finalize frontend architecture and decide whether frontend is served by the API image or a separate service.
+- [ ] Add a reviewed backup/restore runbook for the MovieHub SQLite database and poster cache.
+- [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data-directory ownership.
+- [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
 
 ## Latest code validation
 
-- Workflow: Backend tests
-- Run: [#62](https://github.com/daxiguaya/MovieHub/actions/runs/45125409205)
-- Tested commit: `7f14f7f564621f2acb5c9b53936c5bf2674a83de`
-- Result: **success** — backend compilation passed; **32 tests passed**. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Workflow: Backend tests + Compose validation + Docker image build
+- Run: [#72](https://github.com/daxiguaya/MovieHub/actions/runs/45125983309)
+- Tested commit: `6ff50988cc073a67a225a672fcc34a1bbc4060c0`
+- Result: **success** — backend compilation passed, **32 tests passed**, Compose configuration validated, and backend Docker image built successfully. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 
 - MovieHub owns a new, independent SQLite database.
 - Douban Scout is an external, read-only source. Do not migrate, write to, or otherwise modify Scout's database.
-- No production database creation/migration, deployment, or service restart is part of this audit.
+- No production database creation/migration, deployment, import, NPM proxy change, or service restart is part of this work.
 - Keep validation on temporary fixtures. Do not touch the user's live Scout database.
 - Do not commit credentials, tokens, private environment files, database files, or local repair backups.

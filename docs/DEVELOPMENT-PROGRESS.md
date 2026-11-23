@@ -113,6 +113,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Annual batch CLI integration: verified in CI #45180603281 (147 passed, 4 skipped).** No NAS database was opened and no production import was performed.
 
+## Scout coverage audit reporting hardening (2026-11-23)
+
+- [x] Reject duplicate chart/date snapshots before opening the read-only Scout database.
+- [x] Add aggregate field-coverage counts and percentages across all supplied charts, alongside per-chart coverage.
+- [x] Keep the aggregate denominator restricted to unique Scout ID matches with matching media type.
+- [x] Add regression coverage for duplicate audit inputs and aggregate coverage output.
+
+**Scout audit reporting hardening: implementation and regression tests added.** A consistent staged Scout copy is still required for a real coverage report; no NAS/production database was accessed.
+
 ## Overall first-release progress (estimate)
 
 | Workstream | Status |

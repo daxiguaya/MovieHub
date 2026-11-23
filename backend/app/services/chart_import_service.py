@@ -209,13 +209,13 @@ class ChartImportService:
         directors = ChartImportService._clean_string_list(
             ChartImportService._value(item, "directors", [])
         )
-        if directors and not movie.directors:
+        if directors and movie.directors in (None, '', '[]'):
             movie.directors = ChartImportService._json_list(directors)
 
         actors = ChartImportService._clean_string_list(
             ChartImportService._value(item, "actors", [])
         )
-        if actors and not movie.actors:
+        if actors and movie.actors in (None, '', '[]'):
             movie.actors = ChartImportService._json_list(actors)
 
         genres = ChartImportService._clean_string_list(

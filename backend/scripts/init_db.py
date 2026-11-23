@@ -91,7 +91,7 @@ def validate_database(path: Path) -> None:
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     try:
         inspector = inspect(engine)
-        orm_tables = set(Base.metadata.tables)
+        orm_tables = set(Base.metadata.tables) | {"schema_migrations"}
         db_tables = set(inspector.get_table_names())
         if orm_tables != db_tables:
             raise RuntimeError(

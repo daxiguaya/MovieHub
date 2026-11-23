@@ -93,12 +93,12 @@ Do not implement these in MovieHub first release:
 
 | Capability | Current state | Remaining work |
 |---|---|---|
-| Independent SQLite schema | Complete, 11 core tables | Add reviewed versioned search/index migration |
+| Independent SQLite schema | Complete, 11 core tables | Add a versioned search/index migration only if benchmarks justify it |
 | Chart definitions and dated snapshots | Backend API and seeded definitions exist | Frontend chart browsing and date selector |
-| Movie search/filter API | Exists; currently title matching uses SQL LIKE | Implement FTS5 and test fallback |
+| Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
-| Favorites | Database table exists | CRUD/list API, tests and UI |
+| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs | Regression CI and frontend UI |
 | Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation | Merge-policy regression matrix, large-fixture performance and operator workflow |
 | React frontend | Not present yet | Build frontend application and container |
 | Frontend/backend Compose topology | Backend-only Compose exists | Add separate frontend service and same-origin NPM route documentation |
@@ -107,7 +107,7 @@ Do not implement these in MovieHub first release:
 ## Delivery order
 
 1. Benchmark existing LIKE search on realistic fixtures; only add optional FTS5 if measurements show it is needed.
-2. Add favorites list/add/remove API endpoints and integration tests.
+2. Complete protected favorites API validation, then implement the frontend API client.
 3. Define a stable frontend API client and error/loading/empty states.
 4. Build the React + TypeScript + Vite pages: chart home, chart snapshot, movie search/filter, movie detail and favorites.
 5. Add a separate frontend container and Compose service; keep API internal and route /api through the same NPM host.

@@ -40,7 +40,8 @@ export const api = {
     const params = new URLSearchParams();
     if (snapshotDate) params.set("snapshot_date", snapshotDate);
     if (cursor) params.set("cursor", cursor);
-    const query = params.size ? `?${params.toString()}` : "";
+    const serialized = params.toString();
+    const query = serialized ? `?${serialized}` : "";
     return request<ChartMoviesResponse>(
       `/charts/${encodeURIComponent(slug)}${query}`
     );

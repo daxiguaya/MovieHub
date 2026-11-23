@@ -192,3 +192,66 @@ def test_scout_import_is_read_only_and_maps_to_moviehub_internal_ids(
     assert _sha256(source_path) == source_hash_before
     with sqlite3.connect(source_path) as source:
         assert source.execute("SELECT COUNT(*) FROM item").fetchone()[0] == 2
+
+
+def test_incremental_import_skips_unchanged_rows_but_force_full_reprocesses(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-incremental.sqlite"
+    target_path = tmp_path / "moviehub-incremental.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+
+    def run(force_full):
+        assert service._run_lock.acquire(blocking=False)
+        try:
+            service._run_import(source_path, force_full=force_full)
+            assert service.status.status == "completed"
+        finally:
+            if service._run_lock.locked():
+                service._run_lock.release()
+
+    run(force_full=True)
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.title == "Scout Fixture Movie"
+
+    # Change source metadata without advancing Scout's update_time. An
+    # incremental run must not rewrite a record already imported at this time.
+    with sqlite3.connect(source_path) as conn:
+        row = conn.execute(
+            "SELECT raw_data FROM item WHERE douban_id = '1234567'"
+        ).fetchone()
+        payload = json.loads(row[0])
+        payload["detail"]["summary"] = "Changed without a newer source timestamp"
+        conn.execute(
+            "UPDATE item SET raw_data = ? WHERE douban_id = '1234567'",
+            (json.dumps(payload, ensure_ascii=False),),
+        )
+
+    run(force_full=False)
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.overview == "A Scout fixture overview."
+
+    run(force_full=True)
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.overview == "Changed without a newer source timestamp"
+
+    engine.dispose()

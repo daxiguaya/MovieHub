@@ -914,7 +914,7 @@ def test_import_journal_ignores_incomplete_trailing_record(tmp_path):
 
     journal = tmp_path / "journal.jsonl"
     journal.write_text(
-        '{"event":"run_started","run_id":"a"}\\n{"event":"batch_committed"',
+        '{"event":"run_started","run_id":"a"}\n{"event":"batch_committed"',
         encoding="utf-8",
     )
     assert read_import_events(journal) == [

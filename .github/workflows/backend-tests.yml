@@ -158,6 +158,46 @@ jobs:
         run: npm run test:e2e
         working-directory: frontend
 
+  annual-chart-collection:
+    # Opt-in only: collect from the official public source, validate locally, and retain JSON as a CI artifact.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-annual-collection]'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: backend
+      - name: Collect and dry-run all four official 2025 annual charts
+        run: |
+          set -euo pipefail
+          output_dir="${RUNNER_TEMP}/moviehub-annual-2025"
+          capture_date="$(date -u +%F)"
+          python -m scripts.collect_douban_annual \
+            --date "$capture_date" \
+            --output-dir "$output_dir"
+          count=0
+          for file in "$output_dir"/*.json; do
+            test -f "$file"
+            python -m scripts.import_chart --input "$file" --dry-run
+            count=$((count + 1))
+          done
+          test "$count" -eq 4
+        working-directory: backend
+      - name: Upload normalized annual snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: moviehub-douban-annual-2025
+          path: ${{ runner.temp }}/moviehub-annual-2025/*.json
+          if-no-files-found: error
+          retention-days: 14
+
   performance-benchmarks:
     # Opt-in on demand: manual dispatch or an explicitly marked commit on phase4.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-benchmarks]'))

@@ -722,3 +722,53 @@ def test_scout_import_rejects_duplicate_douban_ids_before_writing(tmp_path):
             )
     finally:
         source.close()
+
+
+def test_scout_import_rejects_invalid_identity_fields_before_target_writes(tmp_path):
+    source_path = tmp_path / "scout-invalid-identity.sqlite"
+    _create_scout_fixture(source_path)
+
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "UPDATE item SET douban_id = NULL WHERE douban_id = '1234567'"
+        )
+
+    source = sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True)
+    source.row_factory = sqlite3.Row
+    try:
+        with pytest.raises(
+            ValueError,
+            match="invalid Douban ID or empty title: rowid=",
+        ):
+            import_service_module.ImportService._validate_source(
+                source,
+                reject_duplicate_ids=True,
+            )
+    finally:
+        source.close()
+
+
+def test_scout_import_rejects_non_numeric_ids_and_blank_titles(tmp_path):
+    source_path = tmp_path / "scout-invalid-title.sqlite"
+    _create_scout_fixture(source_path)
+
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "UPDATE item SET douban_id = ?, douban_title = ? "
+            "WHERE douban_id = '1234567'",
+            ("tt1234567", "   "),
+        )
+
+    source = sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True)
+    source.row_factory = sqlite3.Row
+    try:
+        with pytest.raises(
+            ValueError,
+            match="invalid Douban ID or empty title",
+        ):
+            import_service_module.ImportService._validate_source(
+                source,
+                reject_duplicate_ids=True,
+            )
+    finally:
+        source.close()

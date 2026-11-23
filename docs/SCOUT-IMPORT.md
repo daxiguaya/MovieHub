@@ -30,7 +30,7 @@ curl "https://<moviehub-host>/api/import/status" \
   -H "X-API-Key: <MOVIEHUB_API_KEY>"
 ```
 
-Only one import can run at a time. The service opens one read-only SQLite transaction for the full import so validation, total counting and row iteration use the same source snapshot, including when the source is WAL-backed and still receiving writes. It processes 500 records per target transaction and isolates individual bad records with SAVEPOINTs. The status response includes an `errors` count for records that raised processing exceptions; a run can finish with status `completed` while reporting nonzero record errors, so check both `status` and `errors` before treating the import as clean.
+Before any target write, source validation rejects movie/TV rows with a missing, non-numeric or duplicate Douban ID, or a blank title. This prevents malformed identity rows from being silently counted as ordinary skips. Only one import can run at a time. The service opens one read-only SQLite transaction for the full import so validation, total counting and row iteration use the same source snapshot, including when the source is WAL-backed and still receiving writes. It processes 500 records per target transaction and isolates individual bad records with SAVEPOINTs. The status response includes an `errors` count for records that raised processing exceptions; a run can finish with status `completed` while reporting nonzero record errors, so check both `status` and `errors` before treating the import as clean.
 
 ## Incremental vs. forced full
 

@@ -146,6 +146,7 @@ class DoubanTaggedChartCollector:
             parsed_url is None
             or parsed_url.scheme != "https"
             or parsed_url.hostname != "movie.douban.com"
+            or parsed_url.port not in (None, 443)
             or not re.fullmatch(r"/subject/[0-9]+/?", parsed_url.path)
         ):
             source_url = f"{DOUBAN_BASE_URL}/subject/{douban_id}/"
@@ -200,7 +201,7 @@ class DoubanTaggedChartCollector:
                 }
                 response = client.get(SEARCH_SUBJECTS_URL, params=params)
                 url = f"{SEARCH_SUBJECTS_URL}?page_start={page_start}"
-                payload_text = self._check_response(response, url)
+                self._check_response(response, url)
 
                 try:
                     payload = response.json()

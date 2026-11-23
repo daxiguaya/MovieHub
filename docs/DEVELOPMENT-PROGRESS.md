@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Chart import workflow and backend feature completion; frontend implementation next
+Current phase: Frontend workflow implementation and chart acquisition
 
 ## Phase 4 — independent database foundation
 
@@ -77,7 +77,7 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 48%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 52%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -118,11 +118,26 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 
 **Snapshot import workflow: implemented and tested. This is a manual normalized-data import path, not an automated Douban collector.**
 
+## Phase E — React frontend baseline
+
+- [x] Add React + TypeScript + Vite application scaffold and typed API client.
+- [x] Implement discovery home and chart-group tiles.
+- [x] Implement chart snapshot page with historical date selection and cursor pagination.
+- [x] Implement movie search page with keyword, type, minimum rating, start year and sort controls.
+- [x] Add internal MovieHub movie-ID detail API and detail page with metadata, poster, Douban link and Xiaoya handoff.
+- [x] Implement favorites list/add/remove UI against the protected favorites API.
+- [x] Make Xiaoya search URL runtime-configurable; the title is URL-encoded into the existing `box` parameter and opens in a new tab.
+- [x] Keep the API key out of frontend assets; document server-side NPM header injection only for the favorites path.
+- [x] Add a separate non-root Nginx frontend container, read-only root filesystem, 128 MiB limit and Compose service.
+- [x] Add CI type-check, Vite production build and frontend Docker image build.
+
+**Frontend baseline: implemented and build-validated.** Browser end-to-end tests, real chart data, final visual tuning and actual NPM integration remain outstanding.
+
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
-- [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
-- [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
+- [ ] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff.
+- [x] Define a typed frontend API client and visible loading, empty and error states.
 - [x] Test Scout field-level merge precedence: empty fields preserve enriched MovieHub metadata; source-row deletion does not delete MovieHub records.
 - [x] Test partial batch failure: already committed batches remain durable and an incremental retry completes safely.
 - [ ] Validate import throughput, memory use and batch-lock duration with a larger synthetic fixture.
@@ -133,9 +148,9 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#128](https://github.com/daxiguaya/MovieHub/actions/runs/45129554505)
-- Tested commit: `28d9a6379b448e9eb4916020b076ef7b201db42e`
-- Result: **success** — backend compilation, **70 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#160](https://github.com/daxiguaya/MovieHub/actions/runs/45130608585)
+- Tested commit: `155f7064a6b541ae3e2576d8b9a277b146244c37`
+- Result: **success** — backend compilation, **70 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

@@ -157,7 +157,7 @@ def test_collector_rejects_request_delay_below_safe_minimum():
 
 def test_top250_collector_honors_robots_crawl_delay():
     client = FakeClient(
-        robots_text="User-agent: *\\nAllow: /\\nCrawl-delay: 5"
+        robots_text="User-agent: *\nAllow: /\nCrawl-delay: 5"
     )
     sleeps = []
     DoubanTop250Collector(

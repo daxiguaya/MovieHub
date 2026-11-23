@@ -2,13 +2,14 @@
 
 from datetime import date
 
+import pytest
 from sqlalchemy import create_engine, event, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, ChartSnapshot, ChartItem, Movie
 from app.schemas_chart_import import ChartMovieImport, ChartSnapshotImport
-from app.services.chart_import_service import ChartImportService
+from app.services.chart_import_service import ChartImportError, ChartImportService
 
 
 def _session():
@@ -140,6 +141,69 @@ def test_chart_import_replaces_only_the_requested_date_and_preserves_scout_data(
         assert db.scalar(
             select(func.count()).select_from(ChartSnapshot)
         ) == 2
+    finally:
+        db.close()
+        engine.dispose()
+
+
+
+def test_chart_import_rejects_existing_movie_media_type_conflict_atomically():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        existing = Movie(
+            douban_id="20001",
+            title="Existing Scout movie",
+            type="movie",
+            rating_count=0,
+            directors="[]",
+            actors="[]",
+        )
+        db.add(existing)
+        db.commit()
+
+        initial = _snapshot(
+            date(2026, 11, 23),
+            [
+                ChartMovieImport(
+                    douban_id="20001",
+                    rank=1,
+                    title="Existing Scout movie",
+                    type="movie",
+                )
+            ],
+        )
+        service.import_snapshot(db, initial)
+        db.commit()
+
+        conflicting = _snapshot(
+            date(2026, 11, 23),
+            [
+                ChartMovieImport(
+                    douban_id="20001",
+                    rank=1,
+                    title="Same ID incorrectly labeled as TV",
+                    type="tv",
+                )
+            ],
+        )
+
+        with pytest.raises(ChartImportError, match="media type mismatch"):
+            service.import_snapshot(db, conflicting)
+
+        db.commit()
+        stored_movie = db.scalar(
+            select(Movie).where(Movie.douban_id == "20001")
+        )
+        assert stored_movie.type == "movie"
+
+        snapshots = db.scalars(select(ChartSnapshot)).all()
+        assert len(snapshots) == 1
+        assert snapshots[0].snapshot_date == "2026-11-23"
+        assert snapshots[0].item_count == 1
+        chart_item = db.scalar(select(ChartItem))
+        assert chart_item is not None
+        assert chart_item.movie_id == stored_movie.id
     finally:
         db.close()
         engine.dispose()

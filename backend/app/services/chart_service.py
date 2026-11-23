@@ -252,5 +252,100 @@ class ChartService:
         )
 
 
+    def compare_snapshots(
+        self,
+        db: Session,
+        slug: str,
+        from_date: str,
+        to_date: str,
+    ):
+        """Compare two dated snapshots using MovieHub's internal movie IDs."""
+        from app.schemas import ChartCompareResponse, ChartRankChange
+
+        chart = self.get_chart(db, slug)
+        if chart is None:
+            return None
+
+        snapshots = (
+            db.query(ChartSnapshot)
+            .filter(
+                ChartSnapshot.list_id == chart.list_id,
+                ChartSnapshot.snapshot_date.in_([from_date, to_date]),
+            )
+            .all()
+        )
+        by_date = {snapshot.snapshot_date: snapshot for snapshot in snapshots}
+        before_snapshot = by_date.get(from_date)
+        after_snapshot = by_date.get(to_date)
+        if before_snapshot is None or after_snapshot is None:
+            return None
+
+        def ranked_items(snapshot_id: int) -> dict[int, tuple[int, Movie]]:
+            rows = (
+                db.query(ChartItem, Movie)
+                .join(Movie, Movie.id == ChartItem.movie_id)
+                .filter(ChartItem.snapshot_id == snapshot_id)
+                .all()
+            )
+            return {
+                movie.id: (chart_item.rank, movie)
+                for chart_item, movie in rows
+            }
+
+        before = ranked_items(before_snapshot.id)
+        after = ranked_items(after_snapshot.id)
+        changes = []
+        for movie_id in before.keys() | after.keys():
+            before_entry = before.get(movie_id)
+            after_entry = after.get(movie_id)
+            movie = (after_entry or before_entry)[1]
+            before_rank = before_entry[0] if before_entry else None
+            after_rank = after_entry[0] if after_entry else None
+
+            if before_rank is None:
+                state = "new"
+            elif after_rank is None:
+                state = "removed"
+            elif before_rank == after_rank:
+                state = "unchanged"
+            else:
+                state = "moved"
+
+            changes.append(
+                ChartRankChange(
+                    movie_id=movie.id,
+                    douban_id=movie.douban_id,
+                    title=movie.title,
+                    year=movie.year,
+                    type=movie.type,
+                    before_rank=before_rank,
+                    after_rank=after_rank,
+                    rank_change=(
+                        before_rank - after_rank
+                        if before_rank is not None and after_rank is not None
+                        else None
+                    ),
+                    status=state,
+                )
+            )
+
+        changes.sort(
+            key=lambda item: (
+                item.after_rank is None,
+                item.after_rank if item.after_rank is not None else item.before_rank or 0,
+                item.title.casefold(),
+            )
+        )
+        return ChartCompareResponse(
+            chart=self._chart_response(chart),
+            from_date=from_date,
+            to_date=to_date,
+            total_before=len(before),
+            total_after=len(after),
+            items=changes,
+        )
+
+
+
 chart_service = ChartService()
 

@@ -274,6 +274,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Validation status: implementation and regression tests are committed; a GitHub Actions run for the latest head is still required before treating these changes as CI-verified.
 
 
+
+## Scout import numeric-data integrity (2026-11-23)
+
+- Audited the Scout-to-MovieHub importer after the chart import guard passed CI. Found that raw Scout ratings were converted directly to float, allowing out-of-range or infinite values to reach database writes; invalid years could also be persisted.
+- Added finite 0–10 rating normalization and a conservative year acceptance range (1870–2200). Invalid source values are treated as absent, preserving an existing valid MovieHub value and leaving a new record field unset.
+- Hardened the importer's integer normalizer so booleans and fractional floats are not silently coerced to integers; this also protects rating-count and source timestamp parsing.
+- Added integration coverage for out-of-range/infinite ratings, implausible years, preservation of existing valid metadata, and boolean/fractional integer inputs.
+- CI status: pending for the new Scout importer changes. The preceding full CI run #350 passed all executed jobs.
+
 ## Chart import raw-input integrity hardening (2026-11-23)
 
 - The service now validates rank values and duplicate ranks before opening its write transaction, including for mapping-based internal callers that bypass the Pydantic request schema.

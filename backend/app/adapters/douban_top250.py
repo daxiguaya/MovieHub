@@ -129,7 +129,9 @@ class _Top250PageParser(HTMLParser):
             ]
             self.current["title"] = title_values[0] if title_values else ""
             self.current["original_title"] = (
-                title_values[1] if len(title_values) > 1 else ""
+                re.sub(r"^[/／\\s]+", "", title_values[1])
+                if len(title_values) > 1
+                else ""
             )
         self.items.append(self.current)
         self.current = None

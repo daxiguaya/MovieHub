@@ -412,3 +412,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Pin chart schema validation and lookup queries to one read-only SQLite transaction snapshot.
 - [x] Add synthetic integration tests proving pass/block decisions and unchanged Scout source bytes.
 - Validation: awaiting CI. The source DB is audited twice through separate read-only transactions; use a stable staged backup unchanged during execution. Actual coverage values remain unknown until a staged Scout copy is supplied.
+
+
+## Scout import preview (2026-11-23)
+
+- [x] Add read-only service preview using the same Scout identity/duplicate preflight as the importer.
+- [x] Classify new records, incremental update candidates and unchanged timestamp skips.
+- [x] Support forced-full preview semantics without writing target records.
+- [x] Report invalid year/rating counts as warnings.
+- [x] Add CLI that refuses to run unless the independent MovieHub database is already initialized.
+- [x] Add integration tests proving source and target SQLite file hashes remain unchanged and preview classifications match importer timestamp rules.
+- Validation: awaiting CI. Preview remains advisory; a later import can observe target changes and runtime record errors.

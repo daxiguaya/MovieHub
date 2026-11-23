@@ -783,3 +783,74 @@ def test_scout_import_rejects_non_numeric_ids_and_blank_titles(tmp_path):
             )
     finally:
         source.close()
+
+
+
+def test_import_preview_classifies_new_updates_and_unchanged_without_writes(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-preview.sqlite"
+    target_path = tmp_path / "moviehub-preview.sqlite"
+    _create_scout_fixture(source_path)
+    source_hash_before = _sha256(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    with TargetSession() as db:
+        db.add(Movie(
+            douban_id="1234567",
+            title="Existing movie",
+            type="movie",
+            updated_at=1790000000,
+        ))
+        db.commit()
+    target_hash_before = _sha256(target_path)
+
+    service = import_service_module.ImportService()
+    preview = service.preview_import(source_path)
+    forced = service.preview_import(source_path, force_full=True)
+
+    assert preview["read_only"] is True
+    assert preview["summary"] == {
+        "source_records": 2,
+        "target_records_checked": 1,
+        "new_records": 1,
+        "update_candidates": 0,
+        "unchanged_skips": 1,
+        "would_write": 1,
+        "invalid_years": 0,
+        "invalid_ratings": 0,
+    }
+    assert preview["decision"] == "ready_for_import"
+    assert forced["summary"]["update_candidates"] == 1
+    assert forced["summary"]["unchanged_skips"] == 0
+    assert forced["summary"]["would_write"] == 2
+    assert _sha256(source_path) == source_hash_before
+    assert _sha256(target_path) == target_hash_before
+
+    engine.dispose()
+
+
+def test_import_preview_rejects_invalid_source_before_target_reads(tmp_path, monkeypatch):
+    source_path = tmp_path / "scout-invalid-preview.sqlite"
+    _create_scout_fixture(source_path)
+    with sqlite3.connect(source_path) as source:
+        source.execute("UPDATE item SET douban_id = NULL WHERE douban_id = '1234567'")
+        source.commit()
+
+    def target_must_not_be_opened():
+        raise AssertionError("target must not be queried when source validation fails")
+
+    monkeypatch.setattr(import_service_module, "SessionLocal", target_must_not_be_opened)
+    with pytest.raises(ValueError, match="invalid Douban ID"):
+        import_service_module.ImportService().preview_import(source_path)

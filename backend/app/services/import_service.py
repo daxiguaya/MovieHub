@@ -302,6 +302,105 @@ class ImportService:
                 source_conn.close()
             self._run_lock.release()
 
+    def preview_import(
+        self,
+        source_path: str | Path,
+        force_full: bool = False,
+    ) -> dict[str, Any]:
+        """Classify a Scout import without writing to Scout or MovieHub."""
+        path = Path(source_path).expanduser().resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"Source database not found: {path}")
+
+        source_conn = sqlite3.connect(
+            path.as_uri() + "?mode=ro",
+            uri=True,
+            timeout=30,
+        )
+        source_conn.row_factory = sqlite3.Row
+        try:
+            # Match the importer's validation and stable source snapshot.
+            source_conn.execute("BEGIN")
+            self._validate_source(
+                source_conn,
+                reject_duplicate_ids=True,
+                reject_invalid_identity=True,
+            )
+            total = source_conn.execute(
+                "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
+            ).fetchone()[0]
+            if total <= 0:
+                raise ValueError("Source database contains no movie or TV records")
+
+            with SessionLocal() as db:
+                # This path deliberately performs SELECTs only. It never calls
+                # the upsert routine or flushes/commits target changes.
+                target_rows = db.execute(
+                    select(Movie.douban_id, Movie.updated_at).where(
+                        Movie.douban_id.is_not(None)
+                    )
+                ).all()
+                target_by_id = {
+                    str(douban_id): updated_at
+                    for douban_id, updated_at in target_rows
+                }
+
+            new_records = 0
+            update_candidates = 0
+            unchanged_skips = 0
+            invalid_years = 0
+            invalid_ratings = 0
+            for row in source_conn.execute(SOURCE_ROW_SQL):
+                douban_id = str(row["douban_id"])
+                if douban_id not in target_by_id:
+                    new_records += 1
+                elif not force_full:
+                    source_updated_at = self._safe_int(row["update_time"])
+                    target_updated_at = target_by_id[douban_id]
+                    if (
+                        source_updated_at is not None
+                        and target_updated_at is not None
+                        and source_updated_at <= target_updated_at
+                    ):
+                        unchanged_skips += 1
+                    else:
+                        update_candidates += 1
+                else:
+                    update_candidates += 1
+
+                year = self._safe_int(row["year"])
+                if row["year"] is not None and (
+                    year is None or not 1870 <= year <= 2200
+                ):
+                    invalid_years += 1
+                if row["rating"] is not None and self._safe_rating(row["rating"]) is None:
+                    invalid_ratings += 1
+
+            return {
+                "read_only": True,
+                "source_database": str(path),
+                "force_full": force_full,
+                "source_snapshot_consistent": True,
+                "summary": {
+                    "source_records": total,
+                    "target_records_checked": len(target_by_id),
+                    "new_records": new_records,
+                    "update_candidates": update_candidates,
+                    "unchanged_skips": unchanged_skips,
+                    "would_write": new_records + update_candidates,
+                    "invalid_years": invalid_years,
+                    "invalid_ratings": invalid_ratings,
+                },
+                "decision": "ready_for_import" if new_records + update_candidates else "no_changes",
+                "limitations": [
+                    "Preview is advisory; target data may change before a later import starts.",
+                    "Record-level processing errors and database constraints can only be confirmed during import.",
+                    "No source or target rows were inserted, updated, or deleted.",
+                ],
+            }
+        finally:
+            source_conn.close()
+
     @staticmethod
     def _validate_source(
         conn: sqlite3.Connection,

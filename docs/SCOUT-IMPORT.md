@@ -91,3 +91,16 @@ python -m scripts.audit_scout_preflight \
 ```
 
 Repeat `--input` for every normalized chart snapshot. Exit code 0 means the combined identity and chart-coverage gates passed and the data is ready for operator review. Exit code 2 means one or more blocking issues were found; exit code 1 means the audit could not be completed. The JSON report contains both detailed audits, one consolidated blocking-issues object, and non-blocking numeric/raw-data warnings. Use a consistent staged SQLite backup and keep it unchanged for the duration of the command. A passing report does not itself authorize or perform an import.
+
+
+## Read-only import preview
+
+After the combined Scout/chart quality gate passes, preview the expected target changes before starting the background import:
+
+```sh
+cd backend
+python -m scripts.preview_scout_import --scout-db /path/to/staged-scout.sqlite
+python -m scripts.preview_scout_import --scout-db /path/to/staged-scout.sqlite --force-full
+```
+
+The preview requires an already initialized independent MovieHub database. It opens Scout read-only in a consistent transaction and queries existing MovieHub Douban IDs/source timestamps. It reports new records, update candidates, unchanged incremental skips, expected writes and numeric warnings. It does not call the upsert path or modify either database. A preview is advisory: target data may change before a later import, and record-level errors/constraints can only be confirmed during the actual import.

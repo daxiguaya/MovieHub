@@ -58,3 +58,21 @@ jobs:
         working-directory: frontend
       - name: Build frontend container image
         run: docker build --tag moviehub-frontend:ci ./frontend
+
+
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run browser end-to-end tests
+        run: npm run test:e2e
+        working-directory: frontend

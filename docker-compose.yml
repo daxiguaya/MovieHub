@@ -15,6 +15,7 @@ services:
       MOVIEHUB_API_KEY: ${MOVIEHUB_API_KEY:-}
       MOVIEHUB_CORS_ORIGINS: ${MOVIEHUB_CORS_ORIGINS:-[]}
       MOVIEHUB_LOG_LEVEL: ${MOVIEHUB_LOG_LEVEL:-INFO}
+      FORWARDED_ALLOW_IPS: ${MOVIEHUB_TRUSTED_PROXY_IPS:-127.0.0.1}
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
       - ${MOVIEHUB_IMPORT_PATH:?Set MOVIEHUB_IMPORT_PATH to the directory containing the Scout database}:/imports:ro

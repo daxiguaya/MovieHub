@@ -139,13 +139,24 @@ def test_tagged_collector_rejects_duplicate_ids_and_unsafe_poster_hosts():
             max_items=20,
         ).collect("popular", date(2026, 11, 23))
 
-    client = FakeClient()
+    class UnsafeCoverClient(FakeClient):
+        def get(self, url, params=None):
+            response = super().get(url, params)
+            if url == SEARCH_SUBJECTS_URL:
+                response.payload["subjects"][0]["cover"] = (
+                    "https://evil.example/tracker.jpg"
+                )
+            return response
+
     snapshot = DoubanTaggedChartCollector(
-        client=client,
+        client=UnsafeCoverClient(),
         sleeper=lambda _: None,
         max_items=1,
     ).collect("popular", date(2026, 11, 23))
-    assert snapshot.movies[0].posters[0].startswith("https://img2.doubanio.com/")
+    assert snapshot.movies[0].posters == []
+    assert snapshot.movies[0].douban_url == (
+        "https://movie.douban.com/subject/2000001/"
+    )
 
 
 def test_tagged_collector_validates_chart_and_request_bounds():

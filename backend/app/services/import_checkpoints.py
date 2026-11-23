@@ -45,19 +45,6 @@ def validate_resume_checkpoints(
         if previous_id is not None and last_id <= previous_id:
             raise ValueError("Import checkpoint source cursor is not strictly increasing")
 
-        source_row = source_conn.execute(
-            """
-            SELECT douban_id
-            FROM item
-            WHERE type IN ('movie', 'tv')
-            ORDER BY douban_id
-            LIMIT 1 OFFSET ?
-            """,
-            (values["processed"] - 1,),
-        ).fetchone()
-        if source_row is None or str(source_row[0]) != last_id:
-            raise ValueError("Import checkpoint cursor does not match the source snapshot")
-
         previous = values
         previous_id = last_id
 
@@ -70,6 +57,22 @@ def validate_resume_checkpoints(
             "batch": 0,
             "last_douban_id": None,
         }
+
+    # Validate the actual resume cursor once, after checking all journal
+    # counters. Repeated OFFSET scans for every batch would become quadratic
+    # for large catalogues.
+    source_row = source_conn.execute(
+        """
+        SELECT douban_id
+        FROM item
+        WHERE type IN ('movie', 'tv')
+        ORDER BY douban_id
+        LIMIT 1 OFFSET ?
+        """,
+        (previous["processed"] - 1,),
+    ).fetchone()
+    if source_row is None or str(source_row[0]) != previous_id:
+        raise ValueError("Import checkpoint cursor does not match the source snapshot")
 
     return {
         "processed": previous["processed"],

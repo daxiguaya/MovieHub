@@ -1057,3 +1057,62 @@ def test_scout_import_resume_rejects_changed_source_before_target_writes(
     with TargetSession() as db:
         assert db.query(Movie).count() == 0
     engine.dispose()
+
+
+
+def test_preview_import_and_reconciliation_form_one_end_to_end_flow(
+    tmp_path,
+    monkeypatch,
+):
+    """Prove preview counters and the durable run journal reconcile on real SQLite."""
+    from app.services.import_journal import get_import_journal_path
+    from app.services.import_reconciliation import reconcile_preview_with_run
+
+    source_path = tmp_path / "scout-preview-e2e.sqlite"
+    target_path = tmp_path / "moviehub-preview-e2e.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    preview = service.preview_import(source_path, force_full=False)
+
+    assert preview["summary"]["source_records"] == 2
+    assert preview["summary"]["new_records"] == 2
+    assert preview["summary"]["update_candidates"] == 0
+    assert preview["summary"]["unchanged_skips"] == 0
+    assert preview["source_fingerprint"]
+
+    run_id = "preview-reconcile-e2e"
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=False, run_id=run_id)
+        assert service.status.status == "completed"
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    journal_path = get_import_journal_path(TargetSession)
+    result = reconcile_preview_with_run(preview, journal_path, run_id)
+
+    assert result["reconciled"] is True
+    assert result["status"] == "matched"
+    assert result["preview"]["expected_imported"] == 2
+    assert result["actual"]["imported"] == 2
+    assert result["actual"]["errors"] == 0
+    assert result["mismatches"] == []
+
+    # The preview, import and reconciliation must never modify the source DB.
+    assert _sha256(source_path) == _sha256(source_path)
+    engine.dispose()

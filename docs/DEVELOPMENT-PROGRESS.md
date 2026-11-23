@@ -482,3 +482,13 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add regression tests for matching imports with record errors, changed sources, incomplete runs, counter drift and malformed preview reports.
 
 **Preview → import accounting reconciliation: implemented; CI verification pending.**
+
+
+## Preview/import/reconciliation end-to-end acceptance (2026-11-23)
+
+- [x] Add an integration test using a real temporary Scout SQLite source and isolated MovieHub target.
+- [x] Execute read-only preview, actual importer, durable journal, then reconciliation in one test flow.
+- [x] Verify source fingerprint continuity, expected-vs-actual import counters and zero reconciliation mismatches.
+- [x] Keep the test fully isolated; no production Scout or NAS database is accessed.
+
+**The preview → import → reconciliation chain now has a single automated integration test; CI verification pending.**

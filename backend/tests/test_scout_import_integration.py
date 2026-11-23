@@ -854,3 +854,69 @@ def test_import_preview_rejects_invalid_source_before_target_reads(tmp_path, mon
     monkeypatch.setattr(import_service_module, "SessionLocal", target_must_not_be_opened)
     with pytest.raises(ValueError, match="invalid Douban ID"):
         import_service_module.ImportService().preview_import(source_path)
+
+
+def test_import_writes_durable_run_and_batch_journal(tmp_path, monkeypatch):
+    from app.services.import_journal import (
+        get_import_journal_path,
+        read_import_events,
+    )
+
+    source_path = tmp_path / "scout-journal.sqlite"
+    target_path = tmp_path / "moviehub-journal.sqlite"
+    _create_scout_fixture(source_path)
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(
+        import_service_module.cache_manager,
+        "clear",
+        lambda: None,
+    )
+    service = import_service_module.ImportService()
+    service._BATCH_SIZE = 1
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True, run_id="journal-test-run")
+    finally:
+        # _run_import owns and releases the lock.
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    journal_path = get_import_journal_path(TargetSession)
+    events = read_import_events(journal_path)
+    assert journal_path.is_file()
+    assert journal_path.stat().st_mode & 0o777 == 0o600
+    assert [event["event"] for event in events] == [
+        "run_started",
+        "batch_committed",
+        "batch_committed",
+        "run_completed",
+    ]
+    batches = [event for event in events if event["event"] == "batch_committed"]
+    assert [event["processed"] for event in batches] == [1, 2]
+    assert batches[-1]["last_douban_id"] == "7654321"
+    assert events[-1]["run_id"] == "journal-test-run"
+    assert events[-1]["imported"] == 2
+    engine.dispose()
+
+
+def test_import_journal_ignores_incomplete_trailing_record(tmp_path):
+    from app.services.import_journal import read_import_events
+
+    journal = tmp_path / "journal.jsonl"
+    journal.write_text(
+        '{"event":"run_started","run_id":"a"}\\n{"event":"batch_committed"',
+        encoding="utf-8",
+    )
+    assert read_import_events(journal) == [
+        {"event": "run_started", "run_id": "a"}
+    ]

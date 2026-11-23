@@ -104,3 +104,12 @@ python -m scripts.preview_scout_import --scout-db /path/to/staged-scout.sqlite -
 ```
 
 The preview requires an already initialized independent MovieHub database. It opens Scout read-only in a consistent transaction and queries existing MovieHub Douban IDs/source timestamps. It reports new records, update candidates, unchanged incremental skips, expected writes and numeric warnings. It does not call the upsert path or modify either database. A preview is advisory: target data may change before a later import, and record-level errors/constraints can only be confirmed during the actual import.
+
+
+## Durable import batch journal
+
+Every import run now appends a JSONL journal beside the MovieHub database:
+
+`movies.db.import-journal.jsonl`
+
+The journal records run start, each committed 500-row batch (including the last processed Douban ID and cumulative counts), and terminal success/failure. Each event is appended with a single write and `fsync`; the file is created with owner-only permissions (0600). A torn final line after an abrupt process exit is ignored when reading the journal; earlier complete committed-batch events remain available for diagnosis. The journal is an audit/recovery aid, not yet an automatic resume engine: safe retry still relies on the importer's idempotent upsert behavior.

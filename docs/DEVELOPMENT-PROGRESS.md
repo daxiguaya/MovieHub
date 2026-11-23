@@ -423,3 +423,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add CLI that refuses to run unless the independent MovieHub database is already initialized.
 - [x] Add integration tests proving source and target SQLite file hashes remain unchanged and preview classifications match importer timestamp rules.
 - Validation: awaiting CI. Preview remains advisory; a later import can observe target changes and runtime record errors.
+
+
+## Durable Scout import batch journal (2026-11-23)
+
+- [x] Assign each background import a stable run ID.
+- [x] Persist run-start, committed-batch, completion and failure events beside the MovieHub database.
+- [x] Record batch number, processed/total, last Douban ID and cumulative import/skip/error counts only after the corresponding target transaction commits.
+- [x] Use append-only JSONL, owner-only file permissions and fsync per event.
+- [x] Ignore a torn final journal line after abrupt process termination while preserving preceding complete events.
+- [x] Add tests for multi-batch journal ordering, checkpoint values, file permissions and truncated-tail recovery.
+- Limitation: this is a durable batch ledger and recovery aid, not yet automatic checkpoint resume. Retry remains safe through idempotent upserts; explicit resume validation is the next step.

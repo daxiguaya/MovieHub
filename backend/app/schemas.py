@@ -71,6 +71,7 @@ class ImportStatus(BaseModel):
     """Import process status schema."""
 
     status: Literal["idle", "running", "completed", "failed"]
+    run_id: str | None = None
     processed: int = 0
     total: int = 0
     errors: int = 0

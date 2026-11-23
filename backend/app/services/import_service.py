@@ -8,6 +8,7 @@ from itertools import islice
 import re
 import sqlite3
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar
@@ -27,6 +28,7 @@ from app.database import (
 )
 from app.metadata_constants import VALID_GENRES, VALID_REGIONS
 from app.schemas import ImportStatus
+from app.services.import_journal import append_import_event, get_import_journal_path
 
 logger = logging.getLogger("moviehub.import")
 
@@ -104,8 +106,10 @@ class ImportService:
             raise RuntimeError("Import already in progress")
 
         try:
+            run_id = uuid.uuid4().hex
             with self._status_lock:
                 self._status = ImportStatus(
+                    run_id=run_id,
                     status="running",
                     processed=0,
                     total=0,
@@ -116,7 +120,7 @@ class ImportService:
 
             thread = threading.Thread(
                 target=self._run_import,
-                args=(path, force_full),
+                args=(path, force_full, run_id),
                 name="moviehub-import",
                 daemon=True,
             )
@@ -160,7 +164,9 @@ class ImportService:
         self,
         source_path: Path,
         force_full: bool,
+        run_id: str | None = None,
     ) -> None:
+        run_id = run_id or uuid.uuid4().hex
         source_conn: sqlite3.Connection | None = None
         committed_batches = 0
 
@@ -197,6 +203,15 @@ class ImportService:
             if total <= 0:
                 raise ValueError("Source database contains no movie or TV records")
 
+            journal_path = get_import_journal_path(SessionLocal)
+            append_import_event(journal_path, {
+                "event": "run_started",
+                "run_id": run_id,
+                "source_path": str(source_path),
+                "force_full": force_full,
+                "total": total,
+                "started_at": datetime.now().isoformat(),
+            })
             self._set_progress(0, total, "Reading source database")
             processed = 0
             skipped = 0
@@ -253,6 +268,18 @@ class ImportService:
                             processed += 1
 
                     committed_batches += 1
+                    append_import_event(journal_path, {
+                        "event": "batch_committed",
+                        "run_id": run_id,
+                        "batch": committed_batches,
+                        "processed": processed,
+                        "total": total,
+                        "last_douban_id": str(rows[-1]["douban_id"]),
+                        "imported": imported,
+                        "skipped": skipped,
+                        "errors": record_errors,
+                        "committed_at": datetime.now().isoformat(),
+                    })
                     self._set_progress(
                         processed,
                         total,
@@ -278,6 +305,17 @@ class ImportService:
             with self._status_lock:
                 self._status.errors = record_errors
             self._set_progress(processed, total, completion_message)
+            append_import_event(journal_path, {
+                "event": "run_completed",
+                "run_id": run_id,
+                "processed": processed,
+                "total": total,
+                "imported": imported,
+                "skipped": skipped,
+                "errors": record_errors,
+                "batches": committed_batches,
+                "completed_at": datetime.now().isoformat(),
+            })
             self._finish("completed", completion_message)
 
         except Exception:
@@ -291,6 +329,18 @@ class ImportService:
                     cache_manager.clear()
                 except Exception:
                     logger.exception("Failed to clear caches after partial import")
+            try:
+                append_import_event(
+                    get_import_journal_path(SessionLocal),
+                    {
+                        "event": "run_failed",
+                        "run_id": run_id,
+                        "committed_batches": committed_batches,
+                        "failed_at": datetime.now().isoformat(),
+                    },
+                )
+            except Exception:
+                logger.exception("Failed to persist import failure event")
             self._finish(
                 "failed",
                 "Import failed. Earlier batches, if any, were committed; retry is safe. "

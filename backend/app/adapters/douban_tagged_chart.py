@@ -35,6 +35,7 @@ CHARTS = {
         "name": "豆瓣实时热门",
         "tag": "热门",
         "category": "popular",
+        "period": "realtime",
         "description": "豆瓣网页热门电影列表",
     },
     "high-rated": {
@@ -252,6 +253,7 @@ class DoubanTaggedChartCollector:
                 name=config["name"],
                 source="douban",
                 category=config["category"],
+                period=config.get("period"),
                 description=config["description"],
                 snapshot_date=snapshot_date,
                 movies=movies,

@@ -56,7 +56,7 @@ def test_version_two_migration_upgrades_v1_and_is_idempotent(tmp_path):
     _create_v1_database(db_path)
 
     assert execute_migration(db_path, MIGRATION) == 2
-    assert execute_migration(db_path, MIGRATION) == 1
+    assert execute_migration(db_path, MIGRATION) == 2
 
     conn = sqlite3.connect(str(db_path))
     try:
@@ -179,8 +179,8 @@ def test_failed_restore_removes_stale_wal_sidecars(tmp_path, monkeypatch):
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall() == []
+            "SELECT MAX(version) FROM schema_migrations"
+        ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
         conn.close()

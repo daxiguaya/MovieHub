@@ -7,7 +7,7 @@ MovieHub reads configuration from environment variables with the `MOVIEHUB_` pre
 | `MOVIEHUB_DATA_DIR` | `/data` | MovieHub-owned database and poster-cache root |
 | `MOVIEHUB_BACKUP_DIR` | `/backups` | Dedicated backup destination inside the container |
 | `MOVIEHUB_IMPORT_DIR` | `/imports` | Directory from which Scout source databases may be imported |
-| `MOVIEHUB_API_KEY` | empty | Required to enable protected import APIs |
+| `MOVIEHUB_API_KEY` | empty | Required for protected import, chart-import and favorites write/read APIs |
 | `MOVIEHUB_CORS_ORIGINS` | `[]` | Explicit JSON array of allowed cross-origin frontend origins |
 | `MOVIEHUB_LOG_LEVEL` | `INFO` | Console logging level |
 | `MOVIEHUB_RATE_LIMIT_IMPORT` | `5/minute` | Rate limit for protected import APIs |
@@ -24,9 +24,11 @@ MOVIEHUB_CORS_ORIGINS=["https://moviehub.example.com"]
 
 Do not use a wildcard origin. MovieHub does not enable credentialed CORS.
 
-## Protected import API
+## Protected API access
 
-Set a strong, private `MOVIEHUB_API_KEY`. Requests to protected import endpoints must send it in the `X-API-Key` header. When no key is configured, protected import APIs return HTTP 503 and remain disabled.
+Set a strong, private `MOVIEHUB_API_KEY`. Requests to protected import, chart-import and favorites endpoints must send it in the `X-API-Key` header. When no key is configured, protected endpoints return HTTP 503 and remain disabled.
+
+The browser frontend must never embed this secret in JavaScript. For a same-origin Nginx Proxy Manager deployment, configure the `/api/favorites` location to inject the secret as an upstream `X-API-Key` header, or provide an equivalent server-side authenticated proxy. Keep the key only in private server-side configuration. Do not expose a client-side API-key value.
 
 The Scout source database must be located under `MOVIEHUB_IMPORT_DIR`. The API resolves the requested path and rejects paths or symlinks that escape that directory. MovieHub opens Scout SQLite files in read-only mode; mount the source directory read-only as an additional filesystem boundary.
 

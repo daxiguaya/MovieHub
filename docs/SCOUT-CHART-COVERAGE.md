@@ -41,3 +41,8 @@ initialize MovieHub, start an import, or modify either database.
 This is a preflight report only. The established Scout importer remains the
 metadata ingestion path; chart import then fills only missing MovieHub fields.
 A successful audit is not authorization to import or deploy.
+
+
+## Strict quality-gate mode
+
+The audit CLI supports an optional `--strict` flag for automation and pre-import checks. It always prints the full JSON report, then exits with status `2` if any chart entry is missing from Scout, has an ambiguous duplicate Scout ID, or matches a row with the wrong media type. Without `--strict`, the audit remains report-only and exits successfully when the database can be read. The strict gate does not impose arbitrary metadata-completeness percentages; field coverage remains visible for an operator to review.

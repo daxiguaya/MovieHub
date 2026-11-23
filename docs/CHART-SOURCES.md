@@ -4,9 +4,9 @@ Last reviewed: 2026-11-23
 
 ## Current state
 
-MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, a local JSON adapter, a Cinephile-format adapter, and a CLI with dry-run validation.
+MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, and a one-shot Top 250 public-page collector.
 
-**It does not yet collect Douban charts automatically.** Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
+**It does not yet run scheduled chart collection.** Top 250 can be collected manually when robots.txt permits; popular, high-rated and annual chart collectors are not yet implemented. Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
 
 ## Reference projects
 
@@ -27,6 +27,15 @@ The project describes multi-source metadata aggregation and ID translation acros
 ### Douban Scout
 
 Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout SQLite read-only and imports into its own database. It is not a chart acquisition source, and MovieHub must not modify Scout.
+
+## One-shot Top 250 collector
+
+- Reads only the public `/top250` HTML pages.
+- Checks `robots.txt` before requesting chart pages.
+- Makes ten sequential page requests, with at least two seconds between requests.
+- Does not use cookies, login sessions, proxy rotation, redirects, retries or challenge bypass.
+- Stops on 401/403, 429, unexpected redirects, oversized responses, missing ranks or changed markup.
+- Writes a normalized JSON file only; it does not write directly to the database or run on a schedule.
 
 ## Acquisition constraints
 

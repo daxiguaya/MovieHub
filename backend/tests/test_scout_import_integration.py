@@ -435,3 +435,67 @@ def test_batched_import_keeps_committed_batches_and_retry_completes(
         ) is not None
 
     engine.dispose()
+
+
+def test_scout_import_processes_synthetic_catalogue_across_multiple_batches(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-large-fixture.sqlite"
+    target_path = tmp_path / "moviehub-large-fixture.sqlite"
+    _create_scout_fixture(source_path)
+
+    synthetic_count = 1000
+    with sqlite3.connect(source_path) as source:
+        source.executemany(
+            "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    str(8000000 + index),
+                    None,
+                    f"Synthetic Movie {index}",
+                    1980 + (index % 45),
+                    6.0 + (index % 40) / 10,
+                    json.dumps(
+                        {"detail": {"summary": f"Synthetic overview {index}"}},
+                        ensure_ascii=False,
+                    ),
+                    "movie",
+                    1800000000 + index,
+                )
+                for index in range(synthetic_count)
+            ],
+        )
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    service._BATCH_SIZE = 200
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+        assert service.status.processed == synthetic_count + 2
+        assert service.status.total == synthetic_count + 2
+        assert service.status.percentage == 100.0
+
+        with TargetSession() as db:
+            assert db.query(Movie).count() == synthetic_count + 2
+            assert db.scalar(
+                select(Movie).where(Movie.douban_id == "8000999")
+            ).title == "Synthetic Movie 999"
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+        engine.dispose()

@@ -50,7 +50,7 @@ def test_chart_import_cli_dry_run_validates_without_database_access(tmp_path, mo
         "slug": "cli-chart",
         "snapshot_date": "2026-11-23",
         "item_count": 1,
-        "source": "local",
+        "source": "douban",
     }
 
 
@@ -84,7 +84,7 @@ def test_chart_import_cli_writes_only_to_moviehub_session(tmp_path, monkeypatch)
             chart = db.scalar(select(Chart).where(Chart.slug == "cli-chart"))
             snapshot = db.scalar(select(ChartSnapshot))
             movie = db.scalar(select(Movie).where(Movie.douban_id == "123456"))
-            assert chart.source == "local"
+            assert chart.source == "douban"
             assert snapshot.item_count == 1
             assert movie.title == "CLI Fixture Movie"
     finally:

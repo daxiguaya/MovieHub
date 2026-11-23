@@ -113,7 +113,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Exercise a 1,000-record synthetic Scout catalogue across six bounded batches.
 - [x] Add opt-in 10k/100k synthetic throughput benchmarks using temporary source and target SQLite databases; normal CI skips these hardware-sensitive runs.
 
-**Import hardening milestone: implemented and tested, including a 1,000-row synthetic catalogue processed across multiple batches.** A larger 10k/100k and NAS-hardware benchmark remains. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented and tested, including 1k/10k/100k synthetic catalogues processed across bounded batches.** The 10k/100k CI measurements are recorded below; a separate NAS-hardware benchmark remains pending. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
 ## Scout import operator workflow
 
@@ -122,7 +122,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Document timestamp-based skip behavior, non-destructive empty-field merge policy, no source-delete propagation, batch commits and retry semantics.
 - [x] Explicitly separate Scout metadata import from chart snapshot acquisition.
 
-**Scout import runbook: complete. Large-fixture performance validation remains.**
+**Scout import runbook: complete. Synthetic 10k/100k performance validation is complete; NAS-hardware validation remains pending.**
 
 ## Favorites API milestone
 

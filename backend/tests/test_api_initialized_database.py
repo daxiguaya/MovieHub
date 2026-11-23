@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
+from app.database import Movie
 
 import app.database as database
 import app.main as main_module
@@ -30,6 +31,21 @@ def test_data_apis_work_with_explicitly_initialized_database(
         expire_on_commit=False,
     )
 
+    with TargetSession() as db:
+        movie = Movie(
+            douban_id="654321",
+            title="Internal ID Detail Fixture",
+            year=2023,
+            rating=8.0,
+            rating_count=100,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        db.add(movie)
+        db.commit()
+        movie_id = movie.id
+
     monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))
     monkeypatch.setattr(database, "SessionLocal", TargetSession)
     monkeypatch.setattr(main_module, "get_db_path", lambda: str(db_path))
@@ -43,12 +59,16 @@ def test_data_apis_work_with_explicitly_initialized_database(
         with TestClient(main_module.app) as client:
             charts_response = client.get("/api/charts")
             movies_response = client.get("/api/movies")
+            movie_detail_response = client.get(f"/api/movies/id/{movie_id}")
             health_response = client.get("/api/health")
             readiness_response = client.get("/api/ready")
 
         assert charts_response.status_code == 200
         assert isinstance(charts_response.json(), list)
         assert movies_response.status_code == 200
+        assert movie_detail_response.status_code == 200
+        assert movie_detail_response.json()["id"] == movie_id
+        assert movie_detail_response.json()["title"] == "Internal ID Detail Fixture"
         assert health_response.status_code == 200
         assert health_response.json() == {"status": "healthy"}
         assert readiness_response.status_code == 200

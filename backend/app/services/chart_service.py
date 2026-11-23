@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import (
     Chart,
     ChartItem,
+    ChartSnapshot,
     Movie,
     MovieGenre,
     MovieRegion,
@@ -142,19 +143,26 @@ class ChartService:
         cursor: str | None = None,
         limit: int = 20,
     ) -> ChartMoviesListResponse | None:
-        """Return a ranked chart snapshot with cursor pagination."""
+        """Return one dated chart snapshot with cursor pagination."""
         chart = self.get_chart(db, slug)
         if chart is None:
             return None
 
+        snapshot_query = db.query(ChartSnapshot).filter(
+            ChartSnapshot.list_id == chart.list_id
+        )
         if snapshot_date is None:
-            snapshot_date = (
-                db.query(func.max(ChartItem.snapshot_date))
-                .filter(ChartItem.list_id == chart.list_id)
-                .scalar()
+            snapshot = (
+                snapshot_query
+                .order_by(ChartSnapshot.snapshot_date.desc())
+                .first()
             )
+        else:
+            snapshot = snapshot_query.filter(
+                ChartSnapshot.snapshot_date == snapshot_date
+            ).one_or_none()
 
-        if snapshot_date is None:
+        if snapshot is None:
             return ChartMoviesListResponse(
                 chart=self._chart_response(chart),
                 items=[],
@@ -164,36 +172,24 @@ class ChartService:
 
         query = (
             db.query(ChartItem)
-            .join(
-                Movie,
-                Movie.douban_id == ChartItem.douban_id,
-            )
-            .filter(
-                ChartItem.list_id == chart.list_id,
-                ChartItem.snapshot_date == snapshot_date,
-            )
+            .join(Movie, Movie.id == ChartItem.movie_id)
+            .filter(ChartItem.snapshot_id == snapshot.id)
             .options(
                 selectinload(ChartItem.movie).selectinload(
                     Movie.genres
-                ).selectinload(
-                    MovieGenre.genre_obj
-                ),
+                ).selectinload(MovieGenre.genre_obj),
                 selectinload(ChartItem.movie).selectinload(
                     Movie.regions
-                ).selectinload(
-                    MovieRegion.region_obj
-                ),
+                ).selectinload(MovieRegion.region_obj),
             )
         )
 
-        total = query.count()
-
+        total = snapshot.item_count
         cursor_rank = self._decode_cursor(cursor)
         if cursor_rank is not None:
             query = query.filter(ChartItem.rank > cursor_rank)
 
         limit = max(1, min(int(limit), MAX_PAGE_SIZE))
-
         rows = (
             query.order_by(ChartItem.rank.asc())
             .limit(limit + 1)
@@ -202,24 +198,19 @@ class ChartService:
 
         has_more = len(rows) > limit
         rows = rows[:limit]
-
         items: list[ChartMovieResponse] = []
 
         for chart_item in rows:
             movie = chart_item.movie
             if movie is None:
-                # The join normally excludes this case. Keep the guard
-                # in case a database has inconsistent relationship data.
                 continue
-
             movie_data = self._movie_response(movie)
-
             items.append(
                 ChartMovieResponse(
                     **movie_data.model_dump(),
                     rank=chart_item.rank,
                     source_rating=chart_item.source_rating,
-                    snapshot_date=chart_item.snapshot_date,
+                    snapshot_date=snapshot.snapshot_date,
                 )
             )
 

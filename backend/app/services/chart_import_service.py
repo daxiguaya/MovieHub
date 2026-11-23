@@ -303,6 +303,9 @@ class ChartImportService:
         self,
         db: Session,
         snapshot: ChartSnapshotImport,
+        *,
+        _nested_transaction: bool = False,
+        _clear_cache: bool = True,
     ) -> dict[str, Any]:
         """Import or replace one chart's snapshot for one date.
 
@@ -365,14 +368,15 @@ class ChartImportService:
                     "The snapshot contains duplicate ranks"
                 )
 
-            if db.in_transaction():
+            if db.in_transaction() and not _nested_transaction:
                 raise ChartImportError(
                     "The database session already has an active transaction"
                 )
 
             imported_at = datetime.utcnow()
+            transaction = db.begin_nested() if _nested_transaction else db.begin()
 
-            with db.begin():
+            with transaction:
                 chart = db.scalar(
                     select(Chart).where(Chart.slug == slug)
                 )
@@ -594,8 +598,10 @@ class ChartImportService:
                 db.flush()
 
 
-            # Cache invalidation must happen after the transaction commits.
-            cache_manager.clear()
+            # In batch mode, the outer transaction owns the commit and cache
+            # invalidation. Never clear caches for an uncommitted savepoint.
+            if _clear_cache:
+                cache_manager.clear()
 
             return {
                 "success": True,
@@ -606,15 +612,79 @@ class ChartImportService:
             }
 
         except ChartImportError:
-            db.rollback()
+            if not _nested_transaction:
+                db.rollback()
             raise
 
         except Exception as exc:
-            db.rollback()
+            if not _nested_transaction:
+                db.rollback()
             logger.exception("Chart snapshot import failed")
             raise ChartImportError(
                 "Chart snapshot import failed. Check the backend log for details."
             ) from exc
+
+
+    def import_snapshots(
+        self,
+        db: Session,
+        snapshots: list[ChartSnapshotImport],
+    ) -> dict[str, Any]:
+        """Import multiple chart snapshots as one all-or-nothing transaction."""
+        if not snapshots:
+            raise ChartImportError("No chart snapshots were supplied")
+        if db.in_transaction():
+            raise ChartImportError(
+                "The database session already has an active transaction"
+            )
+
+        keys: list[tuple[str, str]] = []
+        for snapshot in snapshots:
+            slug = self._clean_string(self._value(snapshot, "slug"))
+            snapshot_date = self._clean_string(
+                self._value(snapshot, "snapshot_date")
+            )
+            if not slug or not snapshot_date:
+                raise ChartImportError(
+                    "Every batch snapshot must include a chart slug and date"
+                )
+            keys.append((slug, snapshot_date))
+
+        if len(keys) != len(set(keys)):
+            raise ChartImportError(
+                "The batch contains duplicate chart/date snapshots"
+            )
+
+        results: list[dict[str, Any]] = []
+        try:
+            with db.begin():
+                for snapshot in snapshots:
+                    results.append(
+                        self.import_snapshot(
+                            db,
+                            snapshot,
+                            _nested_transaction=True,
+                            _clear_cache=False,
+                        )
+                    )
+            # Invalidate once, and only after the entire batch is committed.
+            cache_manager.clear()
+        except ChartImportError:
+            db.rollback()
+            raise
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Chart snapshot batch import failed")
+            raise ChartImportError(
+                "Chart snapshot batch import failed; no snapshots were committed"
+            ) from exc
+
+        return {
+            "success": True,
+            "imported_count": len(results),
+            "snapshots": results,
+            "message": "All chart snapshots imported successfully",
+        }
 
 
 chart_import_service = ChartImportService()

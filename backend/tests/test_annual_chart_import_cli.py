@@ -3,7 +3,11 @@ import json
 from datetime import date
 
 import pytest
+from sqlalchemy import create_engine, event, select, func
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
+from app.database import Base, Chart, ChartSnapshot, ChartItem, Movie
 import scripts.import_annual_charts as annual_import
 
 
@@ -208,3 +212,97 @@ def test_cli_rejects_invalid_date_without_database_access(
 
     assert annual_import.main() == 1
     assert "Annual chart import failed" in capsys.readouterr().err
+
+
+
+def _isolated_database():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    @event.listens_for(engine, "connect")
+    def enable_foreign_keys(connection, record):
+        connection.execute("PRAGMA foreign_keys=ON")
+
+    Base.metadata.create_all(engine)
+    return engine
+
+
+def test_annual_batch_apply_integrates_with_real_service_and_isolated_database(
+    tmp_path, monkeypatch
+):
+    _write_batch(tmp_path)
+    engine = _isolated_database()
+    monkeypatch.setattr(annual_import, "database_is_ready", lambda: True)
+    monkeypatch.setattr(
+        annual_import,
+        "SessionLocal",
+        lambda: Session(engine, expire_on_commit=False),
+    )
+
+    try:
+        result = annual_import.import_annual_batch(
+            tmp_path,
+            CAPTURE_DATE,
+            apply=True,
+        )
+
+        with Session(engine) as db:
+            assert result["applied"] is True
+            assert db.scalar(select(func.count()).select_from(Chart)) == 4
+            assert db.scalar(select(func.count()).select_from(ChartSnapshot)) == 4
+            assert db.scalar(select(func.count()).select_from(ChartItem)) == 4
+            assert db.scalar(select(func.count()).select_from(Movie)) == 4
+    finally:
+        engine.dispose()
+
+
+def test_annual_batch_apply_rolls_back_all_charts_on_real_service_conflict(
+    tmp_path, monkeypatch
+):
+    _write_batch(tmp_path)
+    engine = _isolated_database()
+    with Session(engine) as seed_db:
+        seed_db.add(
+            Movie(
+                douban_id="900004",
+                title="Existing Scout movie",
+                type="movie",
+                rating_count=0,
+                directors="[]",
+                actors="[]",
+            )
+        )
+        seed_db.commit()
+
+    monkeypatch.setattr(annual_import, "database_is_ready", lambda: True)
+    monkeypatch.setattr(
+        annual_import,
+        "SessionLocal",
+        lambda: Session(engine, expire_on_commit=False),
+    )
+
+    try:
+        from app.services.chart_import_service import ChartImportError
+
+        with pytest.raises(ChartImportError, match="media type mismatch"):
+            annual_import.import_annual_batch(
+                tmp_path,
+                CAPTURE_DATE,
+                apply=True,
+            )
+
+        with Session(engine) as db:
+            assert db.scalar(select(func.count()).select_from(Chart)) == 0
+            assert db.scalar(select(func.count()).select_from(ChartSnapshot)) == 0
+            assert db.scalar(select(func.count()).select_from(ChartItem)) == 0
+            assert db.scalar(select(func.count()).select_from(Movie)) == 1
+            existing = db.scalar(
+                select(Movie).where(Movie.douban_id == "900004")
+            )
+            assert existing.type == "movie"
+            assert existing.title == "Existing Scout movie"
+    finally:
+        engine.dispose()

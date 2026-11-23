@@ -3,7 +3,10 @@
 Before enriching or importing annual chart snapshots, MovieHub can compare their
 Douban IDs with a consistent local copy of the Scout database. This audit opens
 Scout SQLite with `mode=ro`, checks the expected schema, and reports ID match
-rates, media-type mismatches and per-field metadata coverage. It never opens
+rates, media-type mismatches and per-field metadata coverage. ID matches with
+the wrong media type remain visible as ID matches and mismatches, but are
+excluded from the valid-match denominator and all metadata field-coverage
+numerators. It never opens
 the MovieHub database and never writes to Scout.
 
 Run from the backend directory:

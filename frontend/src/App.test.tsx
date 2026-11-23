@@ -51,7 +51,7 @@ describe("MovieHub frontend workflows", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/"]}>
         <App />
       </MemoryRouter>
     );
@@ -78,7 +78,7 @@ describe("MovieHub frontend workflows", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/search"]}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search"]}>
         <App />
       </MemoryRouter>
     );
@@ -144,7 +144,7 @@ describe("MovieHub frontend workflows", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(
-      <MemoryRouter initialEntries={["/movies/42"]}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/movies/42"]}>
         <App />
       </MemoryRouter>
     );
@@ -209,7 +209,7 @@ describe("MovieHub frontend workflows", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/charts/top250"]}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/charts/top250"]}>
         <App />
       </MemoryRouter>
     );

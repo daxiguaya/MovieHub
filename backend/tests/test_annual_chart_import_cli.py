@@ -10,7 +10,7 @@ import scripts.import_annual_charts as annual_import
 CAPTURE_DATE = date(2026, 11, 23)
 
 
-def _write_batch(directory, *, date_value="2026-11-23", filename_date=None, omit=None):
+def _write_batch(directory, *, date_value="2026-11-23", filename_date=None, omit=None, wrong_name=None):
     directory.mkdir(parents=True, exist_ok=True)
     definitions = {
         "annual-2025-chinese-movies": ("movie", "Chinese movies"),
@@ -23,7 +23,7 @@ def _write_batch(directory, *, date_value="2026-11-23", filename_date=None, omit
             continue
         payload = {
             "slug": slug,
-            "name": name,
+            "name": "Unexpected annual chart" if slug == wrong_name else annual_import.ANNUAL_CHARTS[slug]["name"],
             "source": "douban",
             "category": "annual",
             "period": "2025",
@@ -143,3 +143,68 @@ def test_annual_batch_rejects_wrong_capture_date_before_opening_database(
             date(2026, 11, 23),
             apply=True,
         )
+
+
+
+def test_annual_batch_rejects_wrong_chart_name_before_database_access(
+    tmp_path, monkeypatch
+):
+    _write_batch(tmp_path, wrong_name="annual-2025-hidden-gems")
+    monkeypatch.setattr(
+        annual_import,
+        "database_is_ready",
+        lambda: pytest.fail("database must not be checked for invalid input"),
+    )
+
+    with pytest.raises(ValueError, match="declares name"):
+        annual_import.import_annual_batch(tmp_path, CAPTURE_DATE, apply=True)
+
+
+def test_cli_dry_run_returns_zero_and_prints_preflight_summary(
+    tmp_path, monkeypatch, capsys
+):
+    _write_batch(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "import_annual_charts",
+            "--input-dir",
+            str(tmp_path),
+            "--date",
+            "2026-11-23",
+        ],
+    )
+    monkeypatch.setattr(
+        annual_import,
+        "database_is_ready",
+        lambda: pytest.fail("CLI dry-run must not inspect the database"),
+    )
+
+    assert annual_import.main() == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is True
+    assert output["applied"] is False
+    assert output["chart_count"] == 4
+
+
+def test_cli_rejects_invalid_date_without_database_access(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "import_annual_charts",
+            "--input-dir",
+            str(tmp_path),
+            "--date",
+            "not-a-date",
+        ],
+    )
+    monkeypatch.setattr(
+        annual_import,
+        "database_is_ready",
+        lambda: pytest.fail("invalid CLI date must fail before DB access"),
+    )
+
+    assert annual_import.main() == 1
+    assert "Annual chart import failed" in capsys.readouterr().err

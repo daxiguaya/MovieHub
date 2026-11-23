@@ -1,6 +1,7 @@
 import type {
   Chart,
   ChartMoviesResponse,
+  ChartCompareResponse,
   ChartSnapshot,
   Favorite,
   MovieDetail,
@@ -36,6 +37,12 @@ export const api = {
   charts: () => request<Chart[]>("/charts"),
   snapshots: (slug: string) =>
     request<ChartSnapshot[]>(`/charts/${encodeURIComponent(slug)}/snapshots`),
+  compareChart: (slug: string, fromDate: string, toDate: string) => {
+    const params = new URLSearchParams({ from_date: fromDate, to_date: toDate });
+    return request<ChartCompareResponse>(
+      `/charts/${encodeURIComponent(slug)}/compare?${params.toString()}`
+    );
+  },
   chart: (slug: string, snapshotDate?: string, cursor?: string) => {
     const params = new URLSearchParams();
     if (snapshotDate) params.set("snapshot_date", snapshotDate);

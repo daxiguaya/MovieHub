@@ -94,7 +94,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| Annual chart collection and scheduled updates | 0% |
+| 2025 annual chart taxonomy | Four official lists defined; ranking data import pending |
 | Favorites API and frontend UI | Implemented; Chromium E2E passed |
 | Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
@@ -169,7 +169,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add a one-shot Douban Top 250 HTML collector with robots.txt checks, two-second pacing, redirect denial and no cookies/proxies/retries.
 - [x] Add one-shot popular and high-rated collectors using the site's undocumented `/j/search_subjects` web endpoint, bounded to 100 items by default, with the same robots/rate-limit safeguards.
 - [x] Keep collection output as normalized JSON; validate with dry-run and import through the existing snapshot service.
-- [ ] Add annual chart collection after confirming a stable, permitted source.
+- [x] Verify Douban's official 2025 annual categories and model the four distinct chart definitions without combining movie and TV rankings.
+- [ ] Import the 2025 annual chart snapshots through the normalized JSON workflow after preparing and validating source data.
+- [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 
 **Top 250, popular and high-rated one-shot collection: implemented. Annual charts and scheduling remain pending.**
@@ -208,7 +210,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Next work
 
-- [ ] Implement an annual chart collector if a stable public source can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
+- [ ] Import the four 2025 annual categories from validated normalized source data; do not merge Chinese, international, hidden-gem and TV rankings.
+- [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
+- [ ] Implement an annual chart collector only if a stable public source and permitted acquisition path can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [x] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff using Playwright Chromium and isolated API fixtures.

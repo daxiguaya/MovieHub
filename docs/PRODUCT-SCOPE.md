@@ -94,7 +94,7 @@ Do not implement these in MovieHub first release:
 | Capability | Current state | Remaining work |
 |---|---|---|
 | Independent SQLite schema | Complete, 11 core tables | Add a versioned search/index migration only if benchmarks justify it |
-| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, historical rank comparison API and UI exist | Automated chart acquisition/scheduling and live-data UX validation |
+| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, rank comparison API/UI and a robots-aware one-shot Top 250 collector exist | Popular/high-rated/annual collectors, scheduled refresh and live-data UX validation |
 | Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |

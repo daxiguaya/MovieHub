@@ -37,8 +37,9 @@ Requirements:
 - Filter movie/TV type, rating range, rating count, year range, genres, excluded genres and regions.
 - Sort by rating, rating count or year.
 - Cursor pagination.
-- Search must use SQLite FTS5 when available in the completed implementation; do not add Redis, MySQL or Elasticsearch.
-- Keep a safe fallback strategy for SQLite builds without FTS5, and test both supported behavior and clear failure/diagnostics.
+- Start with the existing SQLite LIKE-based title/original-title search and benchmark it against realistic catalogue sizes.
+- FTS5 is optional, not a hard runtime dependency: add it only if measured search latency or relevance justifies the added schema/index complexity, with a tested LIKE fallback.
+- Do not add Redis, MySQL or Elasticsearch.
 
 ### 3. Movie detail
 
@@ -81,7 +82,7 @@ Do not implement these in MovieHub first release:
 - Frontend: React + TypeScript + Vite, built and served as a separate frontend container.
 - Backend: FastAPI in its own container.
 - Database: one MovieHub-owned SQLite database; internal foreign keys use MovieHub IDs.
-- Search: SQLite FTS5; no external search service.
+- Search: SQLite LIKE by default; optional FTS5 only if benchmarks justify it, with no external search service.
 - Posters: MovieHub-managed local cache on the persistent data volume.
 - Import: Douban Scout is an external, read-only import source. The MovieHub container receives its export/source directory read-only.
 - Reverse proxy: existing Nginx Proxy Manager; prefer one same-origin MovieHub host with frontend routes and an /api reverse-proxy route, avoiding broad CORS.
@@ -96,16 +97,16 @@ Do not implement these in MovieHub first release:
 | Chart definitions and dated snapshots | Backend API and seeded definitions exist | Frontend chart browsing and date selector |
 | Movie search/filter API | Exists; currently title matching uses SQL LIKE | Implement FTS5 and test fallback |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
-| Poster cache/API | Exists | Frontend image states and cache UX |
+| Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
 | Favorites | Database table exists | CRUD/list API, tests and UI |
-| Scout import | Protected backend import API exists | Operator workflow and safe production import review |
+| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation | Merge-policy regression matrix, large-fixture performance and operator workflow |
 | React frontend | Not present yet | Build frontend application and container |
 | Frontend/backend Compose topology | Backend-only Compose exists | Add separate frontend service and same-origin NPM route documentation |
 | Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |
 
 ## Delivery order
 
-1. Implement FTS5 as a versioned MovieHub migration, keeping the original 11-table core model stable and preserving LIKE fallback where required.
+1. Benchmark existing LIKE search on realistic fixtures; only add optional FTS5 if measurements show it is needed.
 2. Add favorites list/add/remove API endpoints and integration tests.
 3. Define a stable frontend API client and error/loading/empty states.
 4. Build the React + TypeScript + Vite pages: chart home, chart snapshot, movie search/filter, movie detail and favorites.

@@ -104,7 +104,20 @@ def audit_chart_snapshots(
             ]
             field_counts = {name: 0 for name in field_names}
             type_mismatches = []
+            type_valid_matches = 0
             for item, row in matched:
+                if row["type"] != item.type:
+                    type_mismatches.append({
+                        "douban_id": item.douban_id,
+                        "title": item.title,
+                        "chart_type": item.type,
+                        "scout_type": row["type"],
+                    })
+                    continue
+
+                # ID equality alone is not enough: metadata from a different
+                # media type must not inflate coverage for this chart.
+                type_valid_matches += 1
                 detail = extractor._extract_detail(row["raw_data"])
                 values = {
                     "year": row["year"],
@@ -114,13 +127,6 @@ def audit_chart_snapshots(
                 for name in field_names:
                     if _present(values.get(name)):
                         field_counts[name] += 1
-                if row["type"] != item.type:
-                    type_mismatches.append({
-                        "douban_id": item.douban_id,
-                        "title": item.title,
-                        "chart_type": item.type,
-                        "scout_type": row["type"],
-                    })
 
             missing_ids = [
                 item.douban_id
@@ -133,6 +139,7 @@ def audit_chart_snapshots(
                 "chart_type": sorted({item.type for item in snapshot.movies}),
                 "chart_items": len(snapshot.movies),
                 "scout_matches": len(matched),
+                "scout_type_valid_matches": type_valid_matches,
                 "scout_missing": len(missing_ids),
                 "missing_douban_ids": missing_ids,
                 "scout_ambiguous": len(chart_ambiguous),
@@ -142,8 +149,8 @@ def audit_chart_snapshots(
                 "field_coverage": {
                     name: {
                         "present": count,
-                        "matched_total": len(matched),
-                        "percent": round(count * 100 / len(matched), 1) if matched else 0.0,
+                        "matched_total": type_valid_matches,
+                        "percent": round(count * 100 / type_valid_matches, 1) if type_valid_matches else 0.0,
                     }
                     for name, count in field_counts.items()
                 },
@@ -151,6 +158,7 @@ def audit_chart_snapshots(
 
         total_items = sum(report["chart_items"] for report in reports)
         total_matches = sum(report["scout_matches"] for report in reports)
+        total_type_valid_matches = sum(report["scout_type_valid_matches"] for report in reports)
         total_mismatches = sum(report["type_mismatch_count"] for report in reports)
         total_ambiguous = sum(report["scout_ambiguous"] for report in reports)
         return {
@@ -161,6 +169,7 @@ def audit_chart_snapshots(
                 "chart_count": len(reports),
                 "chart_items": total_items,
                 "scout_matches": total_matches,
+                "scout_type_valid_matches": total_type_valid_matches,
                 "scout_missing": sum(report["scout_missing"] for report in reports),
                 "scout_ambiguous": total_ambiguous,
                 "type_mismatches": total_mismatches,

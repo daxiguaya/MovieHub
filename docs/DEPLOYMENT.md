@@ -12,7 +12,7 @@ Compose now defines two application containers: a static React frontend and the 
   - SQLite database: `/data/db/movies.db`.
   - Poster cache: `/data/posters/`.
 - Scout import source: `MOVIEHUB_IMPORT_PATH` mounted at `/imports:ro`.
-- Nginx Proxy Manager: the service joins the existing external Docker network `chatgpt-browser_default`; configure its upstream as `moviehub:8000`.
+- Nginx Proxy Manager: the frontend and backend join the existing external Docker network `chatgpt-browser_default`; configure the default upstream as `moviehub-web:8080` and API custom locations as `moviehub:8000`.
 
 The source mount is read-only at the container boundary. Keep the MovieHub database and Scout source in separate host directories. Never point `MOVIEHUB_DATA_PATH` at the Scout database directory.
 
@@ -78,7 +78,7 @@ The container runs as a non-root UID, drops Linux capabilities, uses a read-only
 
 ## Operational boundaries
 
-- This package is an initial backend runtime baseline, not a production rollout approval.
+- This package is an initial dual-container runtime baseline, not a production rollout approval.
 - No production database, Scout import, NPM proxy host, firewall rule, or NAS service is changed by preparing these files.
 - Before deployment, verify host directory permissions, Docker network name, backup/restore procedure, and API access policy.
 - The frontend container and same-origin routing are packaged but not deployed. Actual NPM locations, TLS, access controls, and API-key injection remain operator configuration steps.

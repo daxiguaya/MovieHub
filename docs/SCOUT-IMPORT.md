@@ -4,7 +4,7 @@ MovieHub imports Scout data into its own database. The source is opened read-onl
 
 ## Before importing
 
-1. Initialize the independent MovieHub database explicitly and confirm `GET /api/ready` returns success.
+1. Initialize the independent MovieHub database explicitly with `python -m scripts.init_db`. New databases are built at schema version 2. For an existing version-1 MovieHub database, stop the application, run `python -m scripts.migrate`, verify the retained pre-migration backup and `GET /api/ready`, then resume normal operation.
 2. Set `MOVIEHUB_IMPORT_PATH` to a dedicated directory containing the Scout database or a consistent read-only copy.
 3. Do not point `MOVIEHUB_DATA_PATH` at Scout. Do not run MovieHub migrations or initialization against Scout.
 4. Ensure any SQLite WAL sidecar files required for a consistent source read are present and readable in the mounted directory. Prefer a SQLite online-backup copy when staging a snapshot; do not copy only the main database file while Scout is actively writing in WAL mode.

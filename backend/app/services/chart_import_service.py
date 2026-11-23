@@ -166,7 +166,9 @@ class ChartImportService:
         year = ChartImportService._safe_int(
             ChartImportService._value(item, "year")
         )
-        if year is not None and movie.year is None:
+        # Match the public import schema even when internal callers pass raw
+        # mappings and bypass Pydantic validation.
+        if year is not None and 1870 <= year <= 2200 and movie.year is None:
             movie.year = year
 
         rating = ChartImportService._safe_float(

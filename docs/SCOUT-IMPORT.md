@@ -128,3 +128,15 @@ Use the original run ID returned by `POST /api/import` or `GET /api/import/statu
 ```
 
 The source must remain inside the configured import directory. A resume request will not silently start a new run if the ID is missing, completed, belongs to another source path/mode, or has a different source-data fingerprint.
+
+## Read-only import run history
+
+The durable journal can now be inspected without opening either SQLite database:
+
+```sh
+cd backend
+python -m scripts.import_history
+python -m scripts.import_history --run-id <run-id>
+```
+
+The command reports each run's source path and mode, source fingerprint, latest committed checkpoint, cumulative processed/imported/skipped/error counts, batch count, resume count and lifecycle timestamps. A run with no terminal event is shown as `incomplete` (the journal alone cannot prove whether its process is still running or crashed); a failed attempt that has subsequently been resumed is shown as `running`. A torn final JSONL line is ignored. The command is read-only and does not resume, modify or delete journal entries, open Scout, or write to MovieHub.

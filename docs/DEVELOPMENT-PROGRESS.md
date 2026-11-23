@@ -277,6 +277,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Scout import numeric-data integrity (2026-11-23)
 
+- Full CI and benchmark workflow requested after the importer and regression-test commits.
+
+
 - Audited the Scout-to-MovieHub importer after the chart import guard passed CI. Found that raw Scout ratings were converted directly to float, allowing out-of-range or infinite values to reach database writes; invalid years could also be persisted.
 - Added finite 0–10 rating normalization and a conservative year acceptance range (1870–2200). Invalid source values are treated as absent, preserving an existing valid MovieHub value and leaving a new record field unset.
 - Hardened the importer's integer normalizer so booleans and fractional floats are not silently coerced to integers; this also protects rating-count and source timestamp parsing.

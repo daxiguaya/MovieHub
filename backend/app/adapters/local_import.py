@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.adapters.base import AdapterError, ChartSourceAdapter
+from app.base import AdapterError, ChartSourceAdapter
 from app.schemas_chart_import import ChartSnapshotImport
 
 

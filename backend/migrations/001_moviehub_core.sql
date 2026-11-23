@@ -51,6 +51,45 @@ CREATE INDEX IF NOT EXISTS ix_movies_tmdb_id
 ON movies(tmdb_id);
 
 -- -------------------------------------------------------------------------
+-- 2.5 Normalized movie metadata tables used by the ORM
+-- -------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(32) NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS ix_genres_name ON genres(name);
+
+CREATE TABLE IF NOT EXISTS movie_genres (
+    movie_id INTEGER NOT NULL,
+    genre_id INTEGER NOT NULL,
+    PRIMARY KEY (movie_id, genre_id),
+    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES genres(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS regions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(32) NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS ix_regions_name ON regions(name);
+
+CREATE TABLE IF NOT EXISTS movie_regions (
+    movie_id INTEGER NOT NULL,
+    region_id INTEGER NOT NULL,
+    PRIMARY KEY (movie_id, region_id),
+    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE,
+    FOREIGN KEY (region_id) REFERENCES regions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS movie_posters (
+    movie_id INTEGER NOT NULL,
+    url VARCHAR(512) NOT NULL,
+    PRIMARY KEY (movie_id, url),
+    FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
+);
+
+-- -------------------------------------------------------------------------
 -- 3. Chart definitions
 -- -------------------------------------------------------------------------
 
@@ -123,31 +162,6 @@ CREATE TABLE IF NOT EXISTS favorites (
         REFERENCES movies(douban_id)
         ON DELETE RESTRICT
 );
-
--- -------------------------------------------------------------------------
--- 6. Rebuild FTS5 index with original_title support
--- -------------------------------------------------------------------------
---
--- Scout's FTS5 table is an external-content index without synchronization
--- triggers. The importer rebuilds it after importing data. Rebuild it here
--- as well so the migrated database can be searched immediately.
-
-DROP TABLE IF EXISTS movie_search;
-
-CREATE VIRTUAL TABLE movie_search USING fts5(
-    title,
-    original_title,
-    content='movies',
-    content_rowid='id',
-    tokenize='trigram'
-);
-
-INSERT INTO movie_search(rowid, title, original_title)
-SELECT
-    id,
-    COALESCE(title, ''),
-    COALESCE(original_title, '')
-FROM movies;
 
 -- -------------------------------------------------------------------------
 -- 7. Record migration

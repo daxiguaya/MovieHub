@@ -29,28 +29,6 @@ Base = declarative_base()
 
 DATABASE_NAME = "movies.db"
 
-FTS_TABLE_NAME = "movie_search"
-
-FTS_CREATE_TABLE_SQL = (
-    f"CREATE VIRTUAL TABLE IF NOT EXISTS {FTS_TABLE_NAME} USING "
-    "fts5("
-    "title,"
-    "original_title,"
-    "content='movies',"
-    "content_rowid='id',"
-    "tokenize='trigram'"
-    ")"
-)
-
-FTS_REBUILD_SQL = (
-    f"INSERT INTO {FTS_TABLE_NAME}({FTS_TABLE_NAME}) VALUES ('rebuild')"
-)
-
-FTS_INSERT_ALL_SQL = (
-    f"INSERT INTO {FTS_TABLE_NAME}({FTS_TABLE_NAME}) VALUES ('rebuild')"
-)
-
-
 def get_db_path() -> str:
     """Return the absolute path of the MovieHub SQLite database."""
     return str(
@@ -109,16 +87,16 @@ class Movie(Base):
         back_populates="movie",
         cascade="all, delete-orphan",
     )
+    # SQL migration uses ON DELETE RESTRICT for chart history and favorites.
+    # Do not let ORM cascades silently bypass that protection.
     chart_items = relationship(
         "ChartItem",
         back_populates="movie",
-        cascade="all, delete-orphan",
     )
     favorite = relationship(
         "Favorite",
         back_populates="movie",
         uselist=False,
-        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -216,7 +194,7 @@ class Chart(Base):
 
     __tablename__ = "lists"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    list_id = Column(Integer, primary_key=True, autoincrement=True)
 
     slug = Column(String(96), unique=True, nullable=False, index=True)
     name = Column(String(160), nullable=False)
@@ -258,13 +236,13 @@ class ChartItem(Base):
 
     list_id = Column(
         Integer,
-        ForeignKey("lists.id", ondelete="CASCADE"),
+        ForeignKey("lists.list_id", ondelete="CASCADE"),
         primary_key=True,
     )
     snapshot_date = Column(String(10), primary_key=True)
     douban_id = Column(
         String(32),
-        ForeignKey("movies.douban_id", ondelete="CASCADE"),
+        ForeignKey("movies.douban_id", ondelete="RESTRICT"),
         primary_key=True,
     )
 
@@ -297,7 +275,7 @@ class Favorite(Base):
 
     douban_id = Column(
         String(32),
-        ForeignKey("movies.douban_id", ondelete="CASCADE"),
+        ForeignKey("movies.douban_id", ondelete="RESTRICT"),
         primary_key=True,
     )
 
@@ -306,7 +284,7 @@ class Favorite(Base):
         nullable=False,
         default=datetime.utcnow,
     )
-    note = Column(Text, nullable=True)
+    note = Column(Text, nullable=False, default="")
 
     movie = relationship("Movie", back_populates="favorite")
 

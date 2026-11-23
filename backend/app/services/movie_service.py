@@ -6,12 +6,11 @@ import json
 import logging
 from typing import Any
 
-from sqlalchemy import func, text
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import Query, Session, selectinload
 
 from app.cache import cached
 from app.database import (
-    FTS_TABLE_NAME,
     Genre,
     Movie,
     MovieGenre,
@@ -364,12 +363,11 @@ class MovieService:
                 )
 
             return query.filter(
-                (sort_column < cursor_value)
-                | (
-                    sort_column == cursor_value
-                    & Movie.id < cursor_id
+                or_(
+                    sort_column < cursor_value,
+                    and_(sort_column == cursor_value, Movie.id < cursor_id),
+                    sort_column.is_(None),
                 )
-                | sort_column.is_(None)
             )
 
         if cursor_value is None:
@@ -379,10 +377,9 @@ class MovieService:
             )
 
         return query.filter(
-            (sort_column > cursor_value)
-            | (
-                sort_column == cursor_value
-                & Movie.id > cursor_id
+            or_(
+                sort_column > cursor_value,
+                and_(sort_column == cursor_value, Movie.id > cursor_id),
             )
         )
 
@@ -441,7 +438,7 @@ class MovieService:
         query: Query,
         search: str,
     ) -> Query:
-        """Search title and original title through the FTS5 table."""
+        """Search movie titles directly without requiring FTS5."""
         terms = [
             term.strip()
             for term in search.split()
@@ -451,32 +448,22 @@ class MovieService:
         if not terms:
             return query
 
-        conditions: list[str] = []
-        params: dict[str, str] = {}
+        # Every term must match either the Chinese/display title or
+        # the original title. SQLAlchemy escapes LIKE wildcards.
+        conditions = []
 
-        for index, term in enumerate(terms):
-            title_key = f"title_{index}"
-            original_key = f"original_{index}"
-
+        for term in terms:
             conditions.append(
-                f"(title LIKE :{title_key} "
-                f"OR original_title LIKE :{original_key})"
+                or_(
+                    Movie.title.contains(term, autoescape=True),
+                    Movie.original_title.contains(
+                        term,
+                        autoescape=True,
+                    ),
+                )
             )
 
-            params[title_key] = f"%{term}%"
-            params[original_key] = f"%{term}%"
-
-        sql = (
-            f"SELECT rowid FROM {FTS_TABLE_NAME} "
-            f"WHERE {' AND '.join(conditions)}"
-        )
-
-        matching_ids = db.execute(
-            text(sql),
-            params,
-        ).scalars()
-
-        return query.filter(Movie.id.in_(matching_ids))
+        return query.filter(and_(*conditions))
 
     @staticmethod
     def _apply_rating_range(

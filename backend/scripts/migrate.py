@@ -65,7 +65,6 @@ REQUIRED_TABLES = {
     "list_items",
     "favorites",
     "schema_migrations",
-    "movie_search",
 }
 
 
@@ -263,26 +262,6 @@ def validate_douban_ids(conn: sqlite3.Connection) -> None:
         )
 
 
-def validate_fts(conn: sqlite3.Connection) -> None:
-    """Check that the FTS5 table exists and has one row per movie."""
-    if not table_exists(conn, "movie_search"):
-        raise RuntimeError("FTS table 'movie_search' does not exist")
-
-    movie_count = conn.execute(
-        "SELECT COUNT(*) FROM movies"
-    ).fetchone()[0]
-
-    fts_count = conn.execute(
-        "SELECT COUNT(*) FROM movie_search"
-    ).fetchone()[0]
-
-    if movie_count != fts_count:
-        raise RuntimeError(
-            f"FTS row count mismatch: movies={movie_count}, "
-            f"movie_search={fts_count}"
-        )
-
-
 def validate_migration(
     database_path: Path,
     expected_version: int = MIGRATION_VERSION,
@@ -302,7 +281,6 @@ def validate_migration(
         validate_required_tables(conn)
         validate_movie_columns(conn)
         validate_douban_ids(conn)
-        validate_fts(conn)
         validate_foreign_keys(conn)
 
     finally:

@@ -10,12 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.cache import cache_manager
 from app.database import (
-    FTS_REBUILD_SQL,
     Genre,
     Movie,
     MovieGenre,
@@ -205,16 +204,32 @@ class ImportService:
 
                     for row in cursor:
                         try:
-                            changed = self._upsert_source_row(
-                                db=db,
-                                row=row,
-                                genre_map=genre_map,
-                                region_map=region_map,
-                            )
+                            # A SAVEPOINT isolates a malformed record. Without it,
+                            # one failed flush poisons the outer transaction and
+                            # every subsequent row fails with PendingRollbackError.
+                            with db.begin_nested():
+                                changed = self._upsert_source_row(
+                                    db=db,
+                                    row=row,
+                                    genre_map=genre_map,
+                                    region_map=region_map,
+                                )
                             if not changed:
                                 skipped += 1
 
                         except Exception:
+                            # A failed SAVEPOINT may have rolled back newly
+                            # inserted lookup rows; refresh in-memory ID maps.
+                            genre_map.clear()
+                            genre_map.update({
+                                item.name: item.id
+                                for item in db.scalars(select(Genre)).all()
+                            })
+                            region_map.clear()
+                            region_map.update({
+                                item.name: item.id
+                                for item in db.scalars(select(Region)).all()
+                            })
                             skipped += 1
                             if error_logs < self._MAX_ERROR_LOGS:
                                 logger.exception(
@@ -235,9 +250,6 @@ class ImportService:
 
                     db.flush()
 
-                    # FTS is rebuilt in the same transaction as the metadata
-                    # changes. If rebuilding fails, the whole import rolls back.
-                    db.execute(text(FTS_REBUILD_SQL))
 
                 # Transaction has committed successfully here.
                 logger.info(
@@ -351,6 +363,7 @@ class ImportService:
     def _extract_metadata(
         value: str,
         is_genre: bool,
+        include_unknown: bool = False,
     ) -> set[str]:
         """Extract whitelisted genres or regions from text."""
         if not value:
@@ -376,13 +389,26 @@ class ImportService:
             if not cleaned:
                 continue
 
+            matched = False
             if cleaned in valid:
                 found.add(cleaned)
-                continue
+                matched = True
+            else:
+                for item in whitelist:
+                    if item and item in cleaned:
+                        found.add(item)
+                        matched = True
 
-            for item in whitelist:
-                if item and item in cleaned:
-                    found.add(item)
+            # Structured genres/countries fields are authoritative source data.
+            # Keep new/less-common values instead of silently dropping them.
+            if (
+                include_unknown
+                and not matched
+                and len(cleaned) <= 32
+                and not any(ord(char) < 32 for char in cleaned)
+                and not cleaned.lower().startswith(("http://", "https://"))
+            ):
+                found.add(cleaned)
 
         return found
 
@@ -432,7 +458,7 @@ class ImportService:
             else []
         ):
             if isinstance(value, str):
-                genres.update(self._extract_metadata(value, True))
+                genres.update(self._extract_metadata(value, True, include_unknown=True))
 
         for value in (
             detail.get("countries", [])
@@ -442,7 +468,7 @@ class ImportService:
             else []
         ):
             if isinstance(value, str):
-                regions.update(self._extract_metadata(value, False))
+                regions.update(self._extract_metadata(value, False, include_unknown=True))
 
         subtitle = (
             detail.get("card_subtitle")
@@ -630,6 +656,15 @@ class ImportService:
         # Only replace associations when the source actually supplied values.
         # An incomplete source record must not erase richer existing metadata.
         if detail["genres"]:
+            for name in detail["genres"]:
+                if name not in genre_map:
+                    genre = db.scalar(select(Genre).where(Genre.name == name))
+                    if genre is None:
+                        genre = Genre(name=name)
+                        db.add(genre)
+                        db.flush()
+                    genre_map[name] = genre.id
+
             genre_ids = {
                 genre_map[name]
                 for name in detail["genres"]
@@ -649,6 +684,15 @@ class ImportService:
                 )
 
         if detail["regions"]:
+            for name in detail["regions"]:
+                if name not in region_map:
+                    region = db.scalar(select(Region).where(Region.name == name))
+                    if region is None:
+                        region = Region(name=name)
+                        db.add(region)
+                        db.flush()
+                    region_map[name] = region.id
+
             region_ids = {
                 region_map[name]
                 for name in detail["regions"]

@@ -101,7 +101,7 @@ class ChartResponse(BaseModel):
     description: str | None = None
     enabled: bool
     display_order: int = 0
-    last_updated: str | None = None
+    last_updated: datetime | None = None
 
 
 class ChartMovieResponse(MovieResponse):

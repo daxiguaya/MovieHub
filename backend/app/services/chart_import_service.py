@@ -6,12 +6,11 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.cache import cache_manager
 from app.database import (
-    FTS_REBUILD_SQL,
     Chart,
     ChartItem,
     Favorite,
@@ -21,9 +20,8 @@ from app.database import (
     MoviePoster,
     MovieRegion,
     Region,
-    VALID_GENRES,
-    VALID_REGIONS,
 )
+from app.metadata_constants import VALID_GENRES, VALID_REGIONS
 from app.schemas_chart_import import ChartSnapshotImport
 
 logger = logging.getLogger("moviehub.chart_import")
@@ -102,13 +100,19 @@ class ChartImportService:
         names: set[str],
         allowed_names: set[str],
     ) -> dict[str, int]:
-        """Create missing whitelisted metadata rows and return name -> id."""
+        """Create missing bounded metadata rows and return name -> id.
+
+        allowed_names remains in the signature for compatibility with callers;
+        the seed vocabulary is not an exhaustive taxonomy and must not discard
+        legitimate new genres or production regions.
+        """
         names = {
             name.strip()
             for name in names
             if isinstance(name, str)
             and name.strip()
-            and name.strip() in allowed_names
+            and len(name.strip()) <= 32
+            and not any(ord(char) < 32 for char in name)
         }
 
         existing_rows = db.scalars(
@@ -490,7 +494,7 @@ class ChartImportService:
                 # All other dates and all other charts remain untouched.
                 db.execute(
                     delete(ChartItem).where(
-                        ChartItem.list_id == chart.id,
+                        ChartItem.list_id == chart.list_id,
                         ChartItem.snapshot_date == snapshot_date,
                     )
                 )
@@ -514,7 +518,7 @@ class ChartImportService:
 
                     db.add(
                         ChartItem(
-                            list_id=chart.id,
+                            list_id=chart.list_id,
                             snapshot_date=snapshot_date,
                             douban_id=douban_id,
                             rank=rank,
@@ -524,8 +528,6 @@ class ChartImportService:
 
                 db.flush()
 
-                # Keep FTS in sync with the movie records in this transaction.
-                db.execute(text(FTS_REBUILD_SQL))
 
             # Cache invalidation must happen after the transaction commits.
             cache_manager.clear()

@@ -203,6 +203,7 @@ def test_incremental_import_skips_unchanged_rows_but_force_full_reprocesses(
     source_path = tmp_path / "scout-incremental.sqlite"
     target_path = tmp_path / "moviehub-incremental.sqlite"
     _create_scout_fixture(source_path)
+    source_hash_before = _sha256(source_path)
 
     engine = create_engine(
         f"sqlite:///{target_path.as_posix()}",
@@ -1114,5 +1115,5 @@ def test_preview_import_and_reconciliation_form_one_end_to_end_flow(
     assert result["mismatches"] == []
 
     # The preview, import and reconciliation must never modify the source DB.
-    assert _sha256(source_path) == _sha256(source_path)
+    assert _sha256(source_path) == source_hash_before
     engine.dispose()

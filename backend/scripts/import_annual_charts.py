@@ -43,6 +43,10 @@ def load_annual_batch(
                 f"{path.name} has snapshot_date {snapshot.snapshot_date}; "
                 f"expected {snapshot_date}"
             )
+        if snapshot.name != config["name"]:
+            raise ValueError(
+                f"{path.name} declares name {snapshot.name!r}; expected {config['name']!r}"
+            )
         if snapshot.source != "douban":
             raise ValueError(f"{path.name} must declare source='douban'")
         if snapshot.category != "annual" or snapshot.period != "2025":
@@ -53,6 +57,9 @@ def load_annual_batch(
             raise ValueError(
                 f"{path.name} contains an entry with the wrong media type"
             )
+
+        if not snapshot.movies:
+            raise ValueError(f"{path.name} contains no ranked entries")
 
         ranks = [movie.rank for movie in snapshot.movies]
         if ranks != sorted(ranks):

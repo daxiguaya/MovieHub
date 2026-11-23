@@ -58,7 +58,7 @@ def test_append_repairs_a_torn_final_line_before_writing_next_event(tmp_path):
     first = {"event": "run_started", "run_id": "run-1"}
     recovered = {"event": "run_resumed", "run_id": "run-1"}
     path.write_bytes(
-        (json.dumps(first) + "\\n").encode("utf-8")
+        (json.dumps(first) + "\n").encode("utf-8")
         + b'{"event":"batch_committed","run_id":'
     )
 

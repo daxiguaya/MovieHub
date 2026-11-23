@@ -71,7 +71,7 @@ docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
   --output /tmp/moviehub-high-rated-2026-11-23.json
 ```
 
-The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. The endpoint provides only list-level fields (ID, title, rating and cover); run the read-only Scout metadata import as needed to enrich year, rating count, genres, regions and details.
+The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages and honors any longer robots.txt crawl-delay. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. The endpoint provides only list-level fields (ID, title, rating and cover); run the read-only Scout metadata import as needed to enrich year, rating count, genres, regions and details.
 
 Then use the same `import_chart --dry-run` and import commands above. Annual charts are not covered by this collector yet.
 

@@ -73,6 +73,7 @@ class ImportStatus(BaseModel):
     status: Literal["idle", "running", "completed", "failed"]
     processed: int = 0
     total: int = 0
+    errors: int = 0
     percentage: float = 0.0
     message: str | None = None
     started_at: datetime | None = None

@@ -174,8 +174,10 @@ function ChartTile({ chart }: { chart: Chart }) {
     top250: "影史经典，历久弥新",
     popular: "此刻正在被讨论",
     "high-rated": "口碑与评分兼顾",
-    "annual-2025": "回看 2025 的银幕记忆",
-    "annual-2026": "记录 2026 的精彩作品"
+    "annual-2025-chinese-movies": "年度华语电影口碑榜",
+    "annual-2025-international-movies": "年度外语电影精选",
+    "annual-2025-hidden-gems": "值得发现的年度佳片",
+    "annual-2025-chinese-tv": "年度华语剧集口碑榜"
   };
   return (
     <Link className="chart-tile" to={`/charts/${chart.slug}`}>

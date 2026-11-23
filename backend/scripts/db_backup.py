@@ -227,7 +227,20 @@ def restore_backup(
             # The operator must have stopped the API before this command.
             connection = sqlite3.connect(target_path, timeout=30)
             try:
-                connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                checkpoint = connection.execute(
+                "PRAGMA wal_checkpoint(TRUNCATE)"
+            ).fetchone()
+            if checkpoint and checkpoint[0] != 0:
+                raise RuntimeError(
+                    f"Could not checkpoint the live database before restore: {checkpoint}"
+                )
+            journal_mode = connection.execute(
+                "PRAGMA journal_mode=DELETE"
+            ).fetchone()
+            if not journal_mode or journal_mode[0].lower() != "delete":
+                raise RuntimeError(
+                    "Could not switch the stopped database to DELETE journal mode"
+                )
             finally:
                 connection.close()
 

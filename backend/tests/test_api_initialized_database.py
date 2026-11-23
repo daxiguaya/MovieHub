@@ -44,11 +44,14 @@ def test_data_apis_work_with_explicitly_initialized_database(
             charts_response = client.get("/api/charts")
             movies_response = client.get("/api/movies")
             health_response = client.get("/api/health")
+            readiness_response = client.get("/api/ready")
 
         assert charts_response.status_code == 200
         assert isinstance(charts_response.json(), list)
         assert movies_response.status_code == 200
         assert health_response.status_code == 200
         assert health_response.json() == {"status": "healthy"}
+        assert readiness_response.status_code == 200
+        assert readiness_response.json() == {"status": "ready", "schema_version": 1}
     finally:
         engine.dispose()

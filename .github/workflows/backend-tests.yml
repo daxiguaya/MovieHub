@@ -62,11 +62,91 @@ jobs:
 
   frontend-e2e:
     runs-on: ubuntu-24.04
+    env:
+      MOVIEHUB_DATA_DIR: ${{ runner.temp }}/moviehub-e2e
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies for live API test
+        run: pip install -r requirements.txt
+        working-directory: backend
+      - name: Initialize isolated MovieHub test database
+        run: python -m scripts.init_db
+        working-directory: backend
+      - name: Seed isolated chart and movie fixtures
+        run: |
+          python - <<'PY'
+          from sqlalchemy import select
+          from app.database import (
+              Chart, ChartItem, ChartSnapshot, Genre, Movie,
+              MovieGenre, MovieRegion, Region, SessionLocal,
+          )
+
+          with SessionLocal() as db:
+              chart = db.scalar(select(Chart).where(Chart.slug == "top250"))
+              movie = Movie(
+                  douban_id="1292052",
+                  imdb_id="tt0816692",
+                  title="星际穿越",
+                  original_title="Interstellar",
+                  year=2014,
+                  rating=9.4,
+                  rating_count=100000,
+                  type="movie",
+                  directors='["Christopher Nolan"]',
+                  actors='["Matthew McConaughey"]',
+                  overview="A journey through space and time.",
+                  douban_url="https://movie.douban.com/subject/1292052/",
+              )
+              db.add(movie)
+              db.flush()
+
+              genre = Genre(name="科幻")
+              region = Region(name="美国")
+              db.add_all([genre, region])
+              db.flush()
+              db.add_all([
+                  MovieGenre(movie_id=movie.id, genre_id=genre.id),
+                  MovieRegion(movie_id=movie.id, region_id=region.id),
+              ])
+
+              snapshot = ChartSnapshot(
+                  list_id=chart.list_id,
+                  snapshot_date="2026-11-23",
+                  item_count=1,
+              )
+              db.add(snapshot)
+              db.flush()
+              db.add(ChartItem(
+                  snapshot_id=snapshot.id,
+                  movie_id=movie.id,
+                  rank=1,
+                  source_rating=9.4,
+              ))
+              db.commit()
+          PY
+        working-directory: backend
+      - name: Start FastAPI against the temporary database
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > "${RUNNER_TEMP}/moviehub-e2e-api.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/moviehub-e2e-api.pid"
+        working-directory: backend
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/moviehub-e2e-api.log"
+          exit 1
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
         working-directory: frontend

@@ -104,6 +104,14 @@ class ChartResponse(BaseModel):
     last_updated: datetime | None = None
 
 
+class ChartSnapshotResponse(BaseModel):
+    """Available dated snapshot for a chart."""
+
+    snapshot_date: str
+    imported_at: datetime
+    item_count: int
+
+
 class ChartMovieResponse(MovieResponse):
     """Movie card as it appears inside a chart."""
 

@@ -283,3 +283,78 @@ def test_chart_import_discards_non_finite_raw_ratings():
         db.close()
         engine.dispose()
 
+
+
+@pytest.mark.parametrize("invalid_year", [1800, 2201, -1])
+def test_chart_import_rejects_out_of_range_raw_years(invalid_year):
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        raw_snapshot = {
+            "slug": "raw-year-chart",
+            "name": "Raw year chart",
+            "source": "test",
+            "category": "general",
+            "snapshot_date": "2026-11-23",
+            "movies": [
+                {
+                    "douban_id": "50001",
+                    "rank": 1,
+                    "title": "Out of range year",
+                    "year": invalid_year,
+                    "type": "movie",
+                }
+            ],
+        }
+
+        service.import_snapshot(db, raw_snapshot)
+
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "50001"))
+        assert movie is not None
+        assert movie.year is None
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_chart_import_preserves_existing_year_when_raw_year_is_invalid():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        movie = Movie(
+            douban_id="50002",
+            title="Scout-owned title",
+            year=1998,
+            type="movie",
+            rating_count=0,
+            directors="[]",
+            actors="[]",
+        )
+        db.add(movie)
+        db.commit()
+
+        raw_snapshot = {
+            "slug": "existing-raw-year-chart",
+            "name": "Existing raw year chart",
+            "source": "test",
+            "category": "general",
+            "snapshot_date": "2026-11-23",
+            "movies": [
+                {
+                    "douban_id": "50002",
+                    "rank": 1,
+                    "title": "Chart title",
+                    "year": 1800,
+                    "type": "movie",
+                }
+            ],
+        }
+
+        service.import_snapshot(db, raw_snapshot)
+
+        stored = db.scalar(select(Movie).where(Movie.douban_id == "50002"))
+        assert stored.year == 1998
+        assert stored.title == "Scout-owned title"
+    finally:
+        db.close()
+        engine.dispose()

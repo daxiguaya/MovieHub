@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect
 
 from app.database import Base
+from scripts.init_db import initialize
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]
@@ -152,5 +153,24 @@ def test_snapshot_date_and_rank_are_unique(tmp_path):
             pass
         else:
             raise AssertionError("Ranks must be unique within a snapshot")
+    finally:
+        conn.close()
+
+
+
+def test_explicit_initializer_creates_database_and_seeds_charts(tmp_path):
+    db_path = tmp_path / "initialized" / "movies.db"
+    initialize(db_path, MIGRATION)
+
+    assert db_path.is_file()
+    conn = sqlite3.connect(str(db_path))
+    try:
+        chart_count = conn.execute(
+            "SELECT COUNT(*) FROM lists"
+        ).fetchone()[0]
+        assert chart_count > 0
+
+        mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        assert mode.lower() == "wal"
     finally:
         conn.close()

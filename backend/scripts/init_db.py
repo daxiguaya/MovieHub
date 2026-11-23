@@ -1,4 +1,4 @@
-"""Initialize a brand-new, independent MovieHub SQLite database.
+"""Initialize a brand-new, independent MovieHub SQLite database at the latest schema version.
 
 Run from the backend directory:
     python -m scripts.init_db

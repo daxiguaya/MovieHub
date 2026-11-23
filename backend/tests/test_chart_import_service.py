@@ -207,3 +207,45 @@ def test_chart_import_rejects_existing_movie_media_type_conflict_atomically():
     finally:
         db.close()
         engine.dispose()
+
+@pytest.mark.parametrize(
+    ("rank_values", "error_match"),
+    [
+        ([1, 1], "duplicate ranks"),
+        ([True], "invalid rank"),
+    ],
+)
+def test_chart_import_rejects_invalid_or_duplicate_raw_ranks_before_writes(
+    rank_values,
+    error_match,
+):
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        raw_snapshot = {
+            "slug": "raw-rank-chart",
+            "name": "Raw rank chart",
+            "source": "test",
+            "category": "general",
+            "snapshot_date": "2026-11-23",
+            "movies": [
+                {
+                    "douban_id": str(30001 + index),
+                    "rank": rank,
+                    "title": f"Raw movie {index}",
+                    "type": "movie",
+                }
+                for index, rank in enumerate(rank_values)
+            ],
+        }
+
+        with pytest.raises(ChartImportError, match=error_match):
+            service.import_snapshot(db, raw_snapshot)
+
+        # Rejected payloads must not create chart, movie or snapshot rows.
+        assert db.scalar(select(func.count()).select_from(Movie)) == 0
+        assert db.scalar(select(func.count()).select_from(ChartSnapshot)) == 0
+    finally:
+        db.close()
+        engine.dispose()
+

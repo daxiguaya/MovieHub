@@ -77,7 +77,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 52%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 54%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -123,7 +123,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 - [x] Add React + TypeScript + Vite application scaffold and typed API client.
 - [x] Implement discovery home and chart-group tiles.
 - [x] Implement chart snapshot page with historical date selection and cursor pagination.
-- [x] Implement movie search page with keyword, type, minimum rating, start year and sort controls.
+- [x] Implement movie search page with keyword, movie/TV type, min/max rating, rating-count floor, year range, included/excluded genres, regions, sort direction and cursor pagination.
 - [x] Add internal MovieHub movie-ID detail API and detail page with metadata, poster, Douban link and Xiaoya handoff.
 - [x] Implement favorites list/add/remove UI against the protected favorites API.
 - [x] Make Xiaoya search URL runtime-configurable; the title is URL-encoded into the existing `box` parameter and opens in a new tab.

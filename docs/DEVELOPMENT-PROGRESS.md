@@ -127,20 +127,19 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Workstream | Status |
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
-| Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
-| Scout import hardening | Implementation and merge/partial-retry tests complete; 1k/10k/100k synthetic fixtures passed; NAS-hardware benchmark pending |
-| Manual normalized chart snapshot import | Complete |
+| Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 85% |
+| Scout import hardening and crash recovery | 95% implementation/test coverage; real staged-Scout audit and NAS-hardware benchmark pending |
+| Manual normalized chart snapshot import | Complete; CI verified |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| 2025 annual charts | Four official lists defined; collector and recoverable four-file output implemented; guarded four-file preflight CLI and all-or-nothing multi-chart DB import path implemented; real normalized data import pending |
-| Favorites API and frontend UI | Implemented; Chromium E2E passed |
-| Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
-| React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
-| Container packaging and backup/restore preparation | 100% |
-| Actual NAS deployment and end-to-end production verification | 0% |
+| 2025 annual charts | Official four-list collector, recoverable output, strict preflight and atomic four-chart import implemented; actual reviewed snapshot import remains pending |
+| Favorites API and frontend UI | Implemented; unit and Chromium E2E passed |
+| Xiaoya handoff | Implemented; URL encoding and browser handoff passed; actual NPM route verification pending |
+| React frontend and user workflows | Core flows implemented; 5 frontend tests and 4 browser E2E tests passed; visual QA and real-data review pending |
+| Container packaging and backup/restore preparation | 100% packaged and CI-built; NAS operational validation pending |
+| Actual NAS deployment and end-to-end production verification | 0%; intentionally not started |
 
-**Estimated first-release implementation progress: about 70%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
-
+**Estimated first-release progress: about 75%.** This is a planning estimate, not a test metric. The independent database, backend baseline, importer safety/recovery, chart acquisition/import pipeline, frontend core flows, container packaging and backup/restore tooling are implemented and CI-verified. The remaining quarter is concentrated in real-source/data validation, chart refresh/content readiness, visual and NPM verification, staged operational testing, and the separately authorized NAS rollout.
 ## Chart and Scout import numeric integrity (2026-11-23)
 
 - [x] Reject boolean and fractional values where integer ranks, years, or counts are expected.
@@ -541,3 +540,24 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Validate migration against a copy of a real existing schema-v1 database before any production migration.
 
 **CI remediation milestone: complete.** The prior backend failure (12 failed, 212 passed, 4 skipped) is resolved on the latest branch head. This verifies CI only; no real Scout source, NAS database or production service was accessed.
+
+
+## First-release remaining work — prioritized (2026-11-24)
+
+### P0 — data and migration acceptance before any production use
+- [ ] Create a consistent, isolated copy of an existing schema-v1 MovieHub database and run migration 002 against that copy; verify backup, integrity, foreign keys, schema version 2 and rollback behavior. Do not use the live NAS database as a test fixture.
+- [ ] Obtain a consistent read-only staged Scout SQLite copy (including required WAL state or an online-backup snapshot); run whole-catalogue identity/numeric audit, annual-chart coverage audit, preview and preview-to-import reconciliation. Review blockers and metadata coverage before authorizing any import.
+- [ ] Collect/review all four official 2025 annual chart snapshots, run the four-file dry-run, then import only into a fresh isolated MovieHub database first. Confirm the resulting chart counts/ranks and no partial writes.
+
+### P1 — first-release product completeness
+- [ ] Verify the 2026 chart definitions/categories against current official source publications; do not infer missing rankings.
+- [ ] Perform visual QA on chart home, chart history/comparison, search/filter, detail/poster states and favorites using realistic but non-production fixtures; fix responsive/layout/empty/error states.
+- [ ] Validate the Xiaoya handoff and same-origin API plus protected favorites-key injection in an isolated NPM test host; verify import endpoints remain inaccessible to browser clients.
+- [ ] Run the opt-in 10k/100k search/import benchmarks on a controlled machine and record latency/throughput/memory. NAS-specific measurements remain a later authorized task.
+
+### P2 — deployment readiness (requires separate explicit approval)
+- [ ] Verify NAS paths, UID/GID permissions, Docker network reachability, resource limits and dedicated backup destination without touching existing services.
+- [ ] Execute a backup/restore rehearsal against an isolated test database and confirm rollback recovery.
+- [ ] Prepare a deployment checklist and rollback plan; only after review and explicit approval create the production MovieHub database, configure NPM and deploy. No production deployment, database import, NPM change or service restart is authorized by this checklist.
+
+**Progress accounting:** the 75% estimate counts implementation and automated validation as substantially complete, but does not count real Scout data validation, live annual data import, NPM verification or production rollout as complete. Annual-chart collection and performance benchmark Actions jobs were skipped in the latest CI and remain separately unverified.

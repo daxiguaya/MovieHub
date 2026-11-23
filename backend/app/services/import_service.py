@@ -3,6 +3,7 @@
 
 import json
 import logging
+from itertools import islice
 import re
 import sqlite3
 import threading
@@ -160,16 +161,18 @@ class ImportService:
         force_full: bool,
     ) -> None:
         source_conn: sqlite3.Connection | None = None
+        committed_batches = 0
 
         try:
             logger.info(
-                "Starting MovieHub import: source=%s force_full=%s",
+                "Starting MovieHub import: source=%s force_full=%s batch_size=%s",
                 source_path,
                 force_full,
+                self._BATCH_SIZE,
             )
 
-            # Read-only, but deliberately not immutable:
-            # SQLite may need to read a source database's WAL file.
+            # Read-only, but deliberately not immutable: SQLite may need the
+            # source database's WAL file to present a consistent snapshot.
             source_uri = source_path.as_uri() + "?mode=ro"
             source_conn = sqlite3.connect(
                 source_uri,
@@ -177,112 +180,116 @@ class ImportService:
                 timeout=30,
             )
             source_conn.row_factory = sqlite3.Row
-
             self._validate_source(source_conn)
 
             total = source_conn.execute(
                 "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
             ).fetchone()[0]
-
             if total <= 0:
                 raise ValueError("Source database contains no movie or TV records")
 
             self._set_progress(0, total, "Reading source database")
-
             processed = 0
             skipped = 0
+            imported = 0
             error_logs = 0
+            cursor = source_conn.execute(SOURCE_ROW_SQL)
 
             with SessionLocal() as db:
-                # A single transaction ensures a failed import does not leave
-                # half-updated movie metadata or a stale FTS index.
-                with db.begin():
-                    genre_map = self._ensure_genres(db)
-                    region_map = self._ensure_regions(db)
+                while True:
+                    rows = list(islice(cursor, self._BATCH_SIZE))
+                    if not rows:
+                        break
 
-                    cursor = source_conn.execute(SOURCE_ROW_SQL)
+                    # Commit bounded batches instead of holding one SQLite
+                    # writer transaction for the entire Scout catalogue.
+                    # A failed batch rolls back as a unit; committed batches
+                    # remain safe to retry because the importer is idempotent.
+                    with db.begin():
+                        genre_map = self._ensure_genres(db)
+                        region_map = self._ensure_regions(db)
 
-                    for row in cursor:
-                        try:
-                            # A SAVEPOINT isolates a malformed record. Without it,
-                            # one failed flush poisons the outer transaction and
-                            # every subsequent row fails with PendingRollbackError.
-                            with db.begin_nested():
-                                changed = self._upsert_source_row(
-                                    db=db,
-                                    row=row,
-                                    genre_map=genre_map,
-                                    region_map=region_map,
-                                )
-                            if not changed:
+                        for row in rows:
+                            try:
+                                with db.begin_nested():
+                                    changed = self._upsert_source_row(
+                                        db=db,
+                                        row=row,
+                                        genre_map=genre_map,
+                                        region_map=region_map,
+                                        force_full=force_full,
+                                    )
+                                if changed:
+                                    imported += 1
+                                else:
+                                    skipped += 1
+                            except Exception:
+                                genre_map = {
+                                    item.name: item.id
+                                    for item in db.scalars(select(Genre)).all()
+                                }
+                                region_map = {
+                                    item.name: item.id
+                                    for item in db.scalars(select(Region)).all()
+                                }
                                 skipped += 1
+                                if error_logs < self._MAX_ERROR_LOGS:
+                                    logger.exception(
+                                        "Failed to process source record douban_id=%s",
+                                        row["douban_id"],
+                                    )
+                                    error_logs += 1
+                            processed += 1
 
-                        except Exception:
-                            # A failed SAVEPOINT may have rolled back newly
-                            # inserted lookup rows; refresh in-memory ID maps.
-                            genre_map.clear()
-                            genre_map.update({
-                                item.name: item.id
-                                for item in db.scalars(select(Genre)).all()
-                            })
-                            region_map.clear()
-                            region_map.update({
-                                item.name: item.id
-                                for item in db.scalars(select(Region)).all()
-                            })
-                            skipped += 1
-                            if error_logs < self._MAX_ERROR_LOGS:
-                                logger.exception(
-                                    "Failed to process source record douban_id=%s",
-                                    row["douban_id"],
-                                )
-                                error_logs += 1
+                    committed_batches += 1
+                    self._set_progress(
+                        processed,
+                        total,
+                        f"Processed {processed} of {total} records",
+                    )
 
-                        processed += 1
+            logger.info(
+                "Import committed: processed=%s imported=%s skipped=%s batches=%s force_full=%s",
+                processed,
+                imported,
+                skipped,
+                committed_batches,
+                force_full,
+            )
 
-                        if processed % self._BATCH_SIZE == 0:
-                            db.flush()
-                            self._set_progress(
-                                processed,
-                                total,
-                                f"Processed {processed} of {total}",
-                            )
-
-                    db.flush()
-
-
-                # Transaction has committed successfully here.
-                logger.info(
-                    "Import committed: processed=%s skipped=%s",
-                    processed,
-                    skipped,
-                )
-
-            # Invalidate query caches only after the database commit.
-            cache_manager.clear()
+            if imported:
+                cache_manager.clear()
 
             self._set_progress(
                 processed,
                 total,
-                f"Import completed; skipped {skipped} records",
+                f"Import completed; imported {imported}, skipped {skipped}",
             )
             self._finish(
                 "completed",
-                f"Import completed; skipped {skipped} records",
+                f"Import completed; imported {imported}, skipped {skipped}",
             )
 
         except Exception:
-            logger.exception("MovieHub import failed")
-            # Avoid exposing filesystem paths or database internals in API status.
+            logger.exception(
+                "MovieHub import failed after %s committed batches",
+                committed_batches,
+            )
+            # Earlier committed batches are durable and safe to reprocess.
+            if committed_batches:
+                try:
+                    cache_manager.clear()
+                except Exception:
+                    logger.exception("Failed to clear caches after partial import")
             self._finish(
                 "failed",
-                "Import failed. Check the backend log for details.",
+                "Import failed. Earlier batches, if any, were committed; retry is safe. "
+                "Check the backend log for details.",
             )
 
         finally:
             if source_conn is not None:
                 source_conn.close()
-
             self._run_lock.release()
 
     @staticmethod
@@ -580,8 +587,14 @@ class ImportService:
         row: sqlite3.Row,
         genre_map: dict[str, int],
         region_map: dict[str, int],
+        force_full: bool = False,
     ) -> bool:
-        """Upsert one movie while preserving data absent from this source."""
+        """Upsert one movie while preserving data absent from this source.
+
+        Incremental imports skip records whose Scout update_time is not newer
+        than MovieHub's last imported source timestamp. force_full bypasses
+        this check and reprocesses every valid source record.
+        """
         douban_id = self._safe_string(row["douban_id"])
         title = self._safe_string(row["douban_title"])
 
@@ -593,6 +606,15 @@ class ImportService:
         movie = db.scalar(
             select(Movie).where(Movie.douban_id == douban_id)
         )
+
+        if movie is not None and not force_full:
+            source_updated_at = self._safe_int(row["update_time"])
+            if (
+                source_updated_at is not None
+                and movie.updated_at is not None
+                and source_updated_at <= movie.updated_at
+            ):
+                return False
 
         if movie is None:
             movie = Movie(

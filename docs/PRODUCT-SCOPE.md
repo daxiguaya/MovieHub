@@ -94,12 +94,12 @@ Do not implement these in MovieHub first release:
 | Capability | Current state | Remaining work |
 |---|---|---|
 | Independent SQLite schema | Complete, 11 core tables | Add a versioned search/index migration only if benchmarks justify it |
-| Chart definitions and dated snapshots | Backend API and seeded definitions exist | Frontend chart browsing and date selector |
+| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import and dry-run exist | Automated chart acquisition/scheduling and frontend chart browsing/date selector |
 | Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
-| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs | Regression CI and frontend UI |
-| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation | Merge-policy regression matrix, large-fixture performance and operator workflow |
+| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs | Frontend UI |
+| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge and partial-retry tests | Large-fixture performance and operator workflow |
 | React frontend | Not present yet | Build frontend application and container |
 | Frontend/backend Compose topology | Backend-only Compose exists | Add separate frontend service and same-origin NPM route documentation |
 | Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |

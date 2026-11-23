@@ -56,8 +56,8 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    const title = await screen.findByText("豆瓣电影 Top 250");
-    await userEvent.click(title.closest("a")!);
+    const titles = await screen.findAllByText("豆瓣电影 Top 250");
+    await userEvent.click(titles[0].closest("a")!);
 
     expect(
       await screen.findByRole("heading", { name: "豆瓣电影 Top 250" })

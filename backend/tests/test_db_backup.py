@@ -54,6 +54,7 @@ def test_backup_and_restore_create_verified_backup_and_rollback_copy(tmp_path):
     backup_dir = create_backup(database, backups)
     assert (backup_dir / "manifest.json").is_file()
     assert (backup_dir / "movies.db").is_file()
+    assert _movie_titles(backup_dir / "movies.db") == ["Before backup"]
 
     _insert_movie(database, "After backup")
     rollback = restore_backup(

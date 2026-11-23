@@ -255,3 +255,165 @@ def test_incremental_import_skips_unchanged_rows_but_force_full_reprocesses(
         assert movie.overview == "Changed without a newer source timestamp"
 
     engine.dispose()
+
+
+def test_import_preserves_enriched_fields_and_does_not_delete_absent_scout_rows(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-merge.sqlite"
+    target_path = tmp_path / "moviehub-merge.sqlite"
+    _create_scout_fixture(source_path)
+
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "UPDATE item SET raw_data = ? WHERE douban_id = '1234567'",
+            (json.dumps({"detail": {}}, ensure_ascii=False),),
+        )
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    with TargetSession() as db:
+        genre = Genre(name="Drama")
+        region = Region(name="Japan")
+        movie = Movie(
+            douban_id="1234567",
+            title="Previously enriched title",
+            year=1999,
+            rating=9.4,
+            rating_count=9000,
+            type="movie",
+            original_title="Previously enriched original title",
+            directors='["Enriched Director"]',
+            actors='["Enriched Actor"]',
+            overview="Previously enriched overview",
+            douban_url="https://movie.douban.com/subject/1234567/",
+            updated_at=1790000000,
+        )
+        db.add_all([genre, region, movie])
+        db.flush()
+        db.add_all([
+            MovieGenre(movie_id=movie.id, genre_id=genre.id),
+            MovieRegion(movie_id=movie.id, region_id=region.id),
+            MoviePoster(
+                movie_id=movie.id,
+                url="https://img1.doubanio.com/view/photo/enriched.jpg",
+            ),
+        ])
+        db.commit()
+
+    service = import_service_module.ImportService()
+
+    def run(force_full):
+        assert service._run_lock.acquire(blocking=False)
+        service._run_import(source_path, force_full=force_full)
+        assert service.status.status == "completed"
+
+    run(force_full=True)
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.title == "Scout Fixture Movie"
+        assert movie.year == 2020
+        assert movie.rating == 8.6
+        assert movie.rating_count == 9000
+        assert movie.original_title == "Previously enriched original title"
+        assert movie.directors == '["Enriched Director"]'
+        assert movie.actors == '["Enriched Actor"]'
+        assert movie.overview == "Previously enriched overview"
+        assert db.scalar(
+            select(Genre.name)
+            .join(MovieGenre, MovieGenre.genre_id == Genre.id)
+            .where(MovieGenre.movie_id == movie.id)
+        ) == "Drama"
+        assert db.scalar(
+            select(Region.name)
+            .join(MovieRegion, MovieRegion.region_id == Region.id)
+            .where(MovieRegion.movie_id == movie.id)
+        ) == "Japan"
+        assert db.scalar(
+            select(MoviePoster.url).where(MoviePoster.movie_id == movie.id)
+        ) == "https://img1.doubanio.com/view/photo/enriched.jpg"
+
+    # Deleting a row from Scout is not a deletion instruction for MovieHub.
+    with sqlite3.connect(source_path) as source:
+        source.execute("DELETE FROM item WHERE douban_id = '7654321'")
+
+    run(force_full=True)
+    with TargetSession() as db:
+        assert db.scalar(
+            select(Movie).where(Movie.douban_id == "7654321")
+        ) is not None
+
+    engine.dispose()
+
+
+def test_batched_import_keeps_committed_batches_and_retry_completes(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-batches.sqlite"
+    target_path = tmp_path / "moviehub-batches.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    service._BATCH_SIZE = 1
+    original_ensure_genres = service._ensure_genres
+    calls = {"count": 0}
+
+    def fail_on_second_batch(db):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise RuntimeError("simulated second-batch failure")
+        return original_ensure_genres(db)
+
+    monkeypatch.setattr(service, "_ensure_genres", fail_on_second_batch)
+    assert service._run_lock.acquire(blocking=False)
+    service._run_import(source_path, force_full=False)
+    assert service.status.status == "failed"
+
+    with TargetSession() as db:
+        assert db.scalar(
+            select(Movie).where(Movie.douban_id == "1234567")
+        ) is not None
+        assert db.scalar(
+            select(Movie).where(Movie.douban_id == "7654321")
+        ) is None
+
+    monkeypatch.setattr(service, "_ensure_genres", original_ensure_genres)
+    assert service._run_lock.acquire(blocking=False)
+    service._run_import(source_path, force_full=False)
+    assert service.status.status == "completed"
+
+    with TargetSession() as db:
+        assert db.scalar(
+            select(Movie).where(Movie.douban_id == "1234567")
+        ) is not None
+        assert db.scalar(
+            select(Movie).where(Movie.douban_id == "7654321")
+        ) is not None
+
+    engine.dispose()

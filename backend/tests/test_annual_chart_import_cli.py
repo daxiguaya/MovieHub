@@ -10,7 +10,7 @@ import scripts.import_annual_charts as annual_import
 CAPTURE_DATE = date(2026, 11, 23)
 
 
-def _write_batch(directory, *, date_value="2026-11-23", omit=None):
+def _write_batch(directory, *, date_value="2026-11-23", filename_date=None, omit=None):
     directory.mkdir(parents=True, exist_ok=True)
     definitions = {
         "annual-2025-chinese-movies": ("movie", "Chinese movies"),
@@ -37,7 +37,8 @@ def _write_batch(directory, *, date_value="2026-11-23", omit=None):
                 }
             ],
         }
-        (directory / f"{slug}-{date_value}.json").write_text(
+        file_date = filename_date or date_value
+        (directory / f"{slug}-{file_date}.json").write_text(
             json.dumps(payload, ensure_ascii=False),
             encoding="utf-8",
         )
@@ -76,7 +77,7 @@ def test_annual_batch_rejects_missing_chart_before_database_access(tmp_path, mon
 
 
 def test_annual_batch_rejects_mixed_snapshot_dates(tmp_path, monkeypatch):
-    _write_batch(tmp_path, date_value="2026-11-22")
+    _write_batch(tmp_path, date_value="2026-11-22", filename_date="2026-11-23")
     monkeypatch.setattr(
         annual_import,
         "database_is_ready",

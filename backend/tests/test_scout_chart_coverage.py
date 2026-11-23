@@ -322,3 +322,90 @@ def test_audit_aggregates_field_coverage_across_distinct_charts(tmp_path):
         "matched_total": 2,
         "percent": 100.0,
     }
+
+
+
+def test_strict_cli_fails_when_chart_items_are_missing(tmp_path, monkeypatch, capsys):
+    import sys
+    from scripts import audit_chart_scout_coverage
+
+    scout = tmp_path / "scout.sqlite"
+    snapshot = tmp_path / "annual.json"
+    _create_scout(scout)
+    snapshot.write_text(
+        json.dumps(
+            {
+                "slug": "annual-2025-chinese-movies",
+                "name": "2025 评分最高华语电影",
+                "source": "douban",
+                "category": "annual",
+                "period": "2025",
+                "snapshot_date": "2026-11-23",
+                "movies": [
+                    {"douban_id": "7654321", "rank": 1, "title": "Missing", "type": "movie"}
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "audit_chart_scout_coverage",
+            "--scout-db",
+            str(scout),
+            "--input",
+            str(snapshot),
+            "--strict",
+        ],
+    )
+
+    assert audit_chart_scout_coverage.main() == 2
+    captured = capsys.readouterr()
+    assert '"scout_missing": 1' in captured.out
+    assert "Strict audit failed: missing=1" in captured.err
+
+
+def test_strict_cli_succeeds_when_coverage_has_no_identity_issues(tmp_path, monkeypatch, capsys):
+    import sys
+    from scripts import audit_chart_scout_coverage
+
+    scout = tmp_path / "scout.sqlite"
+    snapshot = tmp_path / "annual.json"
+    _create_scout(scout)
+    snapshot.write_text(
+        json.dumps(
+            {
+                "slug": "annual-2025-chinese-movies",
+                "name": "2025 评分最高华语电影",
+                "source": "douban",
+                "category": "annual",
+                "period": "2025",
+                "snapshot_date": "2026-11-23",
+                "movies": [
+                    {"douban_id": "1234567", "rank": 1, "title": "Movie", "type": "movie"}
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "audit_chart_scout_coverage",
+            "--scout-db",
+            str(scout),
+            "--input",
+            str(snapshot),
+            "--strict",
+        ],
+    )
+
+    assert audit_chart_scout_coverage.main() == 0
+    captured = capsys.readouterr()
+    assert '"scout_missing": 0' in captured.out
+    assert captured.err == ""

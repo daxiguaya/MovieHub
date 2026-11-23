@@ -84,7 +84,19 @@ def test_audit_reports_match_missing_and_field_coverage_without_writes(tmp_path)
     report = audit_chart_snapshots([snapshot], scout)
 
     assert report["read_only"] is True
-    assert report["summary"] == {
+    summary = report["summary"]
+    assert {
+        key: summary[key]
+        for key in (
+            "chart_count",
+            "chart_items",
+            "scout_matches",
+            "scout_type_valid_matches",
+            "scout_missing",
+            "scout_ambiguous",
+            "type_mismatches",
+        )
+    } == {
         "chart_count": 1,
         "chart_items": 2,
         "scout_matches": 1,
@@ -92,6 +104,11 @@ def test_audit_reports_match_missing_and_field_coverage_without_writes(tmp_path)
         "scout_missing": 1,
         "scout_ambiguous": 0,
         "type_mismatches": 0,
+    }
+    assert summary["field_coverage"]["year"] == {
+        "present": 1,
+        "matched_total": 1,
+        "percent": 100.0,
     }
     chart = report["charts"][0]
     assert chart["missing_douban_ids"] == ["7654321"]

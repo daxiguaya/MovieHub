@@ -73,7 +73,7 @@ docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
 
 The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages and honors any longer robots.txt crawl-delay. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. The endpoint provides only list-level fields (ID, title, rating and cover); run the read-only Scout metadata import as needed to enrich year, rating count, genres, regions and details.
 
-Then use the same `import_chart --dry-run` and import commands above. Annual charts are not covered by this collector yet.
+Then use the same `import_chart --dry-run` and import commands above. Annual charts use the official one-shot collector documented in [ANNUAL-CHART-COLLECTOR.md](ANNUAL-CHART-COLLECTOR.md).
 
 
 ## Import 2025 annual charts
@@ -91,7 +91,7 @@ Source: [Douban official 2025 annual roundup](https://blog.douban.com/douban/202
 
 Prepare one JSON file per list using the same [snapshot format](#snapshot-format), with `source: "douban"`, `category: "annual"`, and the matching slug/name above. Use the actual date on which the source list was captured as `snapshot_date`; the `period` is already part of each built-in chart definition. Validate each file with `--dry-run` before importing. The preflight rejects cross-category or cross-period payloads and, in particular, rejects TV entries in movie lists or movie entries in the Chinese TV list. The normalized import path does not fetch the official page or invent missing movie metadata.
 
-The four categories must remain separate: Chinese films, international films, hidden gems and Chinese TV series are not one comparable ranking. MovieHub does not bundle the annual list dataset in Git. As of the 2026-11-23 review, the 2026 annual categories and ranking data had not been verified; no empty 2026 placeholder is seeded. Add 2026 definitions only after official publication.
+The four categories must remain separate: Chinese films, international films, hidden gems and Chinese TV series are not one comparable ranking. The annual collector has been run successfully in CI: four normalized snapshots (8/10/10/10 entries) passed dry-run validation and were uploaded as a 14-day GitHub Actions artifact. The JSON is not committed to Git and has not been imported into any database. As of the 2026-11-23 review, the 2026 annual categories and ranking data had not been verified; no empty 2026 placeholder is seeded. Add 2026 definitions only after official publication.
 
 ## Snapshot format
 

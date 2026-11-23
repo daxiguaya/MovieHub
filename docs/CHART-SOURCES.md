@@ -4,9 +4,9 @@ Last reviewed: 2026-11-23
 
 ## Current state
 
-MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, and a one-shot Top 250 public-page collector.
+MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, a one-shot Top 250 HTML collector, and one-shot popular/high-rated collectors using Douban's undocumented web JSON endpoint.
 
-**It does not yet run scheduled chart collection.** Top 250 can be collected manually when robots.txt permits; popular, high-rated and annual chart collectors are not yet implemented. Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
+**It does not yet run scheduled chart collection.** Top 250, popular and high-rated charts can be collected manually when robots.txt permits. Annual chart collection remains unimplemented. Built-in chart definitions are display metadata only; they are not evidence that Top 250, popular, high-rated, or annual chart data has been fetched.
 
 ## Reference projects
 
@@ -36,6 +36,14 @@ Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout 
 - Does not use cookies, login sessions, proxy rotation, redirects, retries or challenge bypass.
 - Stops on 401/403, 429, unexpected redirects, oversized responses, missing ranks or changed markup.
 - Writes a normalized JSON file only; it does not write directly to the database or run on a schedule.
+
+## Popular and high-rated collectors
+
+- Use Douban's undocumented `/j/search_subjects` web endpoint for the `热门` and `豆瓣高分` tags.
+- Bound each run to at most 100 results by default (hard maximum 500).
+- Use two-second sequential pacing, robots.txt checks, no cookies, no proxy rotation, no redirects and no retries.
+- The endpoint returns only list-level fields; Scout remains the metadata enrichment source.
+- Treat this as a fragile web endpoint, not a supported official API. It may stop working or be disallowed at any time.
 
 ## Acquisition constraints
 

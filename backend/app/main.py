@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.config import settings
 from app.database import DatabaseNotInitializedError, get_db_path
 from app.limiter import limiter
 from app.logging_config import setup_logging
@@ -130,12 +131,16 @@ async def rate_limit_exceeded_handler(
     return _rate_limit_exceeded_handler(request, exc)
 
 
+# Cross-origin requests are disabled by default. Configure
+# MOVIEHUB_CORS_ORIGINS as a JSON string array to allow specific frontends.
+# Same-origin requests (for example, through one Nginx Proxy Manager host)
+# do not require CORS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 
@@ -150,7 +155,7 @@ app.include_router(import_router, prefix="/api")
 
 @app.get("/api/health")
 def health_check() -> dict[str, str]:
-    """Basic application health check."""
+    """Basic application liveness check."""
     return {"status": "healthy"}
 
 

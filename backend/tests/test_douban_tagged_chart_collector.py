@@ -157,3 +157,18 @@ def test_tagged_collector_validates_chart_and_request_bounds():
         DoubanTaggedChartCollector(client=FakeClient(), max_items=501)
     with pytest.raises(ValueError, match="at least 2.0 seconds"):
         DoubanTaggedChartCollector(client=FakeClient(), request_delay=1.0)
+
+
+def test_tagged_collector_honors_robots_crawl_delay():
+    client = FakeClient(
+        robots_text="User-agent: *\\nAllow: /\\nCrawl-delay: 4"
+    )
+    sleeps = []
+    DoubanTaggedChartCollector(
+        client=client,
+        sleeper=sleeps.append,
+        max_items=45,
+    ).collect("popular", date(2026, 11, 23))
+
+    assert len(sleeps) == 2
+    assert all(delay == 4.0 for delay in sleeps)

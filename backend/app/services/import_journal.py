@@ -47,7 +47,19 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
                         truncate_at = start + boundary + 1
                         break
                     cursor = start
-                os.ftruncate(descriptor, truncate_at)
+                # Preserve a complete JSON object that merely lacks its
+                # trailing newline; discard only a malformed partial record.
+                tail_size = end - truncate_at
+                os.lseek(descriptor, truncate_at, os.SEEK_SET)
+                tail = os.read(descriptor, tail_size)
+                try:
+                    tail_event = json.loads(tail.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
+                    tail_event = None
+                if isinstance(tail_event, dict):
+                    os.write(descriptor, b"\\n")
+                else:
+                    os.ftruncate(descriptor, truncate_at)
 
         # One append write plus fsync makes each event durable and prevents
         # interleaving. A torn trailing event is discarded before the next write.

@@ -84,6 +84,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Product scope and architecture baseline: complete.**
 
+## Annual chart batch-output safety (2026-11-23)
+
+- [x] Stage all four annual chart JSON files before publishing any destination file.
+- [x] Roll back newly published files if a later publish fails.
+- [x] Preserve every previous output file when an overwrite batch fails partway through.
+- [x] Reject incomplete four-chart payloads and check overwrite conflicts before making the Douban network request.
+- [x] Add failure-injection tests for first-time publication and overwrite rollback.
+
 ## Overall first-release progress (estimate)
 
 | Workstream | Status |

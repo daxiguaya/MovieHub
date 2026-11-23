@@ -193,6 +193,7 @@ class ImportService:
             processed = 0
             skipped = 0
             imported = 0
+            record_errors = 0
             error_logs = 0
             cursor = source_conn.execute(SOURCE_ROW_SQL)
 
@@ -225,6 +226,7 @@ class ImportService:
                                 else:
                                     skipped += 1
                             except Exception:
+                                record_errors += 1
                                 genre_map = {
                                     item.name: item.id
                                     for item in db.scalars(select(Genre)).all()
@@ -261,15 +263,14 @@ class ImportService:
             if imported:
                 cache_manager.clear()
 
-            self._set_progress(
-                processed,
-                total,
-                f"Import completed; imported {imported}, skipped {skipped}",
+            completion_message = (
+                f"Import completed; imported {imported}, skipped {skipped}, "
+                f"record errors {record_errors}"
             )
-            self._finish(
-                "completed",
-                f"Import completed; imported {imported}, skipped {skipped}",
-            )
+            with self._status_lock:
+                self._status.errors = record_errors
+            self._set_progress(processed, total, completion_message)
+            self._finish("completed", completion_message)
 
         except Exception:
             logger.exception(

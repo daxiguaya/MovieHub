@@ -12,16 +12,16 @@ Current phase: Phase 4 — independent database foundation
 - [x] Add migration safety: schema version checks, verified backup, integrity/foreign-key validation and rollback restoration.
 - [x] Implement chart snapshot semantics: re-import replaces only the selected chart/date snapshot, preserves other dates and does not overwrite populated Scout metadata.
 - [x] Cover failure rollback, WAL sidecar cleanup and idempotent built-in chart initialization without overwriting user settings.
-- [ ] Complete a direct read-only Douban Scout fixture integration test, verifying source-field mapping, internal MovieHub IDs and association/poster handling without modifying Scout data.
+- [x] Add direct read-only Douban Scout fixture integration coverage for source-field mapping, MovieHub internal IDs, genre/region associations, posters, movie/TV records, and source-file immutability.
 
-Progress: **6/7 checklist items complete**.
+Progress: **7/7 checklist items complete — Phase 4 database foundation complete.**
 
-## Latest CI
+## Latest code validation
 
 - Workflow: Backend tests
-- Run: [#24](https://github.com/daxiguaya/MovieHub/actions/runs/45123028732)
-- Commit: `855e720dae91df057e243b6bd48ae4b1939d0c47`
-- Result: **success** — compile passed; **24 tests passed**.
+- Run: [#27](https://github.com/daxiguaya/MovieHub/actions/runs/45123399908)
+- Tested commit: `92ea20927e92d9beb4cd897c5b569921e10bb224`
+- Result: **success** — backend compilation passed; **25 tests passed**.
 
 ## Scope and safety boundaries
 
@@ -30,6 +30,6 @@ Progress: **6/7 checklist items complete**.
 - No production database creation/migration, deployment, or service restart is part of Phase 4.
 - Do not commit credentials, tokens, private environment files, database files, or local repair backups.
 
-## Next task
+## Next phase
 
-Implement and test the direct read-only Scout fixture integration path. Update this checklist and CI result whenever a milestone is completed.
+Phase 4 is complete. Before creating or migrating any production database, perform a separate application integration audit covering startup/database lifecycle, API dependencies, import workflows and chart/history queries. Keep all validation on temporary fixtures; do not touch the user's live Scout database or deploy services as part of this audit.

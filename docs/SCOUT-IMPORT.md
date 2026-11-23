@@ -139,4 +139,4 @@ python -m scripts.import_history
 python -m scripts.import_history --run-id <run-id>
 ```
 
-The command reports each run's source path and mode, source fingerprint, latest committed checkpoint, cumulative processed/imported/skipped/error counts, batch count, resume count and lifecycle timestamps. A run with no terminal event is shown as `interrupted`; a failed attempt that has subsequently been resumed is shown as `running`. A torn final JSONL line is ignored. The command is read-only and does not resume, modify or delete journal entries, open Scout, or write to MovieHub.
+The command reports each run's source path and mode, source fingerprint, latest committed checkpoint, cumulative processed/imported/skipped/error counts, batch count, resume count and lifecycle timestamps. A run with no terminal event is shown as `incomplete` (the journal alone cannot prove whether its process is still running or crashed); a failed attempt that has subsequently been resumed is shown as `running`. A torn final JSONL line is ignored. The command is read-only and does not resume, modify or delete journal entries, open Scout, or write to MovieHub.

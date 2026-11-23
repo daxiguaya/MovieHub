@@ -26,7 +26,7 @@ def summarize_import_events(
             if summary is None:
                 summary = {
                     "run_id": current_id,
-                    "status": "interrupted",
+                    "status": "incomplete",
                     "source_path": event.get("source_path"),
                     "force_full": event.get("force_full"),
                     "source_fingerprint": event.get("source_fingerprint"),

@@ -38,7 +38,7 @@ def test_history_aggregates_checkpoint_and_terminal_counters():
     assert summary["completed_at"] == "2026-11-23T10:02:00"
 
 
-def test_history_distinguishes_failed_resumed_and_interrupted_runs():
+def test_history_distinguishes_failed_resumed_and_incomplete_runs():
     events = [
         {"event": "run_started", "run_id": "failed", "total": 8,
          "started_at": "2026-11-23T10:00:00"},
@@ -49,7 +49,7 @@ def test_history_distinguishes_failed_resumed_and_interrupted_runs():
          "failed_at": "2026-11-23T10:01:00"},
         {"event": "run_resumed", "run_id": "failed",
          "resumed_at": "2026-11-23T10:02:00"},
-        {"event": "run_started", "run_id": "interrupted", "total": 2,
+        {"event": "run_started", "run_id": "incomplete", "total": 2,
          "started_at": "2026-11-23T11:00:00"},
     ]
 
@@ -57,7 +57,7 @@ def test_history_distinguishes_failed_resumed_and_interrupted_runs():
     assert summaries["failed"]["status"] == "running"
     assert summaries["failed"]["processed"] == 4
     assert summaries["failed"]["resume_count"] == 1
-    assert summaries["interrupted"]["status"] == "interrupted"
+    assert summaries["incomplete"]["status"] == "incomplete"
 
 
 def test_history_ignores_torn_final_line_and_can_filter_run(tmp_path):

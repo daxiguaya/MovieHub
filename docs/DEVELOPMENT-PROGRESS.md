@@ -451,7 +451,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 - [x] Add a read-only journal aggregation layer for listing all import runs or selecting one exact run ID.
 - [x] Reconstruct cumulative counters from committed checkpoints and final completion events.
-- [x] Distinguish completed, failed, currently resumed/running and crash-interrupted runs.
+- [x] Distinguish completed, failed and resumed/running runs; label runs without a terminal event as incomplete because a journal-only reader cannot prove whether the process is still alive.
 - [x] Expose source path/mode/fingerprint, last committed Douban ID, batch/resume counts and lifecycle timestamps.
 - [x] Ignore torn trailing journal records and orphan events; do not open or mutate Scout or MovieHub databases.
 - [x] Add regression tests for completed summaries, failed-then-resumed runs, interrupted runs, run filtering and torn-line recovery.

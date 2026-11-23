@@ -85,6 +85,22 @@ def test_parser_finds_subject_link_when_title_cell_is_not_second_cell():
     assert item.rating == 8.5
 
 
+def test_parser_stops_collecting_when_article_moves_to_books_and_music():
+    non_movie_sections = ARTICLE.replace(
+        "</body></html>",
+        """
+        <h2>2025年度图书</h2>
+        <table><tr><td>1、</td><td>《一本书》</td><td>作者</td><td>9.0</td></tr></table>
+        <h2>2025年度高分外语专辑</h2>
+        <table><tr><td>1、</td><td>Album</td><td>Artist</td><td>9.0</td></tr></table>
+        </body></html>
+        """,
+    )
+    snapshots = parse_annual_article(non_movie_sections, date(2026, 11, 23))
+    assert len(snapshots["annual-2025-chinese-tv"].movies) == 1
+    assert snapshots["annual-2025-chinese-tv"].movies[0].title == "无尽的尽头"
+
+
 def test_parser_rejects_untrusted_subject_hosts_and_missing_chart_sections():
     unsafe = ARTICLE.replace(
         "https://movie.douban.com/subject/36809864/",

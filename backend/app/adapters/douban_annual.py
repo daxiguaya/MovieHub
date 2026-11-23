@@ -106,7 +106,7 @@ class _AnnualArticleParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag in {"h1", "h2", "h3", "h4", "h5", "h6", "p"} and tag == self.block_tag:
             heading = _normalise_heading("".join(self.block_text))
-            self.current_slug = _SECTION_ALIASES.get(heading, self.current_slug)
+            self.current_slug = _SECTION_ALIASES.get(heading)
             self.block_tag = None
             self.block_text = []
         if self.in_row and tag in {"td", "th"}:

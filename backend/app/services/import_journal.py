@@ -57,7 +57,7 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
                 except (UnicodeDecodeError, json.JSONDecodeError):
                     tail_event = None
                 if isinstance(tail_event, dict):
-                    os.write(descriptor, b"\\n")
+                    os.write(descriptor, b"\n")
                 else:
                     os.ftruncate(descriptor, truncate_at)
 

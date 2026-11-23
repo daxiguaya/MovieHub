@@ -46,6 +46,44 @@ services:
       - default
       - npm_proxy
 
+  moviehub-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: moviehub-frontend:local
+    container_name: moviehub-web
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "10001:10001"
+    volumes:
+      - ${MOVIEHUB_FRONTEND_CONFIG_PATH:-./deploy/frontend-config.json}:/usr/share/nginx/html/config.json:ro
+    expose:
+      - "8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - npm_proxy
+
 networks:
   default:
     driver: bridge

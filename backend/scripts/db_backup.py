@@ -19,7 +19,11 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.database import CURRENT_SCHEMA_VERSION, get_db_path
+from app.database import (
+    CURRENT_SCHEMA_VERSION,
+    REQUIRED_DATABASE_TABLES,
+    get_db_path,
+)
 
 logger = logging.getLogger("moviehub.db_backup")
 DATABASE_FILENAME = "movies.db"
@@ -50,6 +54,18 @@ def _validate_database(path: Path) -> None:
         if foreign_key_errors:
             raise RuntimeError(
                 f"SQLite foreign-key check failed: {foreign_key_errors[:10]}"
+            )
+
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+        missing_tables = REQUIRED_DATABASE_TABLES - tables
+        if missing_tables:
+            raise RuntimeError(
+                f"Database is missing required tables: {sorted(missing_tables)}"
             )
 
         row = connection.execute(

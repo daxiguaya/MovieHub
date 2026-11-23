@@ -67,6 +67,13 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Poster fetch security baseline: complete.**
 
+## Chart collector-to-database integration
+
+- [x] Add an end-to-end fixture test that collects a tagged chart through the adapter, imports it through the production chart import service, and verifies snapshot ranks reference MovieHub internal movie IDs.
+- [x] Keep this test isolated from real Douban access and production/Scout databases.
+
+**Collector → normalized snapshot → MovieHub SQLite integration: verified in CI.**
+
 ## Product scope and architecture
 
 - [x] Record the agreed first-release user journey: chart discovery → movie details → Xiaoya search.
@@ -208,9 +215,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#261](https://github.com/daxiguaya/MovieHub/actions/runs/45136554707)
-- Tested commit: `34744e0783772ce4dfe01aa99cb63f9f41b4ef06`
-- Result: **success** — **98 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#266](https://github.com/daxiguaya/MovieHub/actions/runs/45137001518)
+- Tested commit: `f531d6e2e3e7dec8528aaf4b7a08ee19799f5f32`
+- Result: **success** — **99 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

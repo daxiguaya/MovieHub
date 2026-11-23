@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   backend:
@@ -156,3 +157,26 @@ jobs:
       - name: Run browser end-to-end tests
         run: npm run test:e2e
         working-directory: frontend
+
+  performance-benchmarks:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+        working-directory: backend
+      - name: Run synthetic SQLite search and Scout import benchmarks
+        run: |
+          MOVIEHUB_RUN_SEARCH_BENCHMARKS=1 MOVIEHUB_RUN_IMPORT_BENCHMARKS=1 \
+            python -m pytest -q -s \
+              tests/test_search_performance.py \
+              tests/test_import_performance.py
+        working-directory: backend

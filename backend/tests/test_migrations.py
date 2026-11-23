@@ -10,13 +10,28 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "001_moviehub_core.sql"
+    / "002_durable_import_batch_receipts.sql"
 )
 
 
 def _create_empty_database(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     sqlite3.connect(str(path)).close()
+
+def _create_v1_database(path: Path) -> None:
+    """Create an isolated, valid schema-v1 fixture for the v1 -> v2 runner."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    initial = (
+        Path(__file__).resolve().parents[1]
+        / "migrations"
+        / "001_moviehub_core.sql"
+    )
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.executescript(initial.read_text(encoding="utf-8"))
+    finally:
+        conn.close()
 
 
 def test_check_only_does_not_modify_empty_database(tmp_path):
@@ -36,18 +51,18 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_initial_migration_creates_schema_and_is_idempotent(tmp_path):
+def test_version_two_migration_upgrades_v1_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 1
+    assert execute_migration(db_path, MIGRATION) == 2
     assert execute_migration(db_path, MIGRATION) == 1
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 1
+        ).fetchone()[0] == 2
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         tables = {
@@ -61,6 +76,7 @@ def test_initial_migration_creates_schema_and_is_idempotent(tmp_path):
             "movie_regions", "movie_posters", "lists",
             "chart_snapshots", "list_items", "favorites",
             "schema_migrations",
+            "import_batch_receipts",
         } <= tables
     finally:
         conn.close()
@@ -69,7 +85,7 @@ def test_initial_migration_creates_schema_and_is_idempotent(tmp_path):
     assert len(backups) == 1
 
 
-def test_initial_migration_refuses_nonempty_database(tmp_path):
+def test_migration_refuses_unversioned_nonempty_database(tmp_path):
     db_path = tmp_path / "scout-or-other.db"
     conn = sqlite3.connect(str(db_path))
     conn.execute("CREATE TABLE existing_data (id INTEGER PRIMARY KEY)")
@@ -108,7 +124,7 @@ def test_migration_refuses_database_with_newer_schema_version(tmp_path):
 
 def test_failed_migration_restores_pre_migration_backup(tmp_path):
     db_path = tmp_path / "movies.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
     broken_migration = tmp_path / "broken.sql"
     broken_migration.write_text(
         "BEGIN IMMEDIATE; CREATE TABLE partial_change (id INTEGER); "
@@ -122,8 +138,8 @@ def test_failed_migration_restores_pre_migration_backup(tmp_path):
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall() == []
+            "SELECT MAX(version) FROM schema_migrations"
+        ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
         conn.close()
@@ -137,7 +153,7 @@ def test_failed_restore_removes_stale_wal_sidecars(tmp_path, monkeypatch):
     import scripts.migrate as migrate_module
 
     db_path = tmp_path / "wal-movies.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
     migration = tmp_path / "valid-but-incomplete.sql"
     migration.write_text(
         "BEGIN IMMEDIATE; "
@@ -174,7 +190,7 @@ def test_validation_rejects_schema_drift_in_an_existing_database(tmp_path):
     from scripts.migrate import validate_migration
 
     db_path = tmp_path / "movies.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
     execute_migration(db_path, MIGRATION)
 
     conn = sqlite3.connect(str(db_path))
@@ -192,7 +208,7 @@ def test_validation_rejects_missing_foreign_key_contract(tmp_path):
     from scripts.migrate import validate_orm_schema_contract
 
     db_path = tmp_path / "movies.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
     execute_migration(db_path, MIGRATION)
 
     conn = sqlite3.connect(str(db_path))
@@ -206,11 +222,11 @@ def test_validation_rejects_missing_foreign_key_contract(tmp_path):
         validate_orm_schema_contract(db_path)
 
 
-def test_concurrent_initial_migrations_are_serialized(tmp_path):
+def test_concurrent_v1_migrations_are_serialized(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
 
     db_path = tmp_path / "concurrent.db"
-    _create_empty_database(db_path)
+    _create_v1_database(db_path)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
@@ -219,12 +235,12 @@ def test_concurrent_initial_migrations_are_serialized(tmp_path):
         ]
         results = [future.result(timeout=30) for future in futures]
 
-    assert results == [1, 1]
+    assert results == [2, 2]
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version=1"
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=2"
         ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:

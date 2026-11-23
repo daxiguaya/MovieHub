@@ -42,7 +42,6 @@ function App() {
         </nav>
         <Link className="top-search" to="/search" aria-label="搜索电影">
           <span>⌕</span><span className="top-search-label">搜索电影</span>
-          <kbd>⌘ K</kbd>
         </Link>
       </header>
 

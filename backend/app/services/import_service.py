@@ -308,8 +308,8 @@ class ImportService:
 
                     # Commit bounded batches instead of holding one SQLite
                     # writer transaction for the entire Scout catalogue.
-                    # A failed batch rolls back as a unit; committed batches
-                    # remain safe to retry because the importer is idempotent.
+                    # Movie rows and the durable batch receipt commit together;
+                    # a failed transaction leaves neither behind.
                     batch_errors: list[dict[str, Any]] = []
                     batch_imported = batch_skipped = batch_errors_count = 0
                     batch_processed = len(rows)
@@ -450,7 +450,8 @@ class ImportService:
                 "MovieHub import failed after %s committed batches",
                 committed_batches,
             )
-            # Earlier committed batches are durable and safe to reprocess.
+            # Earlier committed batches have transactional receipts; resume
+            # restores their exact counters and source cursor from those rows.
             if committed_batches:
                 try:
                     cache_manager.clear()

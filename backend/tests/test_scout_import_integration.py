@@ -3,9 +3,8 @@
 import hashlib
 import json
 import sqlite3
-from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from app.database import (
@@ -54,9 +53,7 @@ def _create_scout_fixture(path):
             """
         )
         conn.execute(
-            """
-            INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+            "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 "1234567",
                 "tt1234567",
@@ -69,9 +66,7 @@ def _create_scout_fixture(path):
             ),
         )
         conn.execute(
-            """
-            INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+            "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 "7654321",
                 None,
@@ -106,7 +101,7 @@ def test_scout_import_is_read_only_and_maps_to_moviehub_internal_ids(
     _create_scout_fixture(source_path)
     source_hash_before = _sha256(source_path)
 
-    engine = import_service_module.create_engine(
+    engine = create_engine(
         f"sqlite:///{target_path.as_posix()}",
         connect_args={"check_same_thread": False},
     )

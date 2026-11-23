@@ -72,6 +72,19 @@ def test_parser_builds_four_separate_2025_charts_and_preserves_rank_gaps():
     assert all(item.category == "annual" and item.period == "2025" for item in snapshots.values())
 
 
+def test_parser_finds_subject_link_when_title_cell_is_not_second_cell():
+    shifted = ARTICLE.replace(
+        '<tr><td>1、</td><td><a href="https://movie.douban.com/subject/36656706/">无尽的尽头</a></td><td>臧溪川</td><td>8.5</td></tr>',
+        '<tr><td>1、</td><td></td><td><a href="//movie.douban.com/subject/36656706/">无尽的尽头</a></td><td>臧溪川</td><td>8.5</td></tr>',
+    )
+    snapshots = parse_annual_article(shifted, date(2026, 11, 23))
+    item = snapshots["annual-2025-chinese-tv"].movies[0]
+    assert item.douban_id == "36656706"
+    assert item.title == "无尽的尽头"
+    assert item.directors == ["臧溪川"]
+    assert item.rating == 8.5
+
+
 def test_parser_rejects_untrusted_subject_hosts_and_missing_chart_sections():
     unsafe = ARTICLE.replace(
         "https://movie.douban.com/subject/36809864/",

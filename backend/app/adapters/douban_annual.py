@@ -126,13 +126,14 @@ class _AnnualArticleParser(HTMLParser):
 def _subject_id(hrefs: list[str]) -> tuple[str, str] | None:
     for href in hrefs:
         try:
-            parsed = urlsplit(href)
+            candidate = href if "://" in href else f"https:{href}" if href.startswith("//") else ""
+            parsed = urlsplit(candidate)
         except ValueError:
             continue
         if (
-            parsed.scheme == "https"
+            parsed.scheme in {"http", "https"}
             and parsed.hostname == "movie.douban.com"
-            and parsed.port in (None, 443)
+            and parsed.port in (None, 80, 443)
         ):
             match = re.fullmatch(r"/subject/([0-9]+)/?", parsed.path)
             if match:
@@ -165,26 +166,57 @@ def parse_annual_article(html: str, snapshot_date: date) -> dict[str, ChartSnaps
             if not 1 <= rank <= 10:
                 raise DoubanCollectionError(f"Unexpected annual rank {rank} in {slug}")
 
-            title = str(cells[1]["text"]).strip()
-            hrefs = cells[1]["hrefs"]
-            assert isinstance(hrefs, list)
-            subject = _subject_id(hrefs)
+            # Do not assume the linked title is always the second table cell:
+            # Douban's WordPress markup may add an empty/auxiliary cell.
+            subject_cell_index = None
+            subject = None
+            for cell_index, cell in enumerate(cells):
+                hrefs = cell["hrefs"]
+                assert isinstance(hrefs, list)
+                candidate = _subject_id(hrefs)
+                if candidate is not None:
+                    subject_cell_index = cell_index
+                    subject = candidate
+                    break
+
+            fallback_title = str(cells[1]["text"]).strip()
             # The official article explicitly uses "空缺" for unfilled ranks.
-            if title == "空缺" and subject is None:
+            if fallback_title == "空缺" and subject is None:
                 continue
-            if not title or subject is None:
+            if subject is None or subject_cell_index is None:
+                href_summary = [href for cell in cells for href in cell["hrefs"]]
                 raise DoubanCollectionError(
-                    f"Annual chart {slug} contains a row without a valid Douban subject link"
+                    f"Annual chart {slug} rank {rank} ({fallback_title!r}) "
+                    f"has no valid Douban subject link; hrefs={href_summary!r}"
+                )
+
+            title = str(cells[subject_cell_index]["text"]).strip()
+            if not title:
+                raise DoubanCollectionError(
+                    f"Annual chart {slug} rank {rank} has an empty linked title"
                 )
 
             douban_id, douban_url = subject
             if douban_id in seen_ids or rank in seen_ranks:
                 raise DoubanCollectionError(f"Duplicate ID or rank in annual chart {slug}")
 
-            rating_text = str(cells[3]["text"]).strip() if len(cells) > 3 else ""
-            rating_match = re.search(r"(?:[0-9]+\.)?[0-9]+", rating_text)
-            rating = float(rating_match.group(0)) if rating_match else None
-            director_text = str(cells[2]["text"]).strip()
+            other_cells = [
+                str(cell["text"]).strip()
+                for index, cell in enumerate(cells)
+                if index not in {0, subject_cell_index}
+            ]
+            rating_index = next(
+                (
+                    index for index in range(len(other_cells) - 1, -1, -1)
+                    if re.fullmatch(r"(?:[0-9]+\.)?[0-9]+", other_cells[index])
+                ),
+                None,
+            )
+            rating = float(other_cells[rating_index]) if rating_index is not None else None
+            director_text = " ".join(
+                value for index, value in enumerate(other_cells)
+                if index != rating_index and value
+            )
             directors = [
                 value.strip()
                 for value in re.split(r"\s*/\s*", director_text)

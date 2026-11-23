@@ -220,6 +220,14 @@ def main() -> int:
         required=True,
         help="Normalized chart JSON file; repeat once per chart",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Return exit code 2 when any chart item is missing, ambiguous, "
+            "or matched to a Scout row with the wrong media type"
+        ),
+    )
     args = parser.parse_args()
     try:
         result = audit_chart_snapshots(args.input, args.scout_db)
@@ -227,6 +235,20 @@ def main() -> int:
         print(f"Scout chart coverage audit failed: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if args.strict:
+        summary = result["summary"]
+        quality_issues = {
+            "missing": summary["scout_missing"],
+            "ambiguous": summary["scout_ambiguous"],
+            "type_mismatches": summary["type_mismatches"],
+        }
+        if any(quality_issues.values()):
+            print(
+                "Strict audit failed: "
+                + ", ".join(f"{name}={count}" for name, count in quality_issues.items()),
+                file=sys.stderr,
+            )
+            return 2
     return 0
 
 

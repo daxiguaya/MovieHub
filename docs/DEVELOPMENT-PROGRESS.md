@@ -89,9 +89,10 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Replace the catalogue-wide write transaction with bounded batches (500 records per transaction) to reduce SQLite writer-lock duration.
 - [x] Keep per-record SAVEPOINT isolation and make interrupted/partially committed imports safe to retry.
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
-- [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
+- [x] Add regression coverage proving incremental skip, newer-timestamp updates and forced full reprocessing behavior.
+- [x] Exercise a 1,000-record synthetic Scout catalogue across six bounded batches.
 
-**Import hardening milestone: implemented and tested.** Remaining Phase B work is larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented and tested, including a 1,000-row synthetic catalogue processed across multiple batches.** A larger 10k/100k and NAS-hardware benchmark remains. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
 ## Scout import operator workflow
 
@@ -173,7 +174,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Define a typed frontend API client and visible loading, empty and error states.
 - [x] Test Scout field-level merge precedence: empty fields preserve enriched MovieHub metadata; source-row deletion does not delete MovieHub records.
 - [x] Test partial batch failure: already committed batches remain durable and an incremental retry completes safely.
-- [ ] Validate import throughput, memory use and batch-lock duration with a larger synthetic fixture.
+- [ ] Run 10k/100k synthetic import throughput, memory and batch-lock measurements; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
@@ -181,9 +182,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#193](https://github.com/daxiguaya/MovieHub/actions/runs/45131712957)
-- Tested commit: `0ddf5dccc7aaa53bde8d68460f4584880db0ee53`
-- Result: **success** — backend compilation, **72 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#201](https://github.com/daxiguaya/MovieHub/actions/runs/45131963712)
+- Tested commit: `30130d452c69f05e691cf19aea71d85e069fd1d5`
+- Result: **success** — backend compilation, **73 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

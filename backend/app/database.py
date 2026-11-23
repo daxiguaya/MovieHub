@@ -3,6 +3,7 @@
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
+import sqlite3
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey, Index, Integer,
@@ -14,6 +15,20 @@ from app.config import settings
 
 Base = declarative_base()
 DATABASE_NAME = "movies.db"
+CURRENT_SCHEMA_VERSION = 1
+REQUIRED_DATABASE_TABLES = {
+    "schema_migrations",
+    "movies",
+    "genres",
+    "regions",
+    "movie_genres",
+    "movie_regions",
+    "movie_posters",
+    "lists",
+    "chart_snapshots",
+    "list_items",
+    "favorites",
+}
 
 
 class DatabaseNotInitializedError(RuntimeError):
@@ -28,6 +43,38 @@ def get_db_path() -> str:
 def get_database_url() -> str:
     """Build the SQLite URL without creating directories or database files."""
     return f"sqlite:///{Path(get_db_path()).as_posix()}"
+
+
+def database_is_ready(path: str | Path | None = None) -> bool:
+    """Check the required schema through a read-only SQLite connection."""
+    database_path = Path(path or get_db_path()).expanduser().resolve()
+    if not database_path.is_file() or database_path.stat().st_size == 0:
+        return False
+
+    try:
+        connection = sqlite3.connect(
+            database_path.as_uri() + "?mode=ro",
+            uri=True,
+            timeout=2,
+        )
+        try:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            if not REQUIRED_DATABASE_TABLES.issubset(tables):
+                return False
+
+            row = connection.execute(
+                "SELECT MAX(version) FROM schema_migrations"
+            ).fetchone()
+            return bool(row and row[0] == CURRENT_SCHEMA_VERSION)
+        finally:
+            connection.close()
+    except (OSError, sqlite3.Error):
+        return False
 
 
 class Movie(Base):

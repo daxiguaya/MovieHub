@@ -70,7 +70,9 @@ def restore_from_batch_receipts(
             raise ValueError("Import journal checkpoint conflicts with its database receipt")
 
     # Recover error details and checkpoints committed to SQLite before a crash
-    # interrupted their corresponding append-only JSONL writes.
+    # interrupted their corresponding append-only JSONL writes. The receipt's
+    # cumulative error delta must exactly match its stored per-record details.
+    previous_errors = 0
     for receipt, event in zip(receipts, receipt_events):
         try:
             error_records = json.loads(receipt.error_records)
@@ -82,6 +84,20 @@ def restore_from_batch_receipts(
             raise ValueError(
                 f"Invalid error manifest payload in batch receipt {receipt.batch_number}"
             )
+        expected_error_delta = receipt.errors - previous_errors
+        if len(error_records) != expected_error_delta:
+            raise ValueError(
+                f"Batch receipt {receipt.batch_number} error details do not match its counters"
+            )
+        if any(
+            item.get("run_id") != run_id
+            or item.get("batch") != receipt.batch_number
+            for item in error_records
+        ):
+            raise ValueError(
+                f"Batch receipt {receipt.batch_number} contains mismatched error identities"
+            )
+        previous_errors = receipt.errors
         if error_records:
             append_import_errors(journal_path, error_records)
 

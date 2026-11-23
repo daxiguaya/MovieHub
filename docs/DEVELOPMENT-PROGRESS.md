@@ -111,14 +111,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| 2025 annual charts | Four official lists defined; collector and recoverable four-file output implemented; all-or-nothing multi-chart DB import service added; real normalized data import pending |
+| 2025 annual charts | Four official lists defined; collector and recoverable four-file output implemented; guarded four-file preflight CLI and all-or-nothing multi-chart DB import path implemented; real normalized data import pending |
 | Favorites API and frontend UI | Implemented; Chromium E2E passed |
 | Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 69%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 70%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
 ## Chart and Scout import numeric integrity (2026-11-23)
 

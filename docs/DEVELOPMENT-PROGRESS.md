@@ -280,7 +280,8 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Integer normalization rejects booleans and fractional numeric values instead of silently treating `True` as rank 1 or truncating 1.5 to rank 1.
 - Rating normalization rejects booleans, NaN and positive/negative infinity; invalid raw values are stored as absent rather than contaminating movie or chart-item rating columns.
 - Added regression coverage for duplicate ranks, boolean/fractional ranks, and non-finite movie/source ratings. These cases also exercise the service's lower-level mapping input path.
-- Validation status: implementation and tests are committed; GitHub Actions validation for the current head is pending.
+- Validation status: implementation and tests are committed; a marked CI run is requested from the current branch head.
+- Commits: service preflight `431b6fb`, integer normalization `f8d7763`, non-finite rating guard `575261a`, regression tests `ddd7d32` / `4e3e95b` / `e17b980`.
 
 ## Chart import identity/type integrity hardening (2026-11-23)
 

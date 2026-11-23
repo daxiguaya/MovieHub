@@ -472,6 +472,27 @@ def _execute_migration_locked(
     logger.info("Current schema version: %s", current_version)
 
     if current_version == 0:
+        if check_only:
+            logger.info(
+                "Check-only mode: database is not initialized; no changes made"
+            )
+            return 0
+
+        with open_database(database_path) as conn:
+            existing_tables = {
+                row["name"]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                )
+            }
+        if existing_tables:
+            raise RuntimeError(
+                "Refusing to migrate a non-empty database without a recognized "
+                "MovieHub schema version. Initialize a new MovieHub database "
+                "with 'python -m scripts.init_db'; Scout and other databases "
+                "are never converted or modified."
+            )
         raise RuntimeError(
             "MovieHub database has not been initialized. Run "
             "'python -m scripts.init_db' first; this migration only upgrades "

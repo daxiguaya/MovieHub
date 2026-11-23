@@ -22,8 +22,11 @@ python -m scripts.audit_chart_scout_coverage \
 
 The report shows how many chart entries have Scout matches and how many matched
 records contain year, rating, rating count, original title, overview, Douban
-URL, directors, actors, genres, regions and poster URLs. It also flags a
-movie/TV type mismatch rather than silently treating it as valid metadata.
+URL, directors, actors, genres, regions and poster URLs. It includes both
+per-chart and aggregate field-coverage counts/percentages, using only unique
+Scout matches with the expected media type as the denominator. Duplicate
+chart/date inputs are rejected before the Scout database is opened. It also
+flags a movie/TV type mismatch rather than silently treating it as valid metadata.
 If Scout contains more than one row for the same Douban ID, the audit reports
 that ID as ambiguous and excludes it from field-coverage calculations rather
 than selecting an arbitrary row. Unexpected Scout media types are included in

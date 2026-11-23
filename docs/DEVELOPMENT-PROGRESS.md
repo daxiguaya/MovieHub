@@ -72,17 +72,18 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
-| Scout import hardening | Implementation and merge/partial-retry tests complete; large-fixture performance pending |
+| Scout import hardening | Implementation and merge/partial-retry tests complete; 1,000-row fixture passed; 10k/100k and NAS benchmark pending |
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
-| Popular/high-rated/annual collection and scheduled updates | 0% |
+| One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
+| Annual chart collection and scheduled updates | 0% |
 | Favorites API and frontend UI | Implemented; browser E2E pending |
 | Xiaoya handoff | UI/config implemented; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; browser E2E and visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 59%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 61%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; annual/scheduled chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -143,6 +144,17 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Historical rank comparison: implemented; backend and frontend CI passed.**
 
+## Phase C — chart acquisition (partial)
+
+- [x] Keep chart definitions, date-scoped snapshots and normalized JSON import separate from collection.
+- [x] Add a one-shot Douban Top 250 HTML collector with robots.txt checks, two-second pacing, redirect denial and no cookies/proxies/retries.
+- [x] Add one-shot popular and high-rated collectors using the site's undocumented `/j/search_subjects` web endpoint, bounded to 100 items by default, with the same robots/rate-limit safeguards.
+- [x] Keep collection output as normalized JSON; validate with dry-run and import through the existing snapshot service.
+- [ ] Add annual chart collection after confirming a stable, permitted source.
+- [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
+
+**Top 250, popular and high-rated one-shot collection: implemented. Annual charts and scheduling remain pending.**
+
 ## Phase E — React frontend baseline
 
 - [x] Add React + TypeScript + Vite application scaffold and typed API client.
@@ -185,9 +197,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#228](https://github.com/daxiguaya/MovieHub/actions/runs/45133033428)
-- Tested commit: `9ccd2d7139439570cdf51d06388313b6b883a93e`
-- Result: **success** — **78 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#237](https://github.com/daxiguaya/MovieHub/actions/runs/45133376536)
+- Tested commit: `7c69ed67bb0f7fe59fef4c467cdf16aa4e5dc766`
+- Result: **success** — **83 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

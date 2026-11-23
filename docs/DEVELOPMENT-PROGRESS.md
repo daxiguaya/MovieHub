@@ -392,3 +392,13 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 **Validation:** [run #403](https://github.com/daxiguaya/MovieHub/actions/runs/45187036550) passed Backend, Frontend and Playwright E2E. The run used commit `fa94f193970e9ad5687c517a1f98f35e54e0dab2`, which contains the service, schema and regression-test changes. Annual collection and performance benchmarks were skipped under their opt-in conditions. The subsequent #404 change only updated documentation; its CI was still running when this note was added.
 
 **Scope:** no live Scout database, NAS service, deployment, NPM configuration or production data was accessed or changed. Actual Scout coverage/import remains blocked on a separately staged, consistent Scout database copy. Overall project progress remains **70%** until that real-data milestone is completed.
+
+
+## Whole-catalogue Scout import quality audit (2026-11-23)
+
+- [x] Add a read-only, snapshot-consistent audit over every Scout movie/TV row, not only IDs present in chart snapshots.
+- [x] Report movie/TV totals, invalid and duplicate identities, invalid ratings/years, malformed raw JSON, and field-level metadata coverage.
+- [x] Add a strict pre-import gate for identity defects and duplicate Douban IDs while keeping numeric/raw-data anomalies visible as review warnings.
+- [x] Reuse the importer's source schema and normalization logic; audit does not open or write the MovieHub database.
+- [x] Add synthetic regression tests, including a SHA-256 before/after check proving the Scout fixture is unchanged.
+- Validation: awaiting the CI run for this commit. Actual coverage figures remain unknown until a consistent staged Scout DB copy is made available; no NAS or production database was accessed.

@@ -63,3 +63,16 @@ MOVIEHUB_RUN_IMPORT_BENCHMARKS=1 pytest -q -s tests/test_import_performance.py
 ```
 
 The output reports elapsed time, rows per second and the configured transaction batch size. These cases are skipped by default in CI because throughput and memory behavior depend on the runner and storage hardware. Run them first on a controlled test machine; repeat on the NAS only as part of a separately authorized pre-deployment test. The benchmark does not deploy the application or touch production data.
+
+
+## Whole-catalogue Scout import preflight
+
+Before importing a staged Scout copy, run the read-only whole-catalogue audit:
+
+```sh
+cd backend
+python -m scripts.audit_scout_import --scout-db /path/to/staged-scout.sqlite
+python -m scripts.audit_scout_import --scout-db /path/to/staged-scout.sqlite --strict
+```
+
+The report uses one read-only SQLite transaction snapshot and streams movie/TV rows. It reports media-type totals, invalid/duplicate identities, invalid ratings and years, malformed `raw_data`, and coverage for every metadata field consumed by the importer. Strict mode exits with code 2 when invalid identities or duplicate Douban IDs exist; numeric and raw-data anomalies remain visible warnings for review. It never opens the MovieHub target database and never modifies Scout.

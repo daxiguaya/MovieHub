@@ -185,7 +185,11 @@ class ImportService:
             # This keeps the reported total and imported rows consistent even
             # if Scout continues writing to its WAL-backed database.
             source_conn.execute("BEGIN")
-            self._validate_source(source_conn, reject_duplicate_ids=True)
+            self._validate_source(
+                source_conn,
+                reject_duplicate_ids=True,
+                reject_invalid_identity=True,
+            )
 
             total = source_conn.execute(
                 "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
@@ -302,6 +306,7 @@ class ImportService:
     def _validate_source(
         conn: sqlite3.Connection,
         reject_duplicate_ids: bool = False,
+        reject_invalid_identity: bool = False,
     ) -> None:
         """Check that the source database has the expected item table."""
         result = conn.execute(
@@ -338,31 +343,31 @@ class ImportService:
                 + ", ".join(sorted(missing))
             )
 
-        # Reject unusable identity fields before the first target write.
-        # Silently skipping these rows would make a partial import look clean
-        # and hide source-export corruption from the operator.
-        invalid_identity = conn.execute(
-            """
-            SELECT rowid, douban_id, douban_title
-            FROM item
-            WHERE type IN ('movie', 'tv')
-              AND (
-                    douban_id IS NULL
-                    OR trim(CAST(douban_id AS TEXT)) = ''
-                    OR trim(CAST(douban_id AS TEXT)) GLOB '*[^0-9]*'
-                    OR douban_title IS NULL
-                    OR trim(douban_title) = ''
-              )
-            LIMIT 1
-            """
-        ).fetchone()
-        if invalid_identity is not None:
-            raise ValueError(
-                "Source database contains a movie/TV row with an invalid "
-                "Douban ID or empty title: "
-                f"rowid={invalid_identity['rowid']}, "
-                f"douban_id={invalid_identity['douban_id']!r}"
-            )
+        # Invalid identity rows can be reported by the read-only audit tool;
+        # the importer opts into rejecting them before any target writes.
+        if reject_invalid_identity:
+            invalid_identity = conn.execute(
+                """
+                SELECT rowid, douban_id, douban_title
+                FROM item
+                WHERE type IN ('movie', 'tv')
+                  AND (
+                        douban_id IS NULL
+                        OR trim(CAST(douban_id AS TEXT)) = ''
+                        OR trim(CAST(douban_id AS TEXT)) GLOB '*[^0-9]*'
+                        OR douban_title IS NULL
+                        OR trim(douban_title) = ''
+                  )
+                LIMIT 1
+                """
+            ).fetchone()
+            if invalid_identity is not None:
+                raise ValueError(
+                    "Source database contains a movie/TV row with an invalid "
+                    "Douban ID or empty title: "
+                    f"rowid={invalid_identity['rowid']}, "
+                    f"douban_id={invalid_identity['douban_id']!r}"
+                )
 
         # A Scout export must identify each imported subject exactly once.
         # Duplicate IDs make the eventual upsert depend on SQLite row order

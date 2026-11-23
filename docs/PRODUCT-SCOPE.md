@@ -94,12 +94,12 @@ Do not implement these in MovieHub first release:
 | Capability | Current state | Remaining work |
 |---|---|---|
 | Independent SQLite schema | Complete, 11 core tables | Add a versioned search/index migration only if benchmarks justify it |
-| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run and historical rank comparison exist | Automated chart acquisition/scheduling and live-data UX validation |
+| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, historical rank comparison API and UI exist | Automated chart acquisition/scheduling and live-data UX validation |
 | Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
 | Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs; 70-test CI passed | Frontend UI |
-| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge and partial-retry tests | Large-fixture performance validation |
+| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge, partial-retry and 1,000-row fixture tests | 10k/100k and target-NAS performance validation |
 | React frontend | Discovery, chart history, full search/filter, internal-ID detail, favorites and configurable Xiaoya handoff implemented; separate container builds in CI | Browser E2E coverage, real-data UX validation and visual polish |
 | Frontend/backend Compose topology | Separate frontend and backend services; same-origin NPM routing documented | Verify actual NPM locations and server-side favorites-key injection during authorized rollout |
 | Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |

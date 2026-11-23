@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Backend feature APIs and data-source workflow; frontend implementation next
+Current phase: Chart import workflow and backend feature completion; frontend implementation next
 
 ## Phase 4 — independent database foundation
 
@@ -108,12 +108,23 @@ Current phase: Backend feature APIs and data-source workflow; frontend implement
 
 **Poster-fetch security milestone: implemented; 66-test CI passed including favorites API integration.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
 
+## Chart snapshot import workflow
+
+- [x] Add a CLI to validate and import normalized local JSON chart snapshots into the independent MovieHub database.
+- [x] Add a dry-run mode that validates the input without opening or modifying the database.
+- [x] Support a generic local adapter that preserves the declared chart provider and a Cinephile adapter that labels its normalized export.
+- [x] Fix the latent adapter package import path discovered by exercising the CLI.
+- [x] Document snapshot format, date-scoped replacement, metadata precedence and explicit non-automation boundary.
+
+**Snapshot import workflow: implemented. This is a manual normalized-data import path, not an automated Douban collector.**
+
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
 - [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
-- [ ] Formalize Scout field-level merge precedence and test empty-field preservation, newer timestamps, and source-row deletion behavior.
+- [x] Test Scout field-level merge precedence: empty fields preserve enriched MovieHub metadata; source-row deletion does not delete MovieHub records.
+- [x] Test partial batch failure: already committed batches remain durable and an incremental retry completes safely.
 - [ ] Validate import throughput, memory use and batch-lock duration with a larger synthetic fixture.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.

@@ -176,7 +176,7 @@ def readiness_check() -> dict[str, str | int]:
                 "'python -m scripts.init_db' and apply pending migrations."
             ),
         )
-    return {"status": "ready", "schema_version": 1}
+    return {"status": "ready", "schema_version": 2}
 
 
 if __name__ == "__main__":

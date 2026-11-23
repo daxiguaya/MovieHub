@@ -37,20 +37,32 @@ The official article currently lists 8 linked Chinese-film entries (ranks 9
 and 10 are explicitly marked empty), 10 international films, 10 hidden gems
 and 10 Chinese TV series. Empty positions are not invented or renumbered.
 
-## Validate before import
+## Validate and optionally import the complete batch
 
-Run dry-run validation for each file:
+From the backend working directory, validate all four files together. The
+default command is a dry run: it checks the complete set, chart identity,
+source/category/period, capture date, media type, schema constraints, IDs and
+rank ordering without checking or opening the database.
 
 ```sh
-for file in /tmp/moviehub-annual-2025/*.json; do
-  python -m scripts.import_chart --input "$file" --dry-run || exit 1
-done
+python -m scripts.import_annual_charts \
+  --input-dir /tmp/moviehub-annual-2025 \
+  --date 2026-11-23
 ```
 
-Only after reviewing the output should an operator deliberately run the
-non-dry-run import command for each file. Re-importing the same chart/date
-replaces only that snapshot. The collector itself never imports, never seeds
-the database and never touches Scout.
+After reviewing the summary and confirming the files are the intended source
+data, explicitly import all four in one all-or-nothing database transaction:
+
+```sh
+python -m scripts.import_annual_charts \
+  --input-dir /tmp/moviehub-annual-2025 \
+  --date 2026-11-23 \
+  --apply
+```
+
+A missing/invalid file prevents database access. A database error during apply
+rolls back the whole four-chart batch. The collector itself never imports,
+never seeds the database and never touches Scout.
 
 The article supplies title, rank, director, rating and Douban subject ID.
 Year, genres, regions, poster URLs and other metadata are intentionally left

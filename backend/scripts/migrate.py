@@ -30,6 +30,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import create_engine, inspect
+
+from app.database import Base
+
 
 logger = logging.getLogger("moviehub.migrate")
 
@@ -231,6 +235,119 @@ def validate_required_tables(conn: sqlite3.Connection) -> None:
         )
 
 
+
+def validate_orm_schema_contract(database_path: Path) -> None:
+    """Require the migrated SQL schema to match the application's ORM contract."""
+    engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+    try:
+        inspector = inspect(engine)
+        expected_tables = set(Base.metadata.tables) | {"schema_migrations"}
+        actual_tables = set(inspector.get_table_names())
+        if actual_tables != expected_tables:
+            raise RuntimeError(
+                "ORM/database table mismatch: "
+                f"ORM-only={sorted(expected_tables-actual_tables)}, "
+                f"DB-only={sorted(actual_tables-expected_tables)}"
+            )
+
+        for table_name, table in Base.metadata.tables.items():
+            actual_columns = {
+                column["name"] for column in inspector.get_columns(table_name)
+            }
+            expected_columns = set(table.columns.keys())
+            if actual_columns != expected_columns:
+                raise RuntimeError(
+                    f"Column mismatch in {table_name}: "
+                    f"ORM-only={sorted(expected_columns-actual_columns)}, "
+                    f"DB-only={sorted(actual_columns-expected_columns)}"
+                )
+
+            expected_indexes = {
+                (
+                    index.name,
+                    tuple(column.name for column in index.columns),
+                    bool(index.unique),
+                )
+                for index in table.indexes
+            }
+            actual_indexes = {
+                (
+                    index["name"],
+                    tuple(index["column_names"]),
+                    bool(index["unique"]),
+                )
+                for index in inspector.get_indexes(table_name)
+            }
+            if actual_indexes != expected_indexes:
+                raise RuntimeError(
+                    f"Index mismatch in {table_name}: "
+                    f"missing={sorted(expected_indexes-actual_indexes)}, "
+                    f"unexpected={sorted(actual_indexes-expected_indexes)}"
+                )
+
+            expected_unique = {
+                (constraint.name, tuple(column.name for column in constraint.columns))
+                for constraint in table.constraints
+                if constraint.__class__.__name__ == "UniqueConstraint"
+            }
+            actual_unique = {
+                (
+                    constraint["name"],
+                    tuple(constraint["column_names"]),
+                )
+                for constraint in inspector.get_unique_constraints(table_name)
+            }
+            if actual_unique != expected_unique:
+                raise RuntimeError(
+                    f"Unique-constraint mismatch in {table_name}: "
+                    f"missing={sorted(expected_unique-actual_unique)}, "
+                    f"unexpected={sorted(actual_unique-expected_unique)}"
+                )
+
+            expected_foreign_keys = {
+                (
+                    tuple(element.parent.name for element in constraint.elements),
+                    constraint.elements[0].column.table.name,
+                    tuple(element.column.name for element in constraint.elements),
+                    (constraint.elements[0].ondelete or "").upper(),
+                )
+                for constraint in table.foreign_key_constraints
+            }
+            actual_foreign_keys = {
+                (
+                    tuple(foreign_key["constrained_columns"]),
+                    foreign_key["referred_table"],
+                    tuple(foreign_key["referred_columns"]),
+                    (foreign_key.get("options", {}).get("ondelete") or "").upper(),
+                )
+                for foreign_key in inspector.get_foreign_keys(table_name)
+            }
+            if actual_foreign_keys != expected_foreign_keys:
+                raise RuntimeError(
+                    f"Foreign-key mismatch in {table_name}: "
+                    f"missing={sorted(expected_foreign_keys-actual_foreign_keys)}, "
+                    f"unexpected={sorted(actual_foreign_keys-expected_foreign_keys)}"
+                )
+
+            expected_checks = {
+                constraint.name
+                for constraint in table.constraints
+                if constraint.__class__.__name__ == "CheckConstraint"
+            }
+            actual_checks = {
+                constraint["name"]
+                for constraint in inspector.get_check_constraints(table_name)
+            }
+            if actual_checks != expected_checks:
+                raise RuntimeError(
+                    f"Check-constraint mismatch in {table_name}: "
+                    f"missing={sorted(expected_checks-actual_checks)}, "
+                    f"unexpected={sorted(actual_checks-expected_checks)}"
+                )
+    finally:
+        engine.dispose()
+
+
 def validate_migration(
     database_path: Path,
     expected_version: int = MIGRATION_VERSION,
@@ -250,7 +367,7 @@ def validate_migration(
         validate_required_tables(conn)
         validate_movie_columns(conn)
         validate_foreign_keys(conn)
-
+\n    validate_orm_schema_contract(database_path)\n
     finally:
         conn.close()
 

@@ -168,3 +168,39 @@ def test_failed_restore_removes_stale_wal_sidecars(tmp_path, monkeypatch):
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
         conn.close()
+
+
+def test_validation_rejects_schema_drift_in_an_existing_database(tmp_path):
+    from scripts.migrate import validate_migration
+
+    db_path = tmp_path / "movies.db"
+    _create_empty_database(db_path)
+    execute_migration(db_path, MIGRATION)
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute("DROP INDEX ix_movies_rating_id")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(RuntimeError, match="Index mismatch in movies"):
+        validate_migration(db_path)
+
+
+def test_validation_rejects_missing_foreign_key_contract(tmp_path):
+    from scripts.migrate import validate_orm_schema_contract
+
+    db_path = tmp_path / "movies.db"
+    _create_empty_database(db_path)
+    execute_migration(db_path, MIGRATION)
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute("DROP TABLE movie_posters")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(RuntimeError, match="table mismatch|no such table"):
+        validate_orm_schema_contract(db_path)

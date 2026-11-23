@@ -6,6 +6,7 @@ This is a backend-only deployment package. The repository does not yet contain a
 
 - API container: `moviehub-backend`, port 8000 on its Docker networks.
 - MovieHub-owned writable data: host path `MOVIEHUB_DATA_PATH` mounted at `/data`.
+- Dedicated backup destination: host path `MOVIEHUB_BACKUP_PATH` mounted at `/backups`.
   - SQLite database: `/data/db/movies.db`.
   - Poster cache: `/data/posters/`.
 - Scout import source: `MOVIEHUB_IMPORT_PATH` mounted at `/imports:ro`.

@@ -6,8 +6,8 @@ A self-hosted movie discovery and chart-history service with its own SQLite data
 
 - Phase 4 database foundation: complete.
 - Application integration audit: complete.
-- Current work: first-release feature implementation; product scope and architecture are documented.
-- Estimated first-release progress: about 48%; frontend, automatic chart collection and production deployment are not yet implemented.
+- Current work: first-release feature implementation; the React frontend and dual-container packaging are now in progress.
+- Estimated first-release progress: about 52%; frontend pages and automatic chart collection are not yet complete.
 - The backend test suite runs on GitHub Actions for pushes to the active development branch.
 
 See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checklist and CI result.

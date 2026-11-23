@@ -317,10 +317,37 @@ class MovieService:
             if not isinstance(data, dict):
                 return None
 
-            if "id" not in data:
+            # Cursors are opaque client input. Accept only the exact
+            # scalar shape emitted by _encode_cursor for the numeric sort
+            # columns; malformed JSON must fall back to the first page
+            # rather than reaching SQLAlchemy/SQLite as a bind error.
+            if set(data) != {"id", "value"}:
                 return None
 
-            return data
+            cursor_id = data["id"]
+            if (
+                isinstance(cursor_id, bool)
+                or not isinstance(cursor_id, int)
+                or cursor_id <= 0
+                or cursor_id > 9_223_372_036_854_775_807
+            ):
+                return None
+
+            cursor_value = data["value"]
+            if cursor_value is not None:
+                if isinstance(cursor_value, bool) or not isinstance(
+                    cursor_value, (int, float)
+                ):
+                    return None
+                try:
+                    if not math.isfinite(cursor_value):
+                        return None
+                except (OverflowError, TypeError, ValueError):
+                    return None
+                if isinstance(cursor_value, int) and abs(cursor_value) > 9_223_372_036_854_775_807:
+                    return None
+
+            return {"id": cursor_id, "value": cursor_value}
 
         except (
             ValueError,

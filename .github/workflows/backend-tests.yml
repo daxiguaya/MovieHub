@@ -30,3 +30,11 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
         working-directory: backend
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+        env:
+          MOVIEHUB_IMPORT_PATH: /tmp/scout-import
+          MOVIEHUB_API_KEY: ci-placeholder-only
+      - name: Build backend container image
+        run: docker build --tag moviehub-backend:ci ./backend

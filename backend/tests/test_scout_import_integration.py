@@ -603,6 +603,9 @@ def test_scout_import_rejects_duplicate_douban_ids_before_writing(tmp_path):
     source.row_factory = sqlite3.Row
     try:
         with pytest.raises(ValueError, match="duplicate Douban IDs: 1234567"):
-            import_service_module.ImportService._validate_source(source)
+            import_service_module.ImportService._validate_source(
+                source,
+                reject_duplicate_ids=True,
+            )
     finally:
         source.close()

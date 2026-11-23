@@ -380,3 +380,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - The run emitted non-blocking dependency/toolchain deprecation warnings (Starlette/httpx, Node.js 20 action runtime, and Node URL/punycode warnings); no job failed.
 
 **Result:** acquisition, validation, benchmark execution and end-to-end CI are verified on the branch. Actual Scout ID/metadata coverage and deliberate import remain blocked on a separately staged, consistent Scout database copy. No production Scout DB, NAS service, deployment or NPM configuration was accessed or changed.
+
+
+## Scout import record-error observability (2026-11-23)
+
+- [x] Expose isolated per-record processing exceptions as `ImportStatus.errors` instead of silently folding them into the skipped count.
+- [x] Include the record-error count in the completion message returned by the protected import status API.
+- [x] Add an integration regression test proving one failed record rolls back independently, later records still import, and the final status reports the error count.
+- [x] Update the Scout import runbook to require checking both `status` and `errors` before considering an import clean.
+
+**Validation:** [run #403](https://github.com/daxiguaya/MovieHub/actions/runs/45187036550) passed Backend, Frontend and Playwright E2E. The run used commit `fa94f193970e9ad5687c517a1f98f35e54e0dab2`, which contains the service, schema and regression-test changes. Annual collection and performance benchmarks were skipped under their opt-in conditions. The subsequent #404 change only updated documentation; its CI was still running when this note was added.
+
+**Scope:** no live Scout database, NAS service, deployment, NPM configuration or production data was accessed or changed. Actual Scout coverage/import remains blocked on a separately staged, consistent Scout database copy. Overall project progress remains **70%** until that real-data milestone is completed.

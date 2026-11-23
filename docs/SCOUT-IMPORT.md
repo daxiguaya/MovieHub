@@ -140,3 +140,22 @@ python -m scripts.import_history --run-id <run-id>
 ```
 
 The command reports each run's source path and mode, source fingerprint, latest committed checkpoint, cumulative processed/imported/skipped/error counts, batch count, resume count and lifecycle timestamps. A run with no terminal event is shown as `incomplete` (the journal alone cannot prove whether its process is still running or crashed); a failed attempt that has subsequently been resumed is shown as `running`. A torn final JSONL line is ignored. The command is read-only and does not resume, modify or delete journal entries, open Scout, or write to MovieHub.
+
+
+## Durable per-record failure manifest
+
+Each failed source row is now written to a separate owner-only JSONL manifest beside the import journal:
+
+`movies.db.import-errors.jsonl`
+
+Entries include the run ID, committed batch number, Douban ID, source title, exception class, a bounded error message and timestamp. Raw Scout `raw_data` is never copied into the manifest. Failure entries are appended only after their containing MovieHub batch commits. If a crash occurs after the manifest append but before the batch checkpoint, a resumed batch can report the same failure again; the read-only report de-duplicates identical run/batch/record/error entries.
+
+Inspect all failures or filter by one run:
+
+```sh
+cd backend
+python -m scripts.import_errors
+python -m scripts.import_errors --run-id <run-id>
+```
+
+The report is read-only. A completed import can still contain record-level failures; use this manifest to identify exact rows and causes before considering the run clean.

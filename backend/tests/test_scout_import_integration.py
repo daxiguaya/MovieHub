@@ -547,6 +547,16 @@ def test_scout_import_reports_record_errors_in_completed_status(
         assert status.errors == 1
         assert "record errors 1" in status.message
 
+        from app.services.import_errors import read_import_errors
+        journal_path = import_service_module.get_import_journal_path(TargetSession)
+        failures = read_import_errors(journal_path, run_id=status.run_id)
+        assert len(failures) == 1
+        assert failures[0]["douban_id"] == "1234567"
+        assert failures[0]["title"] == "Scout Fixture Movie"
+        assert failures[0]["error_type"] == "RuntimeError"
+        assert "simulated malformed source record" in failures[0]["error_message"]
+        assert failures[0]["batch"] == 1
+
         with TargetSession() as db:
             assert db.scalar(
                 select(Movie).where(Movie.douban_id == "1234567")

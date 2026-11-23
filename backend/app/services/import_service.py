@@ -302,6 +302,7 @@ class ImportService:
                     # writer transaction for the entire Scout catalogue.
                     # A failed batch rolls back as a unit; committed batches
                     # remain safe to retry because the importer is idempotent.
+                    batch_errors: list[dict[str, Any]] = []
                     with db.begin():
                         genre_map = self._ensure_genres(db)
                         region_map = self._ensure_regions(db)
@@ -320,8 +321,17 @@ class ImportService:
                                     imported += 1
                                 else:
                                     skipped += 1
-                            except Exception:
+                            except Exception as exc:
                                 record_errors += 1
+                                batch_errors.append({
+                                    "run_id": run_id,
+                                    "batch": committed_batches + 1,
+                                    "douban_id": str(row["douban_id"]),
+                                    "title": str(row["douban_title"] or "")[:300],
+                                    "error_type": type(exc).__name__[:120],
+                                    "error_message": str(exc)[:500],
+                                    "occurred_at": datetime.now().isoformat(),
+                                })
                                 genre_map = {
                                     item.name: item.id
                                     for item in db.scalars(select(Genre)).all()
@@ -338,6 +348,14 @@ class ImportService:
                                     )
                                     error_logs += 1
                             processed += 1
+
+                    # Persist the per-record failure manifest only after the
+                    # containing target batch commits. A crash before the
+                    # checkpoint can replay the batch; the report layer
+                    # de-duplicates identical run/batch/record/error entries.
+                    if batch_errors:
+                        from app.services.import_errors import append_import_errors
+                        append_import_errors(journal_path, batch_errors)
 
                     committed_batches += 1
                     append_import_event(journal_path, {

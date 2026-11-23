@@ -458,3 +458,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Document the operator CLI.
 
 **Import history inspection: implementation and tests added.** This is a read-only operational capability; it does not imply a real Scout catalogue has been audited or imported.
+
+
+## Durable record-level import failure manifest (2026-11-23)
+
+- [x] Persist each failed Scout row to a separate owner-only JSONL manifest after its MovieHub batch commits.
+- [x] Capture run ID, batch, Douban ID, bounded title, exception type/message and timestamp without copying raw Scout payloads.
+- [x] De-duplicate replayed failure entries when a batch committed but its checkpoint append did not.
+- [x] Add a read-only CLI for all failures or one selected run.
+- [x] Test file permissions, filtering, replay de-duplication and torn trailing-line recovery.
+- [x] Extend the real importer integration test to verify exact record failure details survive in the manifest.
+
+**Record-level failure reporting implemented.** This makes import errors actionable across restarts; it does not claim that real Scout data has been validated.

@@ -40,7 +40,7 @@ MovieHub does not create or migrate a database during module import or applicati
 python -m scripts.init_db
 ```
 
-The initializer creates and validates a temporary database before atomically publishing it. It refuses to convert or overwrite an existing non-empty unrecognized database. Douban Scout is not the MovieHub database and must never be passed to this initializer or migration runner.
+The initializer applies the core schema and bundled follow-up migrations, validates a temporary schema-v2 database against the ORM contract, then atomically publishes it. It refuses to convert or overwrite an existing non-empty database. To upgrade an existing MovieHub schema-v1 database, stop the application and run `python -m scripts.migrate`; the runner creates and verifies a pre-migration backup and restores it if migration validation fails. Douban Scout is not the MovieHub database and must never be passed to this initializer or migration runner.
 
 - `GET /api/health` is a process liveness check.
 - `GET /api/ready` checks that the MovieHub schema is present and at the supported schema version.

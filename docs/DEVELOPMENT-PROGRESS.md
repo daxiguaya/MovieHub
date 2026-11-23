@@ -92,6 +92,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Reject incomplete four-chart payloads and check overwrite conflicts before making the Douban network request.
 - [x] Add failure-injection tests for first-time publication and overwrite rollback.
 
+## Multi-chart import transaction boundary (2026-11-23)
+
+- [x] Add a service entry point that imports multiple chart/date snapshots inside one outer database transaction.
+- [x] Keep each snapshot's existing validation and replacement behavior inside a savepoint.
+- [x] Invalidate chart caches once, and only after the complete batch commits.
+- [x] Roll back all earlier chart, movie, metadata and snapshot writes if any later snapshot fails.
+- [x] Reject duplicate chart/date pairs before opening the write transaction.
+- [x] Add regression tests for whole-batch rollback and duplicate-pair rejection.
+
 ## Overall first-release progress (estimate)
 
 | Workstream | Status |
@@ -102,14 +111,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Manual normalized chart snapshot import | Complete |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| 2025 annual charts | Four official lists defined; official-source one-shot collector implemented and CI-tested; normalized data import pending |
+| 2025 annual charts | Four official lists defined; collector and recoverable four-file output implemented; all-or-nothing multi-chart DB import service added; real normalized data import pending |
 | Favorites API and frontend UI | Implemented; Chromium E2E passed |
 | Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 68%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 69%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
 ## Chart and Scout import numeric integrity (2026-11-23)
 

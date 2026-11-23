@@ -439,6 +439,68 @@ def test_batched_import_keeps_committed_batches_and_retry_completes(
     engine.dispose()
 
 
+def test_scout_import_uses_one_consistent_source_snapshot(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-wal-snapshot.sqlite"
+    target_path = tmp_path / "moviehub-wal-snapshot.sqlite"
+    _create_scout_fixture(source_path)
+    with sqlite3.connect(source_path) as source:
+        source.execute("PRAGMA journal_mode=WAL")
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    original_validate = import_service_module.ImportService._validate_source
+    inserted = {"value": False}
+
+    def validate_then_write(source_conn, reject_duplicate_ids=False):
+        original_validate(source_conn, reject_duplicate_ids)
+        if not inserted["value"]:
+            with sqlite3.connect(source_path, timeout=5) as writer:
+                writer.execute(
+                    "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        "8888888", None, "Concurrent Scout Write", 2024, 7.5,
+                        "{}", "movie", 1800000200,
+                    ),
+                )
+            inserted["value"] = True
+
+    monkeypatch.setattr(
+        import_service_module.ImportService,
+        "_validate_source",
+        staticmethod(validate_then_write),
+    )
+
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+        assert service.status.total == 2
+        assert service.status.processed == 2
+        with TargetSession() as db:
+            assert db.query(Movie).count() == 2
+        with sqlite3.connect(source_path) as source:
+            assert source.execute("SELECT COUNT(*) FROM item").fetchone()[0] == 3
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+        engine.dispose()
+
+
 def test_scout_import_reports_record_errors_in_completed_status(
     tmp_path,
     monkeypatch,

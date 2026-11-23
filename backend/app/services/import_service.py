@@ -181,6 +181,10 @@ class ImportService:
                 timeout=30,
             )
             source_conn.row_factory = sqlite3.Row
+            # Pin one SQLite read snapshot before validation/counting/iteration.
+            # This keeps the reported total and imported rows consistent even
+            # if Scout continues writing to its WAL-backed database.
+            source_conn.execute("BEGIN")
             self._validate_source(source_conn, reject_duplicate_ids=True)
 
             total = source_conn.execute(

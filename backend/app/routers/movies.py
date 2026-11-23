@@ -283,9 +283,9 @@ def _poster_bytes_match_content_type(content: bytes, content_type: str) -> bool:
     if not content:
         return False
     if content_type == "image/jpeg":
-        return content.startswith(b"\\xff\\xd8\\xff")
+        return content.startswith(bytes.fromhex("ffd8ff"))
     if content_type == "image/png":
-        return content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        return content.startswith(bytes.fromhex("89504e470d0a1a0a"))
     if content_type == "image/gif":
         return content.startswith((b"GIF87a", b"GIF89a"))
     if content_type == "image/webp":
@@ -301,7 +301,6 @@ def _poster_bytes_match_content_type(content: bytes, content_type: str) -> bool:
             and content[8:12] in (b"avif", b"avis")
         )
     return False
-
 
 def _is_allowed_poster_url(url: str) -> bool:
     """Allow only HTTPS Douban image CDN hosts, never arbitrary URLs."""

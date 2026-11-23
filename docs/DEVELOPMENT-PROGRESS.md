@@ -347,3 +347,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - The importer does not silently rewrite an existing Scout-owned movie's media type to satisfy a chart. The failed import rolls back the entire transaction, preserving the previous snapshot.
 - Added a regression test that first imports a valid snapshot, then attempts a conflicting movie-to-TV replacement and verifies the original MovieHub type and chart snapshot remain intact.
 - Validation status: code and regression test are committed; latest-head GitHub Actions validation is pending. No production database was accessed.
+
+
+## Scout coverage strict quality gate (2026-11-23)
+
+- [x] Add an opt-in `--strict` mode to the read-only Scout chart coverage audit.
+- [x] Emit the complete JSON report before returning a non-zero status when missing IDs, ambiguous duplicate IDs, or media-type mismatches are present.
+- [x] Keep report-only mode as the default and avoid imposing arbitrary metadata completeness thresholds.
+- [x] Add CLI regression tests for strict-mode failure and clean strict-mode success.
+- [x] Document the exit-code contract for pre-import and automation use.
+
+**Strict Scout coverage gate: implemented; latest full CI run is pending.** This remains a read-only audit and does not access or modify the NAS Scout database.

@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 import scripts.import_chart as import_chart
+import app.services.chart_import_service as chart_import_service_module
 from app.database import Base, Chart, ChartSnapshot, Movie
 
 
@@ -67,7 +68,7 @@ def test_chart_import_cli_writes_only_to_moviehub_session(tmp_path, monkeypatch)
     monkeypatch.setattr(import_chart, "database_is_ready", lambda: True)
     monkeypatch.setattr(import_chart, "SessionLocal", TargetSession)
     monkeypatch.setattr(
-        import_chart.chart_import_service.cache_manager,
+        chart_import_service_module.cache_manager,
         "clear",
         lambda: None,
     )

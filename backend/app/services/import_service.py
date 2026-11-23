@@ -249,16 +249,19 @@ class ImportService:
                     event for event in run_events
                     if event.get("event") == "batch_committed"
                 ]
-                if checkpoints:
-                    checkpoint = checkpoints[-1]
-                    processed = int(checkpoint["processed"])
-                    imported = int(checkpoint["imported"])
-                    skipped = int(checkpoint["skipped"])
-                    record_errors = int(checkpoint["errors"])
-                    committed_batches = int(checkpoint["batch"])
-                    last_douban_id = str(checkpoint["last_douban_id"])
-                    if not 0 <= processed <= total:
-                        raise ValueError("Import checkpoint has an invalid processed count")
+                from app.services.import_checkpoints import validate_resume_checkpoints
+
+                restored = validate_resume_checkpoints(
+                    source_conn,
+                    checkpoints,
+                    total,
+                )
+                processed = restored["processed"]
+                imported = restored["imported"]
+                skipped = restored["skipped"]
+                record_errors = restored["errors"]
+                committed_batches = restored["batch"]
+                last_douban_id = restored["last_douban_id"]
                 append_import_event(journal_path, {
                     "event": "run_resumed",
                     "run_id": run_id,

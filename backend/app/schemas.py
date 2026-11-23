@@ -128,3 +128,16 @@ class ChartMoviesListResponse(BaseModel):
     next_cursor: str | None = None
     total: int
 
+
+class FavoriteUpsert(BaseModel):
+    """Favorite write payload for the single-user installation."""
+
+    note: str = Field(default="", max_length=1000)
+
+
+class FavoriteResponse(BaseModel):
+    """A saved movie and its user-owned favorite metadata."""
+
+    movie: MovieResponse
+    created_at: datetime
+    note: str = ""

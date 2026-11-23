@@ -11,6 +11,7 @@ services:
     user: "${MOVIEHUB_UID:-10001}:${MOVIEHUB_GID:-10001}"
     environment:
       MOVIEHUB_DATA_DIR: /data
+      MOVIEHUB_BACKUP_DIR: /backups
       MOVIEHUB_IMPORT_DIR: /imports
       MOVIEHUB_API_KEY: ${MOVIEHUB_API_KEY:-}
       MOVIEHUB_CORS_ORIGINS: ${MOVIEHUB_CORS_ORIGINS:-[]}
@@ -18,6 +19,7 @@ services:
       FORWARDED_ALLOW_IPS: ${MOVIEHUB_TRUSTED_PROXY_IPS:-127.0.0.1}
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
+      - ${MOVIEHUB_BACKUP_PATH:-/volume1/backup/moviehub}:/backups
       - ${MOVIEHUB_IMPORT_PATH:?Set MOVIEHUB_IMPORT_PATH to the directory containing the Scout database}:/imports:ro
     expose:
       - "8000"

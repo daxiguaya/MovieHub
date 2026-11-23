@@ -330,6 +330,26 @@ class ImportService:
                 + ", ".join(sorted(missing))
             )
 
+        # A Scout export must identify each imported subject exactly once.
+        # Duplicate IDs make the eventual upsert depend on SQLite row order
+        # and can silently replace one record with another.
+        duplicate = conn.execute(
+            """
+            SELECT douban_id, COUNT(*) AS row_count
+            FROM item
+            WHERE type IN ('movie', 'tv')
+              AND douban_id IS NOT NULL
+            GROUP BY douban_id
+            HAVING COUNT(*) > 1
+            LIMIT 1
+            """
+        ).fetchone()
+        if duplicate is not None:
+            raise ValueError(
+                "Source database contains duplicate Douban IDs: "
+                f"{duplicate['douban_id']} ({duplicate['row_count']} rows)"
+            )
+
     @staticmethod
     def _parse_json(value: Any) -> dict[str, Any]:
         if not value:

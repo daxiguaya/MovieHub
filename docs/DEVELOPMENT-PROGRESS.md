@@ -210,13 +210,13 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
 - [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
 
-**Source review: complete. Top 250, popular and high-rated one-shot collection is implemented. The official 2025 annual taxonomy is verified and modeled; importing its ranking data, verifying the 2026 categories and any scheduled refresh remain pending.**
+**Source review: complete. Top 250, popular/high-rated and official 2025 annual one-shot collection are implemented. Live annual collection/import remains pending a robots-permitted run; 2026 taxonomy verification and scheduling remain pending.**
 
 ## Next work
 
 - [ ] Prepare and import the four 2025 annual categories from verified normalized source data; do not merge Chinese, international, hidden-gem and TV rankings. The local dry-run now enforces each built-in chart's category, period and media type.
 - [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
-- [ ] Implement an annual chart collector only if a stable public source and permitted acquisition path can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
+- [x] Implement a one-shot official 2025 annual article collector that emits four separate normalized JSON snapshots and refuses collection when robots.txt or access controls do not permit it.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [x] Add opt-in 10k/100k SQLite LIKE-search benchmarks covering sparse Chinese-title matches, original-title matches, no-match scans and multi-term searches; report count/page latency and SQLite query plans without hardware-specific pass thresholds.
 - [x] Add a manually triggered GitHub Actions performance job that runs both the existing 10k/100k Scout import benchmarks and the new search benchmarks on isolated temporary SQLite databases.

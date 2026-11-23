@@ -97,7 +97,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Annual chart collection and scheduled updates | 0% |
 | Favorites API and frontend UI | Implemented; Chromium E2E passed |
 | Xiaoya handoff | Configured new-tab handoff and URL encoding passed Chromium E2E; real NPM verification pending |
-| React frontend and user workflows | Baseline implemented; 3 Chromium E2E workflows passed with isolated API fixtures; live-stack E2E and visual QA pending |
+| React frontend and user workflows | Baseline implemented; 4 Chromium E2E tests passed, including real FastAPI + temporary SQLite integration; visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
@@ -130,7 +130,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add integration tests for authentication, duplicate writes, note updates, internal-ID enforcement and removal.
 - [x] Document that the browser must not embed the API key; the reverse proxy must inject it server-side.
 
-**Favorites API and frontend favorites workflow: implemented; add-favorite interaction passed real Chromium E2E.**
+**Favorites API and frontend favorites workflow: implemented; add/remove interaction passed real Chromium E2E using an isolated API fixture.**
 
 ## Phase D — poster-fetch security hardening
 
@@ -187,10 +187,12 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add a separate non-root Nginx frontend container, read-only root filesystem, 128 MiB limit and Compose service.
 - [x] Add five frontend regression tests covering chart navigation, search filters, Xiaoya handoff, rank comparison and favorite add/remove.
 - [x] Add a separate Playwright + Chromium browser test suite for discovery → chart → detail, keyword search, favorite add and Xiaoya new-tab handoff.
-- [x] Keep Playwright specs isolated from Vitest discovery; run the browser suite in a dedicated Ubuntu 24.04 CI job with a local Vite server and intercepted API fixtures.
+- [x] Keep Playwright specs isolated from Vitest discovery; run the browser suite in a dedicated Ubuntu 24.04 CI job.
+- [x] Add fixture-backed browser coverage for chart navigation, search filters, favorite add and Xiaoya new-tab URL encoding.
+- [x] Start a real FastAPI process backed by a freshly initialized temporary SQLite database in CI; seed one chart snapshot and movie, then verify browser chart → detail → search without API interception.
 - [x] Add CI type-check, Vite production build and frontend Docker image build.
 
-**Frontend baseline and browser workflow validation: complete.** Five Vitest UI tests and three real Chromium E2E tests pass in CI. The E2E tests use isolated API fixtures and validate the actual browser UI; full-stack E2E against a running backend, real chart data, final visual tuning and actual NPM integration remain outstanding.
+**Frontend baseline and browser workflow validation: complete.** Five Vitest UI tests and four real Chromium E2E tests pass in CI. Three E2E cases use isolated API fixtures for interactive write/handoff behavior; the fourth uses a live FastAPI process and temporary SQLite database for real chart, detail and search API integration. NPM integration against the NAS and final visual QA remain outstanding.
 
 ## Chart source review and acquisition policy
 
@@ -210,7 +212,8 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [x] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff using Playwright Chromium and isolated API fixtures.
-- [ ] Add a separate full-stack browser test against a running backend and temporary initialized SQLite database; keep this distinct from fixture-backed browser coverage.
+- [x] Add a live browser integration test against a running FastAPI backend and a temporary initialized/seeded SQLite database.
+- [ ] Verify the complete deployment path through the user's NPM reverse proxy after deployment is separately authorized.
 - [x] Add reproducible opt-in 10k/100k synthetic import throughput benchmarks against temporary SQLite databases.
 - [ ] Execute 10k/100k throughput and memory measurements in a controlled environment; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
@@ -219,10 +222,11 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Latest code validation
 
-- Latest full validation: [#281](https://github.com/daxiguaya/MovieHub/actions/runs/45141049864) — **success**.
-- Backend: **99 passed, 2 skipped** (the opt-in 10k/100k performance cases); frontend: **5 Vitest tests passed**; browser: **3 Playwright Chromium E2E tests passed**.
+- Latest full validation: [#286](https://github.com/daxiguaya/MovieHub/actions/runs/45141717599) — **success**.
+- Backend: **99 passed, 2 skipped** (the opt-in 10k/100k performance cases); frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
 - Compose validation, backend/frontend production builds and both container image builds passed.
-- Browser tests run on Ubuntu 24.04 against the Vite development server with intercepted API fixtures; they do not require NAS services or production data.
+- The browser job starts a real FastAPI process against a fresh temporary SQLite database, seeds a test chart/movie and runs one unmocked chart → detail → search workflow. Three additional browser tests use isolated API fixtures for favorite and Xiaoya handoff interactions.
+- All browser tests run on Ubuntu 24.04; no NAS services, live Scout database or production data are used.
 - Benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. The two performance cases remain opt-in and require a controlled execution to produce throughput measurements.
 
 ## Scope and safety boundaries

@@ -78,11 +78,11 @@ class ChartSnapshotImport(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    slug: str = Field(min_length=1, max_length=128)
-    name: str = Field(min_length=1, max_length=128)
+    slug: str = Field(min_length=1, max_length=96)
+    name: str = Field(min_length=1, max_length=160)
 
-    source: str = Field(min_length=1, max_length=64)
-    category: str = Field(min_length=1, max_length=64)
+    source: str = Field(min_length=1, max_length=32)
+    category: str = Field(min_length=1, max_length=32)
 
     period: str | None = Field(default=None, max_length=32)
     description: str | None = None
@@ -95,7 +95,7 @@ class ChartSnapshotImport(BaseModel):
     @classmethod
     def validate_slug(cls, value: str) -> str:
         value = value.strip().lower()
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", value):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,95}", value):
             raise ValueError(
                 "slug may contain lowercase letters, digits and hyphens"
             )

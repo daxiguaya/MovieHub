@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Pre-deployment hardening and frontend architecture
+Current phase: First-release product architecture agreed; feature implementation next
 
 ## Phase 4 — independent database foundation
 

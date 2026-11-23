@@ -72,7 +72,7 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
-| Scout import hardening | 100% of current implementation milestone; additional merge/performance validation pending |
+| Scout import hardening | Implementation and merge/partial-retry tests complete; large-fixture performance pending |
 | Manual normalized chart snapshot import | Complete |\n| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
@@ -106,7 +106,7 @@ Current phase: Chart import workflow and backend feature completion; frontend im
 - [x] Restrict responses to raster image MIME types and enforce an 8 MiB maximum using both Content-Length and streamed byte counting.
 - [x] Add regression tests for URL allowlisting, private DNS answers and size policy.
 
-**Poster-fetch security milestone: implemented; 66-test CI passed including favorites API integration.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
+**Poster-fetch security milestone: implemented; 70-test CI passed.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
 
 ## Chart snapshot import workflow
 

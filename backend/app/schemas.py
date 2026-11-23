@@ -141,3 +141,27 @@ class FavoriteResponse(BaseModel):
     movie: MovieResponse
     created_at: datetime
     note: str = ""
+
+class ChartRankChange(BaseModel):
+    """One movie's rank movement between two chart snapshots."""
+
+    movie_id: int
+    douban_id: str | None = None
+    title: str
+    year: int | None = None
+    type: MovieType
+    before_rank: int | None = None
+    after_rank: int | None = None
+    rank_change: int | None = None
+    status: Literal["new", "removed", "moved", "unchanged"]
+
+
+class ChartCompareResponse(BaseModel):
+    """Rank comparison for two dated snapshots of the same chart."""
+
+    chart: ChartResponse
+    from_date: str
+    to_date: str
+    total_before: int
+    total_after: int
+    items: list[ChartRankChange]

@@ -47,15 +47,13 @@ def validate_resume_checkpoints(
 
         source_row = source_conn.execute(
             """
-            SELECT douban_id FROM (
-                SELECT douban_id,
-                       ROW_NUMBER() OVER (ORDER BY douban_id) AS row_number
-                FROM item
-                WHERE type IN ('movie', 'tv')
-            )
-            WHERE row_number = ?
+            SELECT douban_id
+            FROM item
+            WHERE type IN ('movie', 'tv')
+            ORDER BY douban_id
+            LIMIT 1 OFFSET ?
             """,
-            (values["processed"],),
+            (values["processed"] - 1,),
         ).fetchone()
         if source_row is None or str(source_row[0]) != last_id:
             raise ValueError("Import checkpoint cursor does not match the source snapshot")

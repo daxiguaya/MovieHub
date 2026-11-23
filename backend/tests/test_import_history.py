@@ -78,5 +78,5 @@ def test_history_ignores_torn_final_line_and_can_filter_run(tmp_path):
     runs = read_import_run_history(journal)
     assert [item["run_id"] for item in runs] == ["two", "one"]
     [selected] = read_import_run_history(journal, run_id="one")
-    assert selected["status"] == "interrupted"
+    assert selected["status"] == "incomplete"
     assert read_import_run_history(journal, run_id="missing") == []

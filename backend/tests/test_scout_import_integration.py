@@ -1306,6 +1306,7 @@ def test_batch_receipt_and_movie_rows_roll_back_in_the_same_transaction(tmp_path
                 error_records="[]",
                 committed_at="2026-11-23T00:00:00",
             ))
+            db.flush()
             raise RuntimeError("forced transaction rollback")
 
     with TargetSession() as db:

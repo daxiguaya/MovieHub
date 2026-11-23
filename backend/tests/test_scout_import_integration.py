@@ -719,6 +719,7 @@ def test_scout_import_rejects_duplicate_douban_ids_before_writing(tmp_path):
             import_service_module.ImportService._validate_source(
                 source,
                 reject_duplicate_ids=True,
+                reject_invalid_identity=True,
             )
     finally:
         source.close()
@@ -743,6 +744,7 @@ def test_scout_import_rejects_invalid_identity_fields_before_target_writes(tmp_p
             import_service_module.ImportService._validate_source(
                 source,
                 reject_duplicate_ids=True,
+                reject_invalid_identity=True,
             )
     finally:
         source.close()
@@ -769,6 +771,7 @@ def test_scout_import_rejects_non_numeric_ids_and_blank_titles(tmp_path):
             import_service_module.ImportService._validate_source(
                 source,
                 reject_duplicate_ids=True,
+                reject_invalid_identity=True,
             )
     finally:
         source.close()

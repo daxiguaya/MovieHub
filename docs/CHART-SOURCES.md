@@ -32,7 +32,7 @@ Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout 
 
 - Reads only the public `/top250` HTML pages.
 - Checks `robots.txt` before requesting chart pages.
-- Makes ten sequential page requests, with at least two seconds between requests.
+- Makes ten sequential page requests, with at least two seconds between requests, or the longer crawl-delay declared in robots.txt.
 - Does not use cookies, login sessions, proxy rotation, redirects, retries or challenge bypass.
 - Stops on 401/403, 429, unexpected redirects, oversized responses, missing ranks or changed markup.
 - Writes a normalized JSON file only; it does not write directly to the database or run on a schedule.
@@ -41,7 +41,7 @@ Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout 
 
 - Use Douban's undocumented `/j/search_subjects` web endpoint for the `热门` and `豆瓣高分` tags.
 - Bound each run to at most 100 results by default (hard maximum 500).
-- Use two-second sequential pacing, robots.txt checks, no cookies, no proxy rotation, no redirects and no retries.
+- Use sequential pacing of at least two seconds (or the longer robots.txt crawl-delay), robots.txt checks, no cookies, no proxy rotation, no redirects and no retries.
 - The endpoint returns only list-level fields; Scout remains the metadata enrichment source.
 - Treat this as a fragile web endpoint, not a supported official API. It may stop working or be disallowed at any time.
 

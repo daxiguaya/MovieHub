@@ -358,3 +358,93 @@ def test_chart_import_preserves_existing_year_when_raw_year_is_invalid():
     finally:
         db.close()
         engine.dispose()
+
+
+def test_multi_chart_import_rolls_back_every_snapshot_when_one_fails():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        existing = Movie(
+            douban_id="90002",
+            title="Existing movie",
+            type="movie",
+            rating_count=0,
+            directors="[]",
+            actors="[]",
+        )
+        db.add(existing)
+        db.commit()
+
+        first = ChartSnapshotImport(
+            slug="batch-first",
+            name="Batch first",
+            source="test",
+            category="annual",
+            period="2025",
+            snapshot_date=date(2026, 11, 23),
+            movies=[
+                ChartMovieImport(
+                    douban_id="90001",
+                    rank=1,
+                    title="Must roll back",
+                    type="movie",
+                )
+            ],
+        )
+        second = ChartSnapshotImport(
+            slug="batch-second",
+            name="Batch second",
+            source="test",
+            category="annual",
+            period="2025",
+            snapshot_date=date(2026, 11, 23),
+            movies=[
+                ChartMovieImport(
+                    douban_id="90002",
+                    rank=1,
+                    title="Conflicting TV label",
+                    type="tv",
+                )
+            ],
+        )
+
+        with pytest.raises(ChartImportError, match="media type mismatch"):
+            service.import_snapshots(db, [first, second])
+
+        db.expire_all()
+        assert db.scalar(select(func.count()).select_from(ChartSnapshot)) == 0
+        assert db.scalar(select(func.count()).select_from(ChartItem)) == 0
+        assert db.scalar(select(func.count()).select_from(Chart)) == 0
+        assert db.scalar(
+            select(func.count()).select_from(Movie).where(
+                Movie.douban_id == "90001"
+            )
+        ) == 0
+        preserved = db.scalar(
+            select(Movie).where(Movie.douban_id == "90002")
+        )
+        assert preserved.type == "movie"
+        assert preserved.title == "Existing movie"
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_multi_chart_import_rejects_duplicate_chart_date_pairs():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        one = _snapshot(
+            date(2026, 11, 23),
+            [ChartMovieImport(douban_id="91001", rank=1, title="One")],
+        )
+        two = _snapshot(
+            date(2026, 11, 23),
+            [ChartMovieImport(douban_id="91002", rank=1, title="Two")],
+        )
+        with pytest.raises(ChartImportError, match="duplicate chart/date"):
+            service.import_snapshots(db, [one, two])
+        assert db.scalar(select(func.count()).select_from(Chart)) == 0
+    finally:
+        db.close()
+        engine.dispose()

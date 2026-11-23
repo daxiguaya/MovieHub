@@ -74,14 +74,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
 | Scout import hardening | Implementation and merge/partial-retry tests complete; large-fixture performance pending |
 | Manual normalized chart snapshot import | Complete |
-| Automatic chart collection and history comparison | 0% |
+| One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
+| Popular/high-rated/annual collection and scheduled updates | 0% |
 | Favorites API and frontend UI | Implemented; browser E2E pending |
 | Xiaoya handoff | UI/config implemented; real NPM verification pending |
 | React frontend and user workflows | Baseline implemented; browser E2E and visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 58%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 59%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -161,16 +162,18 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Chart source review and acquisition policy
 
 - [x] Review Cinéphile's chart taxonomy and scheduled-refresh concept without copying code or datasets.
+- [x] Add a one-shot Douban Top 250 collector that checks robots.txt, waits at least two seconds between pages, disables redirects, uses no cookies/proxies/retries, and stops on 403/429.
 - [x] Review Douban iDatabase's multi-source metadata and ID-translation concepts without copying unlicensed code.
 - [x] Record that Scout is a read-only metadata source, not a chart collector.
 - [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
 - [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
 
-**Source review: complete. Automatic chart acquisition remains pending an authorized, reliable provider decision.**
+**Source review: complete. Top 250 one-shot collection is implemented. Other chart types and scheduled refresh remain pending an authorized, reliable source path.**
 
 ## Next work
 
-- [ ] Select an authorized, reliable chart acquisition source and implement its isolated adapter plus conservative update scheduling; current chart data entry is normalized JSON only.
+- [ ] Implement conservative collectors for popular, high-rated and annual charts; the Top 250 collector is one-shot and manual only.
+- [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [ ] Add full-stack browser end-to-end tests against a running frontend/backend stack for chart navigation, search, detail, favorites and Xiaoya handoff.
 - [ ] Run 10k/100k synthetic import throughput, memory and batch-lock measurements; repeat on the target NAS only during an authorized pre-deployment test.
@@ -181,9 +184,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#217](https://github.com/daxiguaya/MovieHub/actions/runs/45132485377)
-- Tested commit: `1c296e323afac3e85f6b4b2080619c034a864c07`
-- Result: **success** — backend compilation, **73 backend tests**, **5 frontend UI tests**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#228](https://github.com/daxiguaya/MovieHub/actions/runs/45133033428)
+- Tested commit: `9ccd2d7139439570cdf51d06388313b6b883a93e`
+- Result: **success** — **78 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

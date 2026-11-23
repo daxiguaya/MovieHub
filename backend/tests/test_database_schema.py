@@ -17,7 +17,15 @@ EXPECTED_TABLES = set(Base.metadata.tables) | {"schema_migrations"}
 
 
 def _migrated_database(path: Path) -> None:
-    initialize(path, MIGRATION)
+    """Apply both schema migrations without seeding application data."""
+    followup = MIGRATION.with_name("002_durable_import_batch_receipts.sql")
+    conn = sqlite3.connect(str(path))
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.executescript(MIGRATION.read_text(encoding="utf-8"))
+        conn.executescript(followup.read_text(encoding="utf-8"))
+    finally:
+        conn.close()
 
 
 def test_initial_migration_builds_independent_schema(tmp_path):

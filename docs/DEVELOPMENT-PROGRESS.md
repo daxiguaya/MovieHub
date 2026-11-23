@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: First-release product architecture agreed; FTS5 and feature APIs next
+Current phase: Backend feature APIs and security hardening; frontend implementation next
 
 ## Phase 4 — independent database foundation
 
@@ -61,7 +61,7 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 - [x] Record the agreed first-release user journey: chart discovery → movie details → Xiaoya search.
 - [x] Record first-release charts, search/filter, detail, poster, favorites and Xiaoya handoff requirements.
 - [x] Explicitly exclude downloading, playback and media-library management; preserve Xiaoya/Jellyfin/SmartStrm responsibilities.
-- [x] Confirm React + TypeScript + Vite frontend in a separate container, FastAPI backend, SQLite/FTS5, local poster cache, and no Redis/MySQL/Elasticsearch.
+- [x] Confirm React + TypeScript + Vite frontend in a separate container, FastAPI backend, SQLite with optional FTS5 only if justified, local poster cache, and no Redis/MySQL/Elasticsearch.
 - [x] Map current backend coverage and identify FTS5, favorites API, frontend and frontend container as remaining work.
 
 **Product scope and architecture baseline: complete.**
@@ -87,7 +87,7 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
 - [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
 
-**Import hardening milestone: implemented; CI validation in progress.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented; 65-test CI passed before the favorites API additions.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
 ## Phase D — poster-fetch security hardening
 
@@ -98,12 +98,12 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 - [x] Restrict responses to raster image MIME types and enforce an 8 MiB maximum using both Content-Length and streamed byte counting.
 - [x] Add regression tests for URL allowlisting, private DNS answers and size policy.
 
-**Poster-fetch security milestone: implemented; CI validation in progress.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
+**Poster-fetch security milestone: implemented; 65-test CI passed before the favorites API additions.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
 
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
-- [ ] Add favorites list/add/remove API endpoints and integration tests.
+- [ ] Complete favorites API regression tests and document the NPM-side API-key injection required for browser access.
 - [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
 - [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
 - [ ] Formalize Scout field-level merge precedence and test empty-field preservation, newer timestamps, and source-row deletion behavior.

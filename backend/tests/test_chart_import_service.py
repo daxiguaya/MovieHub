@@ -250,3 +250,36 @@ def test_chart_import_rejects_invalid_or_duplicate_raw_ranks_before_writes(
         db.close()
         engine.dispose()
 
+def test_chart_import_discards_non_finite_raw_ratings():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        raw_snapshot = {
+            "slug": "nonfinite-rating-chart",
+            "name": "Non-finite rating chart",
+            "source": "test",
+            "category": "general",
+            "snapshot_date": "2026-11-23",
+            "movies": [
+                {
+                    "douban_id": "40001",
+                    "rank": 1,
+                    "title": "Rating edge case",
+                    "rating": float("nan"),
+                    "source_rating": float("inf"),
+                }
+            ],
+        }
+
+        service.import_snapshot(db, raw_snapshot)
+
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "40001"))
+        chart_item = db.scalar(select(ChartItem))
+        assert movie is not None
+        assert movie.rating is None
+        assert chart_item is not None
+        assert chart_item.source_rating is None
+    finally:
+        db.close()
+        engine.dispose()
+

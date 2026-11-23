@@ -74,6 +74,11 @@ def test_chart_initialization_preserves_existing_user_settings(monkeypatch):
         assert created.enabled is True
         assert created.display_order == 2
 
+        # The reads above trigger SQLAlchemy autobegin. End that read-only
+        # transaction before calling the initializer, which intentionally
+        # requires ownership of a transaction-free session.
+        db.rollback()
+
         second_run = chart_init_service.initialize_chart_definitions(db)
         assert second_run == {"created": 0, "existing": 2}
         assert db.query(Chart).count() == 2

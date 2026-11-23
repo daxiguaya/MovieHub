@@ -213,6 +213,7 @@ def test_chart_import_rejects_existing_movie_media_type_conflict_atomically():
     [
         ([1, 1], "duplicate ranks"),
         ([True], "invalid rank"),
+        ([1.5], "invalid rank"),
     ],
 )
 def test_chart_import_rejects_invalid_or_duplicate_raw_ranks_before_writes(

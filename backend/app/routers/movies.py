@@ -262,7 +262,7 @@ def _is_allowed_poster_url(url: str) -> bool:
             and parsed.username is None
             and parsed.password is None
             and parsed.port in (None, 443)
-            and re.fullmatch(r"img[0-9]+\\.doubanio\\.com", host) is not None
+            and re.fullmatch(r"img[0-9]+\.doubanio\.com", host) is not None
         )
     except ValueError:
         return False

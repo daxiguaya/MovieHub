@@ -84,7 +84,7 @@ def test_annual_batch_rejects_mixed_snapshot_dates(tmp_path, monkeypatch):
         lambda: pytest.fail("database must not be checked for invalid input"),
     )
 
-    with pytest.raises(ValueError, match="Missing annual chart"):
+    with pytest.raises(ValueError, match="snapshot_date"):
         annual_import.import_annual_batch(tmp_path, CAPTURE_DATE)
 
 

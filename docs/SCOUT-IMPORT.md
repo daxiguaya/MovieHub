@@ -112,4 +112,19 @@ Every import run now appends a JSONL journal beside the MovieHub database:
 
 `movies.db.import-journal.jsonl`
 
-The journal records run start, each committed 500-row batch (including the last processed Douban ID and cumulative counts), and terminal success/failure. Each event is appended with a single write and `fsync`; the file is created with owner-only permissions (0600). A torn final line after an abrupt process exit is ignored when reading the journal; earlier complete committed-batch events remain available for diagnosis. The journal is an audit/recovery aid, not yet an automatic resume engine: safe retry still relies on the importer's idempotent upsert behavior.
+The journal records run start, each committed 500-row batch (including the last processed Douban ID and cumulative counts), and terminal success/failure. Each event is appended with a single write and `fsync`; the file is created with owner-only permissions (0600). A torn final line after an abrupt process exit is ignored when reading the journal; earlier complete committed-batch events remain available for diagnosis. The journal also provides durable resume checkpoints. Resume an interrupted run through the protected API by supplying its original `resume_run_id` with the same source path and import mode. Before any target write, MovieHub recomputes a SHA-256 over the ordered Scout rows consumed by the importer and requires an exact match with the original run. It restores cumulative counters and continues after the last durable `last_douban_id`. If a target batch committed but its checkpoint was not persisted, that batch is replayed; idempotent upserts make this commit/log gap safe. Completed runs cannot be resumed. Source changes, mode changes, or a different source path are rejected. Fingerprinting is streaming and read-only but adds one full source pass before a resumed import starts.
+
+
+### Resume an interrupted run
+
+Use the original run ID returned by `POST /api/import` or `GET /api/import/status`:
+
+```json
+{
+  "source_path": "scout.sqlite",
+  "force_full": false,
+  "resume_run_id": "the-original-run-id"
+}
+```
+
+The source must remain inside the configured import directory. A resume request will not silently start a new run if the ID is missing, completed, belongs to another source path/mode, or has a different source-data fingerprint.

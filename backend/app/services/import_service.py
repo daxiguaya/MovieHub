@@ -1,6 +1,7 @@
 
 """Non-destructive MovieHub importer for Douban Scout SQLite databases."""
 
+import hashlib
 import json
 import logging
 import math
@@ -28,7 +29,11 @@ from app.database import (
 )
 from app.metadata_constants import VALID_GENRES, VALID_REGIONS
 from app.schemas import ImportStatus
-from app.services.import_journal import append_import_event, get_import_journal_path
+from app.services.import_journal import (
+    append_import_event,
+    get_import_journal_path,
+    read_import_events,
+)
 
 logger = logging.getLogger("moviehub.import")
 
@@ -91,6 +96,7 @@ class ImportService:
         self,
         source_path: str,
         force_full: bool = False,
+        resume_run_id: str | None = None,
     ) -> ImportStatus:
         """Start a background import.
 
@@ -106,7 +112,7 @@ class ImportService:
             raise RuntimeError("Import already in progress")
 
         try:
-            run_id = uuid.uuid4().hex
+            run_id = resume_run_id or uuid.uuid4().hex
             with self._status_lock:
                 self._status = ImportStatus(
                     run_id=run_id,
@@ -120,7 +126,7 @@ class ImportService:
 
             thread = threading.Thread(
                 target=self._run_import,
-                args=(path, force_full, run_id),
+                args=(path, force_full, run_id, resume_run_id),
                 name="moviehub-import",
                 daemon=True,
             )
@@ -165,8 +171,11 @@ class ImportService:
         source_path: Path,
         force_full: bool,
         run_id: str | None = None,
+        resume_run_id: str | None = None,
     ) -> None:
-        run_id = run_id or uuid.uuid4().hex
+        run_id = resume_run_id or run_id or uuid.uuid4().hex
+        with self._status_lock:
+            self._status.run_id = run_id
         source_conn: sqlite3.Connection | None = None
         committed_batches = 0
 
@@ -203,22 +212,79 @@ class ImportService:
             if total <= 0:
                 raise ValueError("Source database contains no movie or TV records")
 
+            # Hash exactly the ordered Scout projection consumed by import.
+            source_fingerprint = self._fingerprint_source(source_conn)
             journal_path = get_import_journal_path(SessionLocal)
-            append_import_event(journal_path, {
-                "event": "run_started",
-                "run_id": run_id,
-                "source_path": str(source_path),
-                "force_full": force_full,
-                "total": total,
-                "started_at": datetime.now().isoformat(),
-            })
-            self._set_progress(0, total, "Reading source database")
-            processed = 0
-            skipped = 0
-            imported = 0
-            record_errors = 0
+            processed = skipped = imported = record_errors = committed_batches = 0
+            last_douban_id: str | None = None
+
+            if resume_run_id:
+                run_events = [
+                    event for event in read_import_events(journal_path)
+                    if event.get("run_id") == resume_run_id
+                ]
+                start_event = next(
+                    (event for event in run_events if event.get("event") == "run_started"),
+                    None,
+                )
+                if start_event is None:
+                    raise ValueError(f"Import run not found or not resumable: {resume_run_id}")
+                if any(event.get("event") == "run_completed" for event in run_events):
+                    raise ValueError(f"Import run is already completed: {resume_run_id}")
+                if start_event.get("source_path") != str(source_path):
+                    raise ValueError("Resume source path does not match the original import")
+                if start_event.get("force_full") is not force_full:
+                    raise ValueError("Resume import mode does not match the original run")
+                if start_event.get("source_fingerprint") != source_fingerprint:
+                    raise ValueError(
+                        "Source data changed since the interrupted run; refusing checkpoint resume"
+                    )
+                checkpoints = [
+                    event for event in run_events
+                    if event.get("event") == "batch_committed"
+                ]
+                if checkpoints:
+                    checkpoint = checkpoints[-1]
+                    processed = int(checkpoint["processed"])
+                    imported = int(checkpoint["imported"])
+                    skipped = int(checkpoint["skipped"])
+                    record_errors = int(checkpoint["errors"])
+                    committed_batches = int(checkpoint["batch"])
+                    last_douban_id = str(checkpoint["last_douban_id"])
+                    if not 0 <= processed <= total:
+                        raise ValueError("Import checkpoint has an invalid processed count")
+                append_import_event(journal_path, {
+                    "event": "run_resumed",
+                    "run_id": run_id,
+                    "source_fingerprint": source_fingerprint,
+                    "processed_before_resume": processed,
+                    "resumed_at": datetime.now().isoformat(),
+                })
+            else:
+                append_import_event(journal_path, {
+                    "event": "run_started",
+                    "run_id": run_id,
+                    "source_path": str(source_path),
+                    "force_full": force_full,
+                    "source_fingerprint": source_fingerprint,
+                    "total": total,
+                    "started_at": datetime.now().isoformat(),
+                })
+
+            self._set_progress(
+                processed,
+                total,
+                "Resuming from last committed batch" if resume_run_id else "Reading source database",
+            )
             error_logs = 0
-            cursor = source_conn.execute(SOURCE_ROW_SQL)
+            if last_douban_id is None:
+                cursor = source_conn.execute(SOURCE_ROW_SQL)
+            else:
+                resume_sql = SOURCE_ROW_SQL.replace(
+                    "ORDER BY douban_id",
+                    "AND douban_id > ? ORDER BY douban_id",
+                )
+                cursor = source_conn.execute(resume_sql, (last_douban_id,))
 
             with SessionLocal() as db:
                 while True:
@@ -450,6 +516,21 @@ class ImportService:
             }
         finally:
             source_conn.close()
+
+    @staticmethod
+    def _fingerprint_source(conn: sqlite3.Connection) -> str:
+        """Hash every ordered source row consumed by the importer."""
+        digest = hashlib.sha256()
+        for row in conn.execute(SOURCE_ROW_SQL):
+            encoded = json.dumps(
+                [row[key] for key in row.keys()],
+                ensure_ascii=False,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+        return digest.hexdigest()
 
     @staticmethod
     def _validate_source(

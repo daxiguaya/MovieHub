@@ -920,3 +920,127 @@ def test_import_journal_ignores_incomplete_trailing_record(tmp_path):
     assert read_import_events(journal) == [
         {"event": "run_started", "run_id": "a"}
     ]
+
+
+def test_scout_import_resumes_after_last_durable_checkpoint(tmp_path, monkeypatch):
+    from app.services.import_journal import get_import_journal_path, read_import_events
+
+    source_path = tmp_path / "scout-resume.sqlite"
+    target_path = tmp_path / "moviehub-resume.sqlite"
+    _create_scout_fixture(source_path)
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    service._BATCH_SIZE = 1
+    original_upsert = service._upsert_source_row
+    original_append = import_service_module.append_import_event
+    resumed_ids = []
+    interrupted = {"value": False}
+
+    def append_then_interrupt(path, event):
+        original_append(path, event)
+        if event.get("event") == "batch_committed" and not interrupted["value"]:
+            interrupted["value"] = True
+            raise RuntimeError("simulated interruption after durable checkpoint")
+
+    def track_upsert(db, row, genre_map, region_map, force_full=False):
+        resumed_ids.append(str(row["douban_id"]))
+        return original_upsert(db, row, genre_map, region_map, force_full)
+
+    monkeypatch.setattr(import_service_module, "append_import_event", append_then_interrupt)
+    monkeypatch.setattr(service, "_upsert_source_row", track_upsert)
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True, run_id="resume-test-run")
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "failed"
+    journal_path = get_import_journal_path(TargetSession)
+    checkpoint = [
+        event for event in read_import_events(journal_path)
+        if event.get("event") == "batch_committed"
+    ][-1]
+    assert checkpoint["processed"] == 1
+    assert checkpoint["last_douban_id"] == "1234567"
+
+    monkeypatch.setattr(import_service_module, "append_import_event", original_append)
+    resumed_ids.clear()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(
+            source_path,
+            force_full=True,
+            run_id="resume-test-run",
+            resume_run_id="resume-test-run",
+        )
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "completed"
+    assert service.status.run_id == "resume-test-run"
+    assert resumed_ids == ["7654321"]
+    assert service.status.processed == 2
+    assert service.status.errors == 0
+    with TargetSession() as db:
+        assert db.query(Movie).count() == 2
+    events = read_import_events(journal_path)
+    assert any(event.get("event") == "run_resumed" for event in events)
+    assert events[-1]["event"] == "run_completed"
+    assert events[-1]["imported"] == 2
+    engine.dispose()
+
+
+def test_scout_import_resume_rejects_changed_source_before_target_writes(
+    tmp_path,
+    monkeypatch,
+):
+    from app.services.import_journal import append_import_event, get_import_journal_path
+
+    source_path = tmp_path / "scout-resume-changed.sqlite"
+    target_path = tmp_path / "moviehub-resume-changed.sqlite"
+    _create_scout_fixture(source_path)
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+    append_import_event(get_import_journal_path(TargetSession), {
+        "event": "run_started",
+        "run_id": "changed-source-run",
+        "source_path": str(source_path.resolve()),
+        "force_full": True,
+        "source_fingerprint": "not-the-current-fingerprint",
+        "total": 2,
+    })
+
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(
+            source_path,
+            force_full=True,
+            run_id="changed-source-run",
+            resume_run_id="changed-source-run",
+        )
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "failed"
+    assert "Source data changed" in service.status.message
+    with TargetSession() as db:
+        assert db.query(Movie).count() == 0
+    engine.dispose()

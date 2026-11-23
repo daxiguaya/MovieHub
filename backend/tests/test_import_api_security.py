@@ -33,8 +33,8 @@ def test_import_api_requires_key_and_confines_sources_to_import_directory(
 
     calls = []
 
-    def fake_start_import(source_path, force_full=False):
-        calls.append((source_path, force_full))
+    def fake_start_import(source_path, force_full=False, resume_run_id=None):
+        calls.append((source_path, force_full, resume_run_id))
         return ImportStatus(status="running", message="fixture import")
 
     monkeypatch.setattr(
@@ -65,6 +65,7 @@ def test_import_api_requires_key_and_confines_sources_to_import_directory(
                 json={
                     "source_path": "scout.sqlite",
                     "force_full": True,
+                    "resume_run_id": "run-123",
                 },
             )
             status_response = client.get(
@@ -78,6 +79,6 @@ def test_import_api_requires_key_and_confines_sources_to_import_directory(
         assert allowed.status_code == 200
         assert allowed.json()["status"] == "running"
         assert status_response.status_code == 200
-        assert calls == [(str(allowed_source.resolve()), True)]
+        assert calls == [(str(allowed_source.resolve()), True, "run-123")]
     finally:
         escaped_link.unlink(missing_ok=True)

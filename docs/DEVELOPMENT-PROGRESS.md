@@ -434,3 +434,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Ignore a torn final journal line after abrupt process termination while preserving preceding complete events.
 - [x] Add tests for multi-batch journal ordering, checkpoint values, file permissions and truncated-tail recovery.
 - Limitation: this is a durable batch ledger and recovery aid, not yet automatic checkpoint resume. Retry remains safe through idempotent upserts; explicit resume validation is the next step.
+
+
+## Checkpoint-validated Scout import resume (2026-11-23)
+
+- [x] Fingerprint the exact ordered Scout row projection consumed by import using streaming SHA-256.
+- [x] Persist the source fingerprint with the original run ledger entry.
+- [x] Resume through the protected import API using the original run ID.
+- [x] Reject missing/completed runs, changed source contents, changed source path, or changed import mode before target writes.
+- [x] Restore cumulative counters and continue strictly after the last durable Douban ID checkpoint.
+- [x] Safely replay a batch when its target transaction committed but its checkpoint event was not persisted.
+- [x] Add integration tests for interruption after a durable checkpoint and changed-source rejection.
+- Limitation: resume requires a full read-only source fingerprint pass before writing; correctness is preferred over the fastest restart.

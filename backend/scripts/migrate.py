@@ -39,8 +39,8 @@ from app.database import Base
 
 logger = logging.getLogger("moviehub.migrate")
 
-MIGRATION_VERSION = 1
-MIGRATION_FILENAME = "001_moviehub_core.sql"
+MIGRATION_VERSION = 2
+MIGRATION_FILENAME = "002_durable_import_batch_receipts.sql"
 
 REQUIRED_MOVIE_COLUMNS = {
     "id",
@@ -72,6 +72,7 @@ REQUIRED_TABLES = {
     "list_items",
     "favorites",
     "schema_migrations",
+    "import_batch_receipts",
 }
 
 
@@ -477,11 +478,11 @@ def _execute_migration_locked(
 
     logger.info("Current schema version: %s", current_version)
 
-    if current_version == 0 and existing_tables:
+    if current_version == 0:
         raise RuntimeError(
-            "Refusing to run the initial MovieHub schema on a non-empty "
-            "database. This schema is for a new, empty MovieHub database "
-            "only; it does not migrate or alter Douban Scout."
+            "MovieHub database has not been initialized. Run "
+            "'python -m scripts.init_db' first; this migration only upgrades "
+            "schema version 1 to version 2 and never initializes or modifies Scout."
         )
     logger.info("Target schema version: %s", MIGRATION_VERSION)
 
@@ -497,10 +498,10 @@ def _execute_migration_locked(
         logger.info("Existing MovieHub schema passed validation")
         return current_version
 
-    if current_version != 0:
+    if current_version != 1:
         raise RuntimeError(
             f"Unsupported starting schema version: {current_version}. "
-            "A dedicated migration is required."
+            "This migration requires schema version 1."
         )
 
     if check_only:
@@ -581,7 +582,7 @@ def parse_args() -> argparse.Namespace:
         "--migration",
         type=Path,
         default=None,
-        help="Migration SQL path; defaults to migrations/001_moviehub_core.sql",
+        help="Migration SQL path; defaults to migrations/002_durable_import_batch_receipts.sql",
     )
 
     parser.add_argument(

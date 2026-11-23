@@ -272,3 +272,10 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Metadata field coverage now uses only unique ID matches whose Scout media type agrees with the chart item. Wrong-type rows remain visible as ID matches and explicit mismatches, but cannot inflate the field-coverage numerator or denominator.
 - Added synthetic regression assertions for wrong-type records being excluded from field coverage, in addition to the unexpected-type and duplicate-ID cases.
 - Validation status: implementation and regression tests are committed; a GitHub Actions run for the latest head is still required before treating these changes as CI-verified.
+
+## Chart import identity/type integrity hardening (2026-11-23)
+
+- The chart importer now preflights every existing MovieHub movie referenced by an incoming snapshot and rejects a movie/TV type conflict before updating movie metadata or replacing the chart/date snapshot.
+- The importer does not silently rewrite an existing Scout-owned movie's media type to satisfy a chart. The failed import rolls back the entire transaction, preserving the previous snapshot.
+- Added a regression test that first imports a valid snapshot, then attempts a conflicting movie-to-TV replacement and verifies the original MovieHub type and chart snapshot remain intact.
+- Validation status: code and regression test are committed; latest-head GitHub Actions validation is pending. No production database was accessed.

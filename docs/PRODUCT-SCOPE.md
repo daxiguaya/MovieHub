@@ -89,37 +89,39 @@ Do not implement these in MovieHub first release:
 - Keep frontend and backend on the existing Docker network boundary. Do not publish an unnecessary NAS/LAN host port.
 - Do not introduce extra always-on infrastructure beyond the two application containers and SQLite.
 
-## Current implementation coverage (as of 2026-11-23)
+## Current implementation coverage (as of 2026-11-24)
 
 | Capability | Current state | Remaining work |
 |---|---|---|
-| Independent SQLite schema | Complete, 11 core tables | Add a versioned search/index migration only if benchmarks justify it |
-| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, rank comparison API/UI, and robots-aware one-shot Top 250/popular/high-rated collectors exist | Annual collector, scheduled refresh and live-data UX validation |
-| Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
-| Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
-| Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
-| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs; 70-test CI passed | Frontend UI |
-| Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge, partial-retry and 1,000-row fixture tests | 10k/100k and target-NAS performance validation |
-| React frontend | Discovery, chart history/comparison, full search/filter, internal-ID detail, favorites and configurable Xiaoya handoff implemented; 5 UI tests and separate container build pass in CI | Full-stack browser E2E, real-data UX validation and visual polish |
-| Frontend/backend Compose topology | Separate frontend and backend services; same-origin NPM routing documented | Verify actual NPM locations and server-side favorites-key injection during authorized rollout |
-| Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |
+| Independent SQLite schema | Complete, 11 core tables; schema v2 includes durable import-batch receipts; latest backend CI passes | Validate v1 → v2 migration against an isolated copy of a real v1 MovieHub database before production use |
+| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, rank comparison API/UI, robots-aware Top 250/popular/high-rated collectors and official 2025 annual collector exist | Review/import actual 2025 snapshots into an isolated MovieHub DB; verify 2026 categories and publication data; decide whether a refresh mechanism is warranted |
+| Movie search/filter API | Implemented with SQL LIKE and cursor pagination | Run opt-in realistic 10k/100k latency benchmarks; add FTS5 only if measured results justify it |
+| Movie detail API | Implemented; internal MovieHub IDs are used for relations | Real-data visual/UX validation |
+| Poster cache/API | Implemented with source-host allowlist, redirect/DNS validation, response-size and image-signature checks | Visual QA of loading, missing and failed poster states |
+| Favorites | Protected list/add/update-note/remove API uses MovieHub internal IDs; frontend UI and browser flow implemented | Verify protected key injection through an isolated NPM test host |
+| Scout import | Read-only source boundary, identity/numeric gates, 500-record transactions, per-record SAVEPOINT isolation, merge/partial retry, durable receipts, journal, error manifest, preview/reconciliation and readiness CLI; latest backend CI passes | Audit a consistent staged Scout copy, reconcile its preview, then validate throughput on controlled hardware |
+| React frontend | Chart discovery/history/comparison, search/filter, detail, favorites and configurable Xiaoya handoff; 5 frontend tests and 4 Playwright E2E tests pass | Visual/responsive QA and review against representative real catalogue data |
+| Frontend/backend Compose topology | Separate frontend/backend services, same-origin routing documented; both images build in CI | Verify actual NPM locations, TLS/access controls and server-side favorites-key injection during authorized rollout |
+| Backup/restore | SQLite online backup, integrity/foreign-key checks, manifest, retention, guarded restore and rollback utility/runbook implemented | Rehearse against an isolated test database and verify the intended NAS backup destination during authorized rollout |
+| Production rollout | Not deployed; no production DB, NPM or NAS service modified | Separate approval, deployment checklist, staged smoke test and rollback plan |
 
+Latest full CI: [run #45212034805](https://github.com/daxiguaya/MovieHub/actions/runs/45212034805) — backend 224 passed / 4 skipped, frontend 5 passed, browser E2E 4 passed. Annual collection and performance benchmark jobs were skipped by workflow conditions and remain unverified.
 ## Chart acquisition policy
 
 - Use normalized snapshot imports until an authorized and reliable chart provider is selected.
 - Do not rely on deprecated public API keys, mandatory paid proxies, or high-frequency scraping.
 - Keep source adapters isolated and preserve source attribution, pacing, cache and retry boundaries.
 
-## Delivery order
+## Remaining delivery order
 
-1. Benchmark existing LIKE search on realistic fixtures; only add optional FTS5 if measurements show it is needed.
-2. Complete protected favorites API validation, then implement the frontend API client.
-3. Define a stable frontend API client and error/loading/empty states.
-4. Build the React + TypeScript + Vite pages: chart home, chart snapshot, movie search/filter, movie detail and favorites.
-5. Add a separate frontend container and Compose service; keep API internal and route /api through the same NPM host.
-6. Add configurable Xiaoya search handoff.
-7. Run end-to-end tests against temporary databases and test fixtures.
-8. Only after review, plan NAS deployment, Scout import, NPM routing and production initialization as separate operator actions.
+1. Validate the schema-v1 migration using a consistent, isolated copy of a real v1 MovieHub database; do not use the live NAS database as a test fixture.
+2. Run the read-only Scout whole-catalogue audit and chart-coverage gate against a consistent staged Scout copy, then generate and reconcile an import preview.
+3. Review the official 2025 four-chart snapshots and import them only into a fresh isolated MovieHub database before considering any production data operation.
+4. Verify 2026 chart definitions against official publication sources and decide whether scheduled refresh is actually required for the first release.
+5. Complete visual/responsive QA and realistic-data UX review for charts, search, details, posters and favorites.
+6. Validate same-origin NPM routing, TLS/access controls and favorites-only server-side API-key injection in an isolated test host.
+7. Run opt-in 10k/100k search/import benchmarks and an isolated backup/restore rehearsal; record results separately from CI.
+8. Only after the above review, prepare a deployment checklist and rollback plan. Production initialization, Scout import, NPM changes and service restarts remain separate operator actions requiring explicit approval.
 
 ## Safety and compatibility
 

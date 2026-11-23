@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.migrate import execute_migration, get_schema_version
+from scripts.migrate import execute_migration
 
 MIGRATION = (
     Path(__file__).resolve().parents[1]

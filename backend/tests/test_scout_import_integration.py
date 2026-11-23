@@ -1181,3 +1181,164 @@ def test_resume_rejects_a_forged_checkpoint_before_target_writes(tmp_path, monke
     with TargetSession() as db:
         assert db.query(Movie).count() == 0
     engine.dispose()
+
+
+def test_resume_recovers_committed_batch_when_journal_append_was_lost(
+    tmp_path,
+    monkeypatch,
+):
+    from app.services.import_journal import get_import_journal_path, read_import_events
+
+    source_path = tmp_path / "scout-receipt-recovery.sqlite"
+    target_path = tmp_path / "moviehub-receipt-recovery.sqlite"
+    _create_scout_fixture(source_path)
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    service = import_service_module.ImportService()
+    service._BATCH_SIZE = 1
+    original_append = import_service_module.append_import_event
+    processed_ids = []
+    interrupted = {"value": False}
+    original_upsert = service._upsert_source_row
+
+    def lose_checkpoint_after_commit(path, event):
+        if event.get("event") == "batch_committed" and not interrupted["value"]:
+            interrupted["value"] = True
+            raise OSError("simulated process loss before journal checkpoint")
+        return original_append(path, event)
+
+    def track_upsert(db, row, genre_map, region_map, force_full=False):
+        processed_ids.append(str(row["douban_id"]))
+        return original_upsert(db, row, genre_map, region_map, force_full)
+
+    monkeypatch.setattr(import_service_module, "append_import_event", lose_checkpoint_after_commit)
+    monkeypatch.setattr(service, "_upsert_source_row", track_upsert)
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True, run_id="receipt-gap-run")
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "failed"
+    journal_path = get_import_journal_path(TargetSession)
+    events_before_resume = read_import_events(journal_path)
+    assert not any(
+        event.get("event") == "batch_committed"
+        for event in events_before_resume
+        if event.get("run_id") == "receipt-gap-run"
+    )
+    with TargetSession() as db:
+        from app.database import ImportBatchReceipt
+        receipts = db.query(ImportBatchReceipt).filter_by(run_id="receipt-gap-run").all()
+        assert len(receipts) == 1
+        assert receipts[0].processed == 1
+        assert receipts[0].imported == 1
+
+    monkeypatch.setattr(import_service_module, "append_import_event", original_append)
+    processed_ids.clear()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(
+            source_path,
+            force_full=True,
+            run_id="receipt-gap-run",
+            resume_run_id="receipt-gap-run",
+        )
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    assert service.status.status == "completed"
+    assert processed_ids == ["7654321"]
+    assert service.status.processed == 2
+    assert service.status.errors == 0
+    with TargetSession() as db:
+        from app.database import ImportBatchReceipt
+        assert db.query(Movie).count() == 2
+        assert db.query(ImportBatchReceipt).filter_by(run_id="receipt-gap-run").count() == 2
+    checkpoints = [
+        event for event in read_import_events(journal_path)
+        if event.get("run_id") == "receipt-gap-run"
+        and event.get("event") == "batch_committed"
+    ]
+    assert [event["processed"] for event in checkpoints] == [1, 2]
+    assert checkpoints[-1]["imported"] == 2
+    assert checkpoints[-1]["skipped"] == 0
+    engine.dispose()
+
+
+def test_batch_receipt_and_movie_rows_roll_back_in_the_same_transaction(tmp_path):
+    from sqlalchemy.exc import IntegrityError
+    from app.database import ImportBatchReceipt
+
+    target_path = tmp_path / "receipt-atomicity.sqlite"
+    engine = create_engine(f"sqlite:///{target_path.as_posix()}")
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    with pytest.raises(RuntimeError, match="forced transaction rollback"):
+        with TargetSession.begin() as db:
+            db.add(Movie(
+                douban_id="9910001",
+                title="Must roll back",
+                type="movie",
+                directors="[]",
+                actors="[]",
+            ))
+            db.add(ImportBatchReceipt(
+                run_id="atomic-run",
+                batch_number=1,
+                source_fingerprint="a" * 64,
+                processed=1,
+                total=1,
+                imported=1,
+                skipped=0,
+                errors=0,
+                last_douban_id="9910001",
+                error_records="[]",
+                committed_at="2026-11-23T00:00:00",
+            ))
+            raise RuntimeError("forced transaction rollback")
+
+    with TargetSession() as db:
+        assert db.query(Movie).filter_by(douban_id="9910001").count() == 0
+        assert db.query(ImportBatchReceipt).filter_by(run_id="atomic-run").count() == 0
+
+    with TargetSession.begin() as db:
+        db.add(ImportBatchReceipt(
+            run_id="unique-run",
+            batch_number=1,
+            source_fingerprint="b" * 64,
+            processed=1,
+            total=1,
+            imported=1,
+            skipped=0,
+            errors=0,
+            last_douban_id="9910002",
+            error_records="[]",
+            committed_at="2026-11-23T00:00:00",
+        ))
+    with pytest.raises(IntegrityError):
+        with TargetSession.begin() as db:
+            db.add(ImportBatchReceipt(
+                run_id="unique-run",
+                batch_number=1,
+                source_fingerprint="b" * 64,
+                processed=1,
+                total=1,
+                imported=1,
+                skipped=0,
+                errors=0,
+                last_douban_id="9910002",
+                error_records="[]",
+                committed_at="2026-11-23T00:00:01",
+            ))
+    engine.dispose()

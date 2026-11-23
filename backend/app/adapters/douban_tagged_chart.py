@@ -94,7 +94,7 @@ class DoubanTaggedChartCollector:
         return response.text
 
     @staticmethod
-    def _check_robots(client) -> None:
+    def _check_robots(client) -> float:
         response = client.get(ROBOTS_URL)
         if response.status_code == 404:
             parser = RobotFileParser()
@@ -114,6 +114,8 @@ class DoubanTaggedChartCollector:
             raise DoubanCollectionError(
                 "Douban robots.txt disallows the tagged chart endpoint"
             )
+        crawl_delay = parser.crawl_delay(USER_AGENT) or 0.0
+        return max(REQUEST_DELAY_SECONDS, float(crawl_delay))
 
     @staticmethod
     def _parse_subject(subject: dict, rank: int) -> ChartMovieImport:
@@ -185,7 +187,8 @@ class DoubanTaggedChartCollector:
         )
 
         try:
-            self._check_robots(client)
+            robots_delay = self._check_robots(client)
+            delay_seconds = max(self.request_delay, robots_delay)
             movies: list[ChartMovieImport] = []
             seen_ids: set[str] = set()
             page_start = 0
@@ -237,7 +240,7 @@ class DoubanTaggedChartCollector:
                     break
                 page_start += page_limit
                 if len(movies) < self.max_items:
-                    self.sleeper(self.request_delay)
+                    self.sleeper(delay_seconds)
 
             if not movies:
                 raise DoubanCollectionError(

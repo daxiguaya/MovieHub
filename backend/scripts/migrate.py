@@ -21,11 +21,13 @@ Optional:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
 import os
 import shutil
 import sqlite3
 import sys
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -429,7 +431,21 @@ def restore_backup(
     logger.warning("Original database restored from: %s", backup_path)
 
 
-def execute_migration(
+
+@contextmanager
+def migration_lock(database_path: Path):
+    """Serialize migration/check operations across processes on POSIX hosts."""
+    lock_path = Path(str(database_path) + ".migration.lock")
+    descriptor = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o600)
+    with os.fdopen(descriptor, "a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _execute_migration_locked(
     database_path: Path,
     migration_path: Path,
     check_only: bool = False,
@@ -533,6 +549,20 @@ def execute_migration(
                 )
 
         raise
+
+
+def execute_migration(
+    database_path: Path,
+    migration_path: Path,
+    check_only: bool = False,
+) -> int:
+    """Run migration under a process-wide lock for this database file."""
+    with migration_lock(database_path):
+        return _execute_migration_locked(
+            database_path=database_path,
+            migration_path=migration_path,
+            check_only=check_only,
+        )
 
 
 def parse_args() -> argparse.Namespace:

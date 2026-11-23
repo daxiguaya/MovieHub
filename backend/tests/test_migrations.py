@@ -204,3 +204,31 @@ def test_validation_rejects_missing_foreign_key_contract(tmp_path):
 
     with pytest.raises(RuntimeError, match="table mismatch|no such table"):
         validate_orm_schema_contract(db_path)
+
+
+def test_concurrent_initial_migrations_are_serialized(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    db_path = tmp_path / "concurrent.db"
+    _create_empty_database(db_path)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(execute_migration, db_path, MIGRATION)
+            for _ in range(2)
+        ]
+        results = [future.result(timeout=30) for future in futures]
+
+    assert results == [1, 1]
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=1"
+        ).fetchone()[0] == 1
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        conn.close()
+
+    assert len(list(tmp_path.glob("*.pre-migration-*.bak"))) == 1
+    assert Path(str(db_path) + ".migration.lock").exists()

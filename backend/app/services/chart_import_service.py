@@ -13,6 +13,7 @@ from app.cache import cache_manager
 from app.database import (
     Chart,
     ChartItem,
+    ChartSnapshot,
     Favorite,
     Genre,
     Movie,
@@ -148,79 +149,79 @@ class ChartImportService:
         title = ChartImportService._clean_string(
             ChartImportService._value(item, "title")
         )
-        if title:
+        if title and not (movie.title or '').strip():
             movie.title = title
 
         original_title = ChartImportService._clean_string(
             ChartImportService._value(item, "original_title")
         )
-        if original_title:
+        if original_title and not movie.original_title:
             movie.original_title = original_title
 
         year = ChartImportService._safe_int(
             ChartImportService._value(item, "year")
         )
-        if year is not None:
+        if year is not None and movie.year is None:
             movie.year = year
 
         rating = ChartImportService._safe_float(
             ChartImportService._value(item, "rating")
         )
-        if rating is not None:
+        if rating is not None and movie.rating is None:
             movie.rating = rating
 
         rating_count = ChartImportService._safe_int(
             ChartImportService._value(item, "rating_count")
         )
-        if rating_count is not None and rating_count > 0:
+        if rating_count is not None and rating_count > 0 and not movie.rating_count:
             movie.rating_count = rating_count
 
         movie_type = ChartImportService._clean_string(
             ChartImportService._value(item, "type")
         )
-        if movie_type in ("movie", "tv"):
+        if movie_type in ("movie", "tv") and not movie.type:
             movie.type = movie_type
 
         imdb_id = ChartImportService._clean_string(
             ChartImportService._value(item, "imdb_id")
         )
-        if imdb_id:
+        if imdb_id and not movie.imdb_id:
             movie.imdb_id = imdb_id
 
         tmdb_id = ChartImportService._clean_string(
             ChartImportService._value(item, "tmdb_id")
         )
-        if tmdb_id:
+        if tmdb_id and not movie.tmdb_id:
             movie.tmdb_id = tmdb_id
 
         overview = ChartImportService._clean_string(
             ChartImportService._value(item, "overview")
         )
-        if overview:
+        if overview and not movie.overview:
             movie.overview = overview
 
         douban_url = ChartImportService._clean_string(
             ChartImportService._value(item, "douban_url")
         )
-        if douban_url:
+        if douban_url and not movie.douban_url:
             movie.douban_url = douban_url
 
         directors = ChartImportService._clean_string_list(
             ChartImportService._value(item, "directors", [])
         )
-        if directors:
+        if directors and not movie.directors:
             movie.directors = ChartImportService._json_list(directors)
 
         actors = ChartImportService._clean_string_list(
             ChartImportService._value(item, "actors", [])
         )
-        if actors:
+        if actors and not movie.actors:
             movie.actors = ChartImportService._json_list(actors)
 
         genres = ChartImportService._clean_string_list(
             ChartImportService._value(item, "genres", [])
         )
-        if genres:
+        if genres and not movie.genres:
             genre_ids = {
                 genre_map[name]
                 for name in genres
@@ -245,7 +246,7 @@ class ChartImportService:
         regions = ChartImportService._clean_string_list(
             ChartImportService._value(item, "regions", [])
         )
-        if regions:
+        if regions and not movie.regions:
             region_ids = {
                 region_map[name]
                 for name in regions
@@ -490,14 +491,26 @@ class ChartImportService:
                     db.flush()
                     imported_movie_ids[douban_id] = movie.id
 
-                # Replace only this chart's snapshot on this date.
-                # All other dates and all other charts remain untouched.
-                db.execute(
-                    delete(ChartItem).where(
-                        ChartItem.list_id == chart.list_id,
-                        ChartItem.snapshot_date == snapshot_date,
+                # Replace only this chart/date snapshot. Its items cascade;
+                # all other dates and all other charts remain untouched.
+                previous_snapshot = db.scalar(
+                    select(ChartSnapshot).where(
+                        ChartSnapshot.list_id == chart.list_id,
+                        ChartSnapshot.snapshot_date == snapshot_date,
                     )
                 )
+                if previous_snapshot is not None:
+                    db.delete(previous_snapshot)
+                    db.flush()
+
+                chart_snapshot = ChartSnapshot(
+                    list_id=chart.list_id,
+                    snapshot_date=snapshot_date,
+                    imported_at=imported_at,
+                    item_count=len(items),
+                )
+                db.add(chart_snapshot)
+                db.flush()
 
                 for item in items:
                     douban_id = self._clean_string(
@@ -518,9 +531,8 @@ class ChartImportService:
 
                     db.add(
                         ChartItem(
-                            list_id=chart.list_id,
-                            snapshot_date=snapshot_date,
-                            douban_id=douban_id,
+                            snapshot_id=chart_snapshot.id,
+                            movie_id=imported_movie_ids[douban_id],
                             rank=rank,
                             source_rating=source_rating,
                         )

@@ -1,12 +1,13 @@
 """Schema-v2 migration coverage for atomic Scout import receipts."""
 
 import sqlite3
+from pathlib import Path
 
 from scripts.migrate import execute_migration
 
 
 def test_v1_database_migrates_to_v2_with_receipt_constraints(tmp_path):
-    backend_root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    backend_root = Path(__file__).resolve().parents[1]
     database_path = tmp_path / "moviehub-v1.sqlite"
     initial_migration = backend_root / "migrations" / "001_moviehub_core.sql"
     receipt_migration = backend_root / "migrations" / "002_durable_import_batch_receipts.sql"

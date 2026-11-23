@@ -13,7 +13,7 @@ CREATE TABLE schema_migrations (
 );
 
 CREATE TABLE movies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     douban_id VARCHAR(32),
     imdb_id VARCHAR(32),
     tmdb_id VARCHAR(32),
@@ -47,13 +47,13 @@ CREATE INDEX ix_movies_year_id ON movies(year, id);
 CREATE INDEX ix_movies_rating_count_id ON movies(rating_count, id);
 
 CREATE TABLE genres (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     name VARCHAR(32) NOT NULL
 );
 CREATE UNIQUE INDEX ix_genres_name ON genres(name);
 
 CREATE TABLE regions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     name VARCHAR(32) NOT NULL
 );
 CREATE UNIQUE INDEX ix_regions_name ON regions(name);
@@ -82,7 +82,7 @@ CREATE TABLE movie_posters (
 );
 
 CREATE TABLE lists (
-    list_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER PRIMARY KEY,
     slug VARCHAR(96) NOT NULL,
     name VARCHAR(160) NOT NULL,
     source VARCHAR(32) NOT NULL,
@@ -100,7 +100,7 @@ CREATE INDEX ix_lists_source ON lists(source);
 CREATE INDEX ix_lists_category ON lists(category);
 
 CREATE TABLE chart_snapshots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     list_id INTEGER NOT NULL,
     snapshot_date VARCHAR(10) NOT NULL,
     imported_at DATETIME NOT NULL,

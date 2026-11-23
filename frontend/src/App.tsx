@@ -12,6 +12,7 @@ import { api } from "./api";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
 import type {
   Chart,
+  ChartCompareResponse,
   ChartMovie,
   Favorite,
   Movie,
@@ -231,17 +232,25 @@ function ChartPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [compareFrom, setCompareFrom] = useState("");
+  const [compareTo, setCompareTo] = useState("");
+  const [comparison, setComparison] = useState<ChartCompareResponse | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState("");
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setItems([]);
     setSnapshotDate("");
+    setComparison(null);
     Promise.all([api.snapshots(slug), api.chart(slug)])
       .then(([history, latest]) => {
         if (!active) return;
         setSnapshots(history);
         setSnapshotDate(history[0]?.snapshot_date ?? "");
+        setCompareTo(history[0]?.snapshot_date ?? "");
+        setCompareFrom(history[1]?.snapshot_date ?? "");
         setChartName(latest.chart.name);
         setItems(latest.items);
         setTotal(latest.total);
@@ -279,6 +288,27 @@ function ChartPage() {
     }
   }
 
+  async function runComparison() {
+    if (!compareFrom || !compareTo || compareFrom === compareTo) return;
+    setCompareLoading(true);
+    setCompareError("");
+    try {
+      setComparison(await api.compareChart(slug, compareFrom, compareTo));
+    } catch (err) {
+      setCompareError((err as Error).message);
+      setComparison(null);
+    } finally {
+      setCompareLoading(false);
+    }
+  }
+
+  const statusLabel: Record<string, string> = {
+    new: "新上榜",
+    removed: "已退出",
+    moved: "排名变动",
+    unchanged: "排名不变"
+  };
+
   return (
     <>
       <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><span>榜单</span></div>
@@ -302,6 +332,34 @@ function ChartPage() {
           <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} />)}</div>
           {nextCursor && <button className="secondary-button load-more" onClick={() => void loadMore()}>加载更多</button>}
         </>
+      )}
+      {snapshots.length >= 2 && (
+        <section className="rank-compare">
+          <div className="rank-compare-heading">
+            <div><div className="eyebrow">HISTORY TRACKER</div><h2>榜单排名变化</h2><p>比较两个日期，查看上升、下降、新上榜与退出榜单的作品。</p></div>
+          </div>
+          <div className="compare-controls">
+            <label>对比起始日期<select value={compareFrom} onChange={(e) => setCompareFrom(e.target.value)}>{snapshots.map((item) => <option key={item.snapshot_date} value={item.snapshot_date}>{item.snapshot_date}</option>)}</select></label>
+            <span className="compare-arrow">→</span>
+            <label>对比结束日期<select value={compareTo} onChange={(e) => setCompareTo(e.target.value)}>{snapshots.map((item) => <option key={item.snapshot_date} value={item.snapshot_date}>{item.snapshot_date}</option>)}</select></label>
+            <button className="primary-button" disabled={!compareFrom || !compareTo || compareFrom === compareTo || compareLoading} onClick={() => void runComparison()}>{compareLoading ? "正在比较…" : "比较排名"}</button>
+          </div>
+          {compareError && <div className="inline-error">{compareError}</div>}
+          {comparison && (
+            <>
+              <div className="result-caption"><span>{comparison.from_date} → {comparison.to_date}</span><span>{comparison.total_before} → {comparison.total_after} 部作品</span></div>
+              <div className="rank-change-list">
+                {comparison.items.map((item) => (
+                  <div className="rank-change-row" key={item.movie_id}>
+                    <div className="rank-change-title"><strong>{item.title}</strong><span>{item.year ?? "年份未知"}</span></div>
+                    <div className="rank-position">{item.before_rank ? `#${item.before_rank}` : "—"} <span>→</span> {item.after_rank ? `#${item.after_rank}` : "—"}</div>
+                    <span className={`rank-status status-${item.status}`}>{statusLabel[item.status]}{item.rank_change !== null ? ` · ${item.rank_change > 0 ? `↑${item.rank_change}` : item.rank_change < 0 ? `↓${Math.abs(item.rank_change)}` : "0"}` : ""}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
       )}
     </>
   );

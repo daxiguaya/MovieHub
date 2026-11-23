@@ -30,7 +30,7 @@ curl "https://<moviehub-host>/api/import/status" \
   -H "X-API-Key: <MOVIEHUB_API_KEY>"
 ```
 
-Only one import can run at a time. The service processes 500 records per transaction and isolates individual bad records with SAVEPOINTs.
+Only one import can run at a time. The service processes 500 records per transaction and isolates individual bad records with SAVEPOINTs. The status response includes an `errors` count for records that raised processing exceptions; a run can finish with status `completed` while reporting nonzero record errors, so check both `status` and `errors` before treating the import as clean.
 
 ## Incremental vs. forced full
 

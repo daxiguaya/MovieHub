@@ -1,4 +1,3 @@
-
 """FastAPI application entry point for MovieHub."""
 
 import asyncio
@@ -10,10 +9,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.database import get_db_path
+from app.database import DatabaseNotInitializedError, get_db_path
 from app.limiter import limiter
 from app.logging_config import setup_logging
 from app.routers.chart_import import router as chart_import_router
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if not db_path.exists():
         logger.warning(
             "Database file not found at %s. "
-            "The API will return database errors until data is imported.",
+            "Run the explicit database initializer before using data APIs.",
             db_path,
         )
     else:
@@ -88,6 +88,18 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+
+@app.exception_handler(DatabaseNotInitializedError)
+async def database_not_initialized_handler(
+    request: Request,
+    exc: DatabaseNotInitializedError,
+) -> JSONResponse:
+    """Return a clear service-unavailable response without opening SQLite."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": str(exc)},
+    )
 
 
 @app.exception_handler(Exception)
@@ -150,4 +162,3 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
     )
-

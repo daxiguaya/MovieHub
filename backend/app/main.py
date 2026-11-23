@@ -1,0 +1,153 @@
+
+"""FastAPI application entry point for MovieHub."""
+
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+from app.database import get_db_path
+from app.limiter import limiter
+from app.logging_config import setup_logging
+from app.routers.chart_import import router as chart_import_router
+from app.routers.charts import router as charts_router
+from app.routers.data_import import router as import_router
+from app.routers.movies import router as movies_router
+from app.services.poster_service import poster_cache_service
+
+setup_logging()
+
+logger = logging.getLogger("moviehub.main")
+
+POSTER_CACHE_CLEANUP_INTERVAL = 24 * 60 * 60
+
+
+async def _poster_cache_cleanup_loop() -> None:
+    """Periodically remove expired poster cache files."""
+    while True:
+        await asyncio.sleep(POSTER_CACHE_CLEANUP_INTERVAL)
+
+        try:
+            await asyncio.to_thread(
+                poster_cache_service.clear_expired_cache
+            )
+        except Exception:
+            logger.exception("Poster cache cleanup failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan context manager."""
+    logger.info("MovieHub application starting...")
+
+    db_path = Path(get_db_path())
+
+    if not db_path.exists():
+        logger.warning(
+            "Database file not found at %s. "
+            "The API will return database errors until data is imported.",
+            db_path,
+        )
+    else:
+        logger.info("Using database at %s", db_path)
+
+    try:
+        await asyncio.to_thread(
+            poster_cache_service.clear_expired_cache
+        )
+    except Exception:
+        logger.exception("Initial poster cache cleanup failed")
+
+    cleanup_task = asyncio.create_task(
+        _poster_cache_cleanup_loop()
+    )
+
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+
+        with contextlib.suppress(asyncio.CancelledError):
+            await cleanup_task
+
+        logger.info("MovieHub application shutting down...")
+
+
+app = FastAPI(
+    title="MovieHub API",
+    description="Private movie discovery and chart browsing service",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(
+    request: Request,
+    exc: Exception,
+) -> Response:
+    """Log unexpected errors and return a safe response."""
+    logger.exception(
+        "Unhandled exception while handling %s %s",
+        request.method,
+        request.url.path,
+    )
+
+    return Response(
+        content='{"detail":"Internal Server Error"}',
+        status_code=500,
+        media_type="application/json",
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(
+    request: Request,
+    exc: RateLimitExceeded,
+) -> Response:
+    """Handle rate limit exceeded errors."""
+    return _rate_limit_exceeded_handler(request, exc)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Read APIs
+app.include_router(movies_router, prefix="/api")
+app.include_router(charts_router, prefix="/api")
+
+# Protected write/import APIs
+app.include_router(chart_import_router, prefix="/api")
+app.include_router(import_router, prefix="/api")
+
+
+@app.get("/api/health")
+def health_check() -> dict[str, str]:
+    """Basic application health check."""
+    return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+    )
+

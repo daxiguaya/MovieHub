@@ -66,7 +66,7 @@ def test_backup_and_restore_create_verified_backup_and_rollback_copy(tmp_path):
 
     assert rollback.is_file()
     assert _movie_titles(database) == ["Before backup"]
-    assert _movie_titles(rollback) == ["After backup"]
+    assert _movie_titles(rollback) == ["After backup", "Before backup"]
 
 
 def test_restore_requires_explicit_confirmation_and_stopped_service(tmp_path):

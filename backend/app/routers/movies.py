@@ -1,9 +1,12 @@
 
 """Movie API endpoints for MovieHub."""
 
+import asyncio
+import ipaddress
 import json
 import logging
 import re
+import socket
 from urllib.parse import urljoin, urlsplit
 from typing import Literal
 
@@ -268,6 +271,32 @@ def _is_allowed_poster_url(url: str) -> bool:
         return False
 
 
+def _all_resolved_addresses_are_public(addresses: list[str]) -> bool:
+    """Reject DNS answers containing loopback, private, link-local or reserved IPs."""
+    if not addresses:
+        return False
+    try:
+        return all(ipaddress.ip_address(address).is_global for address in addresses)
+    except ValueError:
+        return False
+
+
+async def _poster_host_resolves_publicly(url: str) -> bool:
+    """Resolve each allowlisted CDN host and reject any non-public address."""
+    try:
+        parsed = urlsplit(url)
+        loop = asyncio.get_running_loop()
+        records = await loop.getaddrinfo(
+            parsed.hostname,
+            parsed.port or 443,
+            type=socket.SOCK_STREAM,
+        )
+        addresses = list({record[4][0] for record in records})
+        return _all_resolved_addresses_are_public(addresses)
+    except (OSError, ValueError):
+        return False
+
+
 async def _download_poster_image(
     url: str,
 ) -> tuple[bytes, str] | None:
@@ -290,6 +319,9 @@ async def _download_poster_image(
         for redirect_count in range(POSTER_MAX_REDIRECTS + 1):
             if not _is_allowed_poster_url(current_url):
                 logger.warning("Rejected poster URL outside the Douban image CDN allowlist")
+                return None
+            if not await _poster_host_resolves_publicly(current_url):
+                logger.warning("Rejected poster CDN host resolving to a non-public address")
                 return None
 
             try:

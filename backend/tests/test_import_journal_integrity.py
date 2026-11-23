@@ -66,3 +66,16 @@ def test_append_repairs_a_torn_final_line_before_writing_next_event(tmp_path):
 
     assert read_import_events(path) == [first, recovered]
     assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_append_preserves_a_complete_event_without_a_trailing_newline(tmp_path):
+    from app.services.import_journal import append_import_event
+
+    path = tmp_path / "import.jsonl"
+    first = {"event": "run_started", "run_id": "run-1"}
+    second = {"event": "run_resumed", "run_id": "run-1"}
+    path.write_text(json.dumps(first), encoding="utf-8")
+
+    append_import_event(path, second)
+
+    assert read_import_events(path) == [first, second]

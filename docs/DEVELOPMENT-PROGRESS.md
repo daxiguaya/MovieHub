@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Backend container packaging (pre-deployment)
+Current phase: Pre-deployment hardening and frontend architecture
 
 ## Phase 4 — independent database foundation
 
@@ -34,8 +34,8 @@ Current phase: Backend container packaging (pre-deployment)
 ## Backend container packaging
 
 - [x] Add a Python 3.11 slim backend Dockerfile; run as a non-root UID.
-- [x] Add a Compose service with read-only root filesystem, dropped capabilities, no-new-privileges, resource/PID limits and writable data volume only.
-- [x] Keep MovieHub data and Scout source paths separate; mount Scout import source read-only.
+- [x] Add a Compose service with read-only root filesystem, dropped capabilities, no-new-privileges, resource/PID limits and dedicated writable volumes.
+- [x] Keep MovieHub data, backup destination and Scout source paths separate; mount Scout import source read-only.
 - [x] Connect API only to the existing NPM Docker network and Compose bridge; do not publish a NAS/LAN host port.
 - [x] Add explicit one-shot database initialization instructions; container startup never initializes or migrates a database.
 - [x] Add liveness/readiness health-check wiring and document proxy-header trust boundaries.
@@ -44,19 +44,32 @@ Current phase: Backend container packaging (pre-deployment)
 
 **Backend packaging baseline: complete. Not deployed.**
 
+## Database backup and restore
+
+- [x] Add SQLite online-backup utility for consistent backups while the API is running.
+- [x] Verify database integrity, foreign keys, required tables and schema version before accepting a backup.
+- [x] Write SHA-256 manifest and metadata; retain the newest seven backup generations by default.
+- [x] Add guarded restore requiring explicit confirmation and an operator assertion that the API is stopped.
+- [x] Create a pre-restore rollback copy and atomically replace/validate the restored database.
+- [x] Cover backup snapshot consistency, restore/rollback behavior, tamper rejection, retention and incomplete-schema rejection with tests.
+- [x] Document NAS backup-volume preparation and the backup/restore operator runbook.
+
+**Backup/restore baseline: complete. Poster cache is intentionally excluded because it is rebuildable.**
+
 ## Next work
 
 - [ ] Finalize frontend architecture and decide whether frontend is served by the API image or a separate service.
-- [ ] Add a reviewed backup/restore runbook for the MovieHub SQLite database and poster cache.
-- [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data-directory ownership.
+- [ ] Review product/API requirements against the existing MovieHub and Scout workflows before adding new feature endpoints.
+- [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
+- [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
 
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#72](https://github.com/daxiguaya/MovieHub/actions/runs/45125983309)
-- Tested commit: `6ff50988cc073a67a225a672fcc34a1bbc4060c0`
-- Result: **success** — backend compilation passed, **32 tests passed**, Compose configuration validated, and backend Docker image built successfully. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#91](https://github.com/daxiguaya/MovieHub/actions/runs/45127099982)
+- Tested commit: `a9a108e047780a2e12d9d4dcbcbb95b777e651d6`
+- Result: **success** — backend compilation passed, **37 tests passed**, Compose configuration validated, and backend Docker image built successfully. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

@@ -5,6 +5,7 @@ MovieHub reads configuration from environment variables with the `MOVIEHUB_` pre
 | Variable | Default | Purpose |
 |---|---|---|
 | `MOVIEHUB_DATA_DIR` | `/data` | MovieHub-owned database and poster-cache root |
+| `MOVIEHUB_BACKUP_DIR` | `/backups` | Dedicated backup destination inside the container |
 | `MOVIEHUB_IMPORT_DIR` | `/imports` | Directory from which Scout source databases may be imported |
 | `MOVIEHUB_API_KEY` | empty | Required to enable protected import APIs |
 | `MOVIEHUB_CORS_ORIGINS` | `[]` | Explicit JSON array of allowed cross-origin frontend origins |

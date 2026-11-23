@@ -4,6 +4,7 @@ import pytest
 
 from app.routers.movies import (
     POSTER_MAX_BYTES,
+    _all_resolved_addresses_are_public,
     _is_allowed_poster_url,
 )
 
@@ -43,3 +44,32 @@ def test_poster_allowlist_rejects_untrusted_urls(url):
 
 def test_poster_download_has_a_strict_size_limit():
     assert POSTER_MAX_BYTES == 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        ["8.8.8.8", "1.1.1.1"],
+        ["2606:4700:4700::1111"],
+    ],
+)
+def test_poster_dns_accepts_only_public_ip_addresses(addresses):
+    assert _all_resolved_addresses_are_public(addresses)
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        ["127.0.0.1"],
+        ["10.0.0.5"],
+        ["172.16.0.10"],
+        ["192.168.1.1"],
+        ["169.254.169.254"],
+        ["::1"],
+        ["fd00::1"],
+        ["8.8.8.8", "192.168.1.10"],
+        [],
+    ],
+)
+def test_poster_dns_rejects_private_or_mixed_ip_addresses(addresses):
+    assert not _all_resolved_addresses_are_public(addresses)

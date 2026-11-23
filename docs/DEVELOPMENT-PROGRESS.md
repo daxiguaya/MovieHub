@@ -77,7 +77,7 @@ Current phase: Backend feature APIs and data-source workflow; frontend implement
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 47%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, favorites API, frontend, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 47%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -88,6 +88,14 @@ Current phase: Backend feature APIs and data-source workflow; frontend implement
 - [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
 
 **Import hardening milestone: implemented; 66-test CI passed including favorites API integration.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+
+## Favorites API milestone
+
+- [x] Add protected favorites list/add/update-note/remove endpoints using internal MovieHub IDs, with idempotent writes and API-key enforcement.
+- [x] Add integration tests for authentication, duplicate writes, note updates, internal-ID enforcement and removal.
+- [x] Document that the browser must not embed the API key; the reverse proxy must inject it server-side.
+
+**Favorites API: complete. Frontend favorites UI remains outstanding.**
 
 ## Phase D — poster-fetch security hardening
 
@@ -103,9 +111,6 @@ Current phase: Backend feature APIs and data-source workflow; frontend implement
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
-- [x] Add protected favorites list/add/update-note/remove endpoints using internal MovieHub IDs, with idempotent writes and API-key enforcement.
-- [x] Add favorites API integration tests for authentication, duplicate writes, note updates, internal-ID enforcement and removal.
-- [x] Document that the browser must not embed the API key; the reverse proxy must inject it server-side.
 - [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
 - [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
 - [ ] Formalize Scout field-level merge precedence and test empty-field preservation, newer timestamps, and source-row deletion behavior.

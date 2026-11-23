@@ -100,7 +100,7 @@ Do not implement these in MovieHub first release:
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
 | Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs; 70-test CI passed | Frontend UI |
 | Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge and partial-retry tests | Large-fixture performance and operator workflow |
-| React frontend | Discovery, chart history, search/filter, internal-ID detail, favorites and configurable Xiaoya handoff implemented; separate container builds in CI | Browser E2E coverage, real-data UX validation and visual polish |
+| React frontend | Discovery, chart history, full search/filter, internal-ID detail, favorites and configurable Xiaoya handoff implemented; separate container builds in CI | Browser E2E coverage, real-data UX validation and visual polish |
 | Frontend/backend Compose topology | Separate frontend and backend services; same-origin NPM routing documented | Verify actual NPM locations and server-side favorites-key injection during authorized rollout |
 | Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |
 

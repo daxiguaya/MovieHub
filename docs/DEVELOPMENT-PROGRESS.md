@@ -218,7 +218,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 - Previous completed full validation: [#266](https://github.com/daxiguaya/MovieHub/actions/runs/45137001518) — 99 backend tests, 5 frontend UI tests, Compose validation and both container image builds passed.
 - Latest documentation validation before the benchmark harness: [#268](https://github.com/daxiguaya/MovieHub/actions/runs/45137187054) — success.
-- The opt-in 10k/100k benchmark harness is newly committed; its CI run is pending. The performance cases are intentionally skipped in ordinary CI because results depend on runner and storage hardware.
+- Benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. Ordinary CI skips the two opt-in performance cases; all standard checks passed.
 
 ## Scope and safety boundaries
 

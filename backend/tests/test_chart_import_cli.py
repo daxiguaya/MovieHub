@@ -16,7 +16,7 @@ def _write_snapshot(path):
             {
                 "slug": "cli-chart",
                 "name": "CLI Chart",
-                "source": "ignored-input-source",
+                "source": "douban",
                 "category": "test",
                 "snapshot_date": "2026-11-23",
                 "movies": [

@@ -91,7 +91,16 @@ Current phase: Frontend workflow implementation and chart acquisition
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
 - [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
 
-**Import hardening milestone: implemented and tested.** Remaining Phase B work is larger-fixture performance validation and an operator workflow. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented and tested.** Remaining Phase B work is larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+
+## Scout import operator workflow
+
+- [x] Document read-only source mount requirements and WAL-consistent staging guidance.
+- [x] Document protected incremental and forced-full API requests plus status polling.
+- [x] Document timestamp-based skip behavior, non-destructive empty-field merge policy, no source-delete propagation, batch commits and retry semantics.
+- [x] Explicitly separate Scout metadata import from chart snapshot acquisition.
+
+**Scout import runbook: complete. Large-fixture performance validation remains.**
 
 ## Favorites API milestone
 

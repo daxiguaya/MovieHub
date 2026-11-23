@@ -367,9 +367,11 @@ def validate_migration(
         validate_required_tables(conn)
         validate_movie_columns(conn)
         validate_foreign_keys(conn)
-\n    validate_orm_schema_contract(database_path)\n
+
     finally:
         conn.close()
+
+    validate_orm_schema_contract(database_path)
 
 
 def restore_backup(

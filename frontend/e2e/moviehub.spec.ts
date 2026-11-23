@@ -124,7 +124,7 @@ test("opens a chart and navigates from its ranked item to movie details", async 
   await page.getByRole("link", { name: /豆瓣电影 Top 250/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
-  await page.getByRole("link", { name: "星际穿越" }).click();
+  await page.locator("a.movie-title", { hasText: "星际穿越" }).click();
 
   await expect(page.getByRole("heading", { name: "星际穿越" })).toBeVisible();
   await expect(page.getByText("Interstellar")).toBeVisible();
@@ -138,7 +138,7 @@ test("searches by Chinese title and displays matching movie results", async ({ p
 
   await expect(page.getByRole("link", { name: "星际穿越" }).first()).toBeVisible();
   await expect(page.getByText("1 部作品")).toBeVisible();
-  await expect(page).toHaveURL(/search=.%E9%99%85%E7%A9%BF%E8%B6%8A|search=%E6%98%9F%E9%99%85%E7%A9%BF%E8%B6%8A/);
+  expect(new URL(page.url()).searchParams.get("search")).toBe("星际穿越");
 });
 
 test("adds a favorite and opens the configured Xiaoya search in a new tab", async ({ page, context }) => {

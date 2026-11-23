@@ -101,6 +101,18 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Reject duplicate chart/date pairs before opening the write transaction.
 - [x] Add regression tests for whole-batch rollback and duplicate-pair rejection.
 
+## Annual chart batch CLI and integration verification (2026-11-23)
+
+- [x] Validate all four expected annual chart files as one input batch before any database readiness check.
+- [x] Enforce the configured chart slug and display name, Douban source, annual category, 2025 period, matching capture date and correct movie/TV type.
+- [x] Enforce normalized schema, unique IDs/ranks and ascending rank order without inventing missing source ranks.
+- [x] Keep dry-run database-free; require explicit `--apply` for persistence.
+- [x] Exercise the apply path against an isolated in-memory SQLite database using the real chart import service.
+- [x] Verify successful application creates four charts/snapshots and that a late media-type conflict rolls back the complete batch while preserving the pre-existing Scout-like movie record.
+- [x] Cover command-line output, invalid dates, missing files, mixed capture dates and incorrect chart names.
+
+**Annual batch CLI integration: verified in CI #45180603281 (147 passed, 4 skipped).** No NAS database was opened and no production import was performed.
+
 ## Overall first-release progress (estimate)
 
 | Workstream | Status |

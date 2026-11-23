@@ -153,3 +153,17 @@ def test_collector_stops_on_rate_limit_without_retrying():
 def test_collector_rejects_request_delay_below_safe_minimum():
     with pytest.raises(ValueError, match="at least 2.0 seconds"):
         DoubanTop250Collector(client=FakeClient(), request_delay=0.1)
+
+
+def test_top250_collector_honors_robots_crawl_delay():
+    client = FakeClient(
+        robots_text="User-agent: *\\nAllow: /\\nCrawl-delay: 5"
+    )
+    sleeps = []
+    DoubanTop250Collector(
+        client=client,
+        sleeper=sleeps.append,
+    ).collect(date(2026, 11, 23))
+
+    assert len(sleeps) == PAGE_COUNT - 1
+    assert all(delay == 5.0 for delay in sleeps)

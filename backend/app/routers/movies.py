@@ -278,6 +278,31 @@ _ALLOWED_POSTER_CONTENT_TYPES = {
 }
 
 
+def _poster_bytes_match_content_type(content: bytes, content_type: str) -> bool:
+    """Require a matching raster-image file signature, not just a server header."""
+    if not content:
+        return False
+    if content_type == "image/jpeg":
+        return content.startswith(b"\\xff\\xd8\\xff")
+    if content_type == "image/png":
+        return content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+    if content_type == "image/gif":
+        return content.startswith((b"GIF87a", b"GIF89a"))
+    if content_type == "image/webp":
+        return (
+            len(content) >= 12
+            and content.startswith(b"RIFF")
+            and content[8:12] == b"WEBP"
+        )
+    if content_type == "image/avif":
+        return (
+            len(content) >= 12
+            and content[4:8] == b"ftyp"
+            and content[8:12] in (b"avif", b"avis")
+        )
+    return False
+
+
 def _is_allowed_poster_url(url: str) -> bool:
     """Allow only HTTPS Douban image CDN hosts, never arbitrary URLs."""
     try:
@@ -385,7 +410,10 @@ async def _download_poster_image(
                         chunks.append(chunk)
 
                     body = b"".join(chunks)
-                    return (body, content_type) if body else None
+                    if not _poster_bytes_match_content_type(body, content_type):
+                        logger.warning("Rejected poster whose file signature does not match its content type")
+                        return None
+                    return body, content_type
 
             except httpx.HTTPError:
                 logger.debug("Poster candidate unavailable")
@@ -412,6 +440,7 @@ async def get_poster(
             headers={
                 "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
                 "X-Cache": "HIT",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 
@@ -459,6 +488,7 @@ async def get_poster(
             headers={
                 "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
                 "X-Cache": "MISS",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 
@@ -468,6 +498,7 @@ async def get_poster(
         headers={
             "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
             "X-Cache": "MISS",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

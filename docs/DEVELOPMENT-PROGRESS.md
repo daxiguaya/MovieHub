@@ -170,11 +170,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Next work
 
-- [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
-- [ ] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff.
-- [x] Define a typed frontend API client and visible loading, empty and error states.
-- [x] Test Scout field-level merge precedence: empty fields preserve enriched MovieHub metadata; source-row deletion does not delete MovieHub records.
-- [x] Test partial batch failure: already committed batches remain durable and an incremental retry completes safely.
+- [ ] Select an authorized, reliable chart acquisition source and implement its isolated adapter plus conservative update scheduling; current chart data entry is normalized JSON only.
+- [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
+- [ ] Add full-stack browser end-to-end tests against a running frontend/backend stack for chart navigation, search, detail, favorites and Xiaoya handoff.
 - [ ] Run 10k/100k synthetic import throughput, memory and batch-lock measurements; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
@@ -182,7 +180,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Latest code validation
 
-- Workflow: Backend tests + Compose validation + Docker image build
+- Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
 - Run: [#217](https://github.com/daxiguaya/MovieHub/actions/runs/45132485377)
 - Tested commit: `1c296e323afac3e85f6b4b2080619c034a864c07`
 - Result: **success** — backend compilation, **73 backend tests**, **5 frontend UI tests**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.

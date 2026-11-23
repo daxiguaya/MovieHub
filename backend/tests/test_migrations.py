@@ -131,3 +131,40 @@ def test_failed_migration_restores_pre_migration_backup(tmp_path):
     backups = list(tmp_path.glob("*.pre-migration-*.bak"))
     assert len(backups) == 1
     assert backups[0].is_file()
+
+
+def test_failed_restore_removes_stale_wal_sidecars(tmp_path, monkeypatch):
+    import scripts.migrate as migrate_module
+
+    db_path = tmp_path / "wal-movies.db"
+    _create_empty_database(db_path)
+    migration = tmp_path / "valid-but-incomplete.sql"
+    migration.write_text(
+        "BEGIN IMMEDIATE; "
+        "CREATE TABLE partial_change (id INTEGER PRIMARY KEY); "
+        "COMMIT;",
+        encoding="utf-8",
+    )
+
+    def fail_validation(path, expected_version=migrate_module.MIGRATION_VERSION):
+        Path(str(path) + "-wal").write_bytes(b"stale wal")
+        Path(str(path) + "-shm").write_bytes(b"stale shm")
+        raise RuntimeError("simulated post-migration validation failure")
+
+    monkeypatch.setattr(migrate_module, "validate_migration", fail_validation)
+
+    with pytest.raises(RuntimeError, match="simulated post-migration"):
+        migrate_module.execute_migration(db_path, migration)
+
+    assert not Path(str(db_path) + "-wal").exists()
+    assert not Path(str(db_path) + "-shm").exists()
+    assert not Path(str(db_path) + "-journal").exists()
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        assert conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall() == []
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        conn.close()

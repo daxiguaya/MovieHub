@@ -73,7 +73,7 @@ def restore_from_batch_receipts(
     # interrupted their corresponding append-only JSONL writes. The receipt's
     # cumulative error delta must exactly match its stored per-record details.
     previous_errors = 0
-    for receipt, event in zip(receipts, receipt_events):
+    for index, (receipt, event) in enumerate(zip(receipts, receipt_events)):
         try:
             error_records = json.loads(receipt.error_records)
         except (TypeError, json.JSONDecodeError) as exc:

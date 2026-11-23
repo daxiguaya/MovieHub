@@ -79,12 +79,12 @@ def test_poster_dns_rejects_private_or_mixed_ip_addresses(addresses):
 @pytest.mark.parametrize(
     "content_type,content",
     [
-        ("image/jpeg", b"\\xff\\xd8\\xff\\xe0poster"),
-        ("image/png", b"\\x89PNG\\r\\n\\x1a\\nposter"),
-        ("image/gif", b"GIF89aposter"),
-        ("image/webp", b"RIFF\\x00\\x00\\x00\\x00WEBPposter"),
-        ("image/avif", b"\\x00\\x00\\x00\\x18ftypavifposter"),
-        ("image/avif", b"\\x00\\x00\\x00\\x18ftypavisposter"),
+        ("image/jpeg", bytes.fromhex("ffd8ff") + b"poster"),
+        ("image/png", bytes.fromhex("89504e470d0a1a0a") + b"poster"),
+        ("image/gif", b"GIF89a" + b"poster"),
+        ("image/webp", b"RIFF" + bytes(4) + b"WEBPposter"),
+        ("image/avif", bytes.fromhex("00000018") + b"ftypavifposter"),
+        ("image/avif", bytes.fromhex("00000018") + b"ftypavisposter"),
     ],
 )
 def test_poster_file_signature_matches_declared_content_type(content_type, content):
@@ -96,9 +96,9 @@ def test_poster_file_signature_matches_declared_content_type(content_type, conte
     [
         ("image/jpeg", b"<html>not an image</html>"),
         ("image/png", b"GIF89a"),
-        ("image/gif", b"\\x89PNG\\r\\n\\x1a\\n"),
-        ("image/webp", b"RIFF\\x00\\x00\\x00\\x00NOPE"),
-        ("image/avif", b"\\x00\\x00\\x00\\x18ftypmp42"),
+        ("image/gif", bytes.fromhex("89504e470d0a1a0a")),
+        ("image/webp", b"RIFF" + bytes(4) + b"NOPE"),
+        ("image/avif", bytes.fromhex("00000018") + b"ftypmp42"),
         ("image/svg+xml", b"<svg></svg>"),
         ("image/jpeg", b""),
     ],

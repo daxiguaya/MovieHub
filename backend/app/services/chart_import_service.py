@@ -3,6 +3,7 @@
 
 import json
 import logging
+import math
 from datetime import datetime
 from typing import Any
 
@@ -71,7 +72,7 @@ class ChartImportService:
 
     @staticmethod
     def _safe_float(value: Any) -> float | None:
-        if value is None or value == "":
+        if value is None or value == "" or isinstance(value, bool):
             return None
 
         try:
@@ -79,7 +80,7 @@ class ChartImportService:
         except (TypeError, ValueError, OverflowError):
             return None
 
-        if result < 0 or result > 10:
+        if not math.isfinite(result) or result < 0 or result > 10:
             return None
 
         return result

@@ -1,105 +1,60 @@
-
-"""MovieHub database models and SQLite connection management."""
+"""MovieHub-owned SQLite schema and connection management."""
 
 from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Float,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-    create_engine,
-    event,
-    func,
+    Boolean, Column, DateTime, Float, ForeignKey, Index, Integer,
+    String, Text, UniqueConstraint, CheckConstraint, create_engine, event,
 )
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
 from app.config import settings
 
-
 Base = declarative_base()
-
 DATABASE_NAME = "movies.db"
 
+
 def get_db_path() -> str:
-    """Return the absolute path of the MovieHub SQLite database."""
-    return str(
-        (Path(settings.data_dir).expanduser().absolute() / "db" / DATABASE_NAME)
-    )
+    """Return the configured MovieHub database path."""
+    return str(Path(settings.data_dir).expanduser().absolute() / "db" / DATABASE_NAME)
 
 
 def get_database_url() -> str:
-    """Build the writable SQLite connection URL."""
-    db_path = Path(get_db_path())
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    return f"sqlite:///{db_path.as_posix()}"
+    """Build the SQLite URL without creating directories or database files."""
+    return f"sqlite:///{Path(get_db_path()).as_posix()}"
 
 
 class Movie(Base):
-    """Movie or TV-series metadata."""
-
     __tablename__ = "movies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-
-    # Douban ID is the stable external identity.
     douban_id = Column(String(32), unique=True, nullable=True, index=True)
-
-    imdb_id = Column(String(32), nullable=True, index=True)
-    tmdb_id = Column(String(32), nullable=True, index=True)
-
+    imdb_id = Column(String(32), unique=True, nullable=True, index=True)
+    tmdb_id = Column(String(32), unique=True, nullable=True, index=True)
     title = Column(String(256), nullable=False, index=True)
     original_title = Column(String(256), nullable=True, index=True)
-
     year = Column(Integer, nullable=True, index=True)
     rating = Column(Float, nullable=True, index=True)
     rating_count = Column(Integer, nullable=False, default=0, index=True)
-
     type = Column(String(16), nullable=False, default="movie", index=True)
-
     directors = Column(Text, nullable=False, default="[]")
     actors = Column(Text, nullable=False, default="[]")
     overview = Column(Text, nullable=True)
     douban_url = Column(String(512), nullable=True)
-
     updated_at = Column(Integer, nullable=True)
 
-    genres = relationship(
-        "MovieGenre",
-        back_populates="movie",
-        cascade="all, delete-orphan",
-    )
-    regions = relationship(
-        "MovieRegion",
-        back_populates="movie",
-        cascade="all, delete-orphan",
-    )
-    posters = relationship(
-        "MoviePoster",
-        back_populates="movie",
-        cascade="all, delete-orphan",
-    )
-    # SQL migration uses ON DELETE RESTRICT for chart history and favorites.
-    # Do not let ORM cascades silently bypass that protection.
-    chart_items = relationship(
-        "ChartItem",
-        back_populates="movie",
-    )
-    favorite = relationship(
-        "Favorite",
-        back_populates="movie",
-        uselist=False,
-    )
+    genres = relationship("MovieGenre", back_populates="movie", cascade="all, delete-orphan")
+    regions = relationship("MovieRegion", back_populates="movie", cascade="all, delete-orphan")
+    posters = relationship("MoviePoster", back_populates="movie", cascade="all, delete-orphan")
+    chart_items = relationship("ChartItem", back_populates="movie")
+    favorite = relationship("Favorite", back_populates="movie", uselist=False)
 
     __table_args__ = (
+        CheckConstraint("rating IS NULL OR (rating >= 0 AND rating <= 10)", name="ck_movies_rating"),
+        CheckConstraint("rating_count >= 0", name="ck_movies_rating_count"),
+        CheckConstraint("type IN ('movie', 'tv')", name="ck_movies_type"),
         Index("ix_movies_rating_id", "rating", "id"),
         Index("ix_movies_year_id", "year", "id"),
         Index("ix_movies_rating_count_id", "rating_count", "id"),
@@ -107,241 +62,128 @@ class Movie(Base):
 
 
 class Genre(Base):
-    """Normalized movie genre."""
-
     __tablename__ = "genres"
-
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(32), unique=True, nullable=False, index=True)
-
-    movie_associations = relationship(
-        "MovieGenre",
-        back_populates="genre_obj",
-    )
+    movie_associations = relationship("MovieGenre", back_populates="genre_obj")
 
 
 class MovieGenre(Base):
-    """Movie-to-genre association."""
-
     __tablename__ = "movie_genres"
-
-    movie_id = Column(
-        Integer,
-        ForeignKey("movies.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    genre_id = Column(
-        Integer,
-        ForeignKey("genres.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    genre_id = Column(Integer, ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True)
     movie = relationship("Movie", back_populates="genres")
     genre_obj = relationship("Genre", back_populates="movie_associations")
 
 
 class Region(Base):
-    """Normalized production region."""
-
     __tablename__ = "regions"
-
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(32), unique=True, nullable=False, index=True)
-
-    movie_associations = relationship(
-        "MovieRegion",
-        back_populates="region_obj",
-    )
+    movie_associations = relationship("MovieRegion", back_populates="region_obj")
 
 
 class MovieRegion(Base):
-    """Movie-to-region association."""
-
     __tablename__ = "movie_regions"
-
-    movie_id = Column(
-        Integer,
-        ForeignKey("movies.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    region_id = Column(
-        Integer,
-        ForeignKey("regions.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    region_id = Column(Integer, ForeignKey("regions.id", ondelete="CASCADE"), primary_key=True)
     movie = relationship("Movie", back_populates="regions")
     region_obj = relationship("Region", back_populates="movie_associations")
 
 
 class MoviePoster(Base):
-    """Poster URLs associated with a movie."""
-
     __tablename__ = "movie_posters"
-
-    movie_id = Column(
-        Integer,
-        ForeignKey("movies.id", ondelete="CASCADE"),
-        primary_key=True,
-    )
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
     url = Column(String(512), primary_key=True)
-
     movie = relationship("Movie", back_populates="posters")
 
 
 class Chart(Base):
-    """A named chart/list from an external source."""
-
     __tablename__ = "lists"
-
     list_id = Column(Integer, primary_key=True, autoincrement=True)
-
     slug = Column(String(96), unique=True, nullable=False, index=True)
     name = Column(String(160), nullable=False)
-
     source = Column(String(32), nullable=False, index=True)
     category = Column(String(32), nullable=False, index=True)
     period = Column(String(32), nullable=True)
-
     description = Column(Text, nullable=True)
-
     enabled = Column(Boolean, nullable=False, default=True)
     display_order = Column(Integer, nullable=False, default=0)
-
     last_updated = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    snapshots = relationship("ChartSnapshot", back_populates="chart", cascade="all, delete-orphan")
 
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-    )
-    updated_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
 
-    items = relationship(
-        "ChartItem",
-        back_populates="chart",
-        cascade="all, delete-orphan",
+class ChartSnapshot(Base):
+    __tablename__ = "chart_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    list_id = Column(Integer, ForeignKey("lists.list_id", ondelete="CASCADE"), nullable=False)
+    snapshot_date = Column(String(10), nullable=False)
+    imported_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    item_count = Column(Integer, nullable=False, default=0)
+    chart = relationship("Chart", back_populates="snapshots")
+    items = relationship("ChartItem", back_populates="snapshot", cascade="all, delete-orphan")
+    __table_args__ = (
+        UniqueConstraint("list_id", "snapshot_date", name="uq_chart_snapshots_list_date"),
+        CheckConstraint("item_count >= 0", name="ck_chart_snapshots_item_count"),
+        Index("ix_chart_snapshots_list_id", "list_id"),
+        Index("ix_chart_snapshots_snapshot_date", "snapshot_date"),
     )
 
 
 class ChartItem(Base):
-    """A movie's position in a dated chart snapshot."""
-
     __tablename__ = "list_items"
-
-    list_id = Column(
-        Integer,
-        ForeignKey("lists.list_id", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    snapshot_date = Column(String(10), primary_key=True)
-    douban_id = Column(
-        String(32),
-        ForeignKey("movies.douban_id", ondelete="RESTRICT"),
-        primary_key=True,
-    )
-
+    snapshot_id = Column(Integer, ForeignKey("chart_snapshots.id", ondelete="CASCADE"), primary_key=True)
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="RESTRICT"), primary_key=True)
     rank = Column(Integer, nullable=False)
     source_rating = Column(Float, nullable=True)
-
-    chart = relationship("Chart", back_populates="items")
+    snapshot = relationship("ChartSnapshot", back_populates="items")
     movie = relationship("Movie", back_populates="chart_items")
-
     __table_args__ = (
-        UniqueConstraint(
-            "list_id",
-            "snapshot_date",
-            "rank",
-            name="uq_list_snapshot_rank",
-        ),
-        Index(
-            "ix_list_items_snapshot_rank",
-            "list_id",
-            "snapshot_date",
-            "rank",
-        ),
+        UniqueConstraint("snapshot_id", "rank", name="uq_list_items_snapshot_rank"),
+        CheckConstraint("rank >= 1", name="ck_list_items_rank"),
+        CheckConstraint("source_rating IS NULL OR (source_rating >= 0 AND source_rating <= 10)", name="ck_list_items_source_rating"),
+        Index("ix_list_items_snapshot_rank", "snapshot_id", "rank"),
+        Index("ix_list_items_movie_id", "movie_id"),
     )
 
 
 class Favorite(Base):
-    """User's locally stored movie favorites."""
-
     __tablename__ = "favorites"
-
-    douban_id = Column(
-        String(32),
-        ForeignKey("movies.douban_id", ondelete="RESTRICT"),
-        primary_key=True,
-    )
-
-    created_at = Column(
-        DateTime,
-        nullable=False,
-        default=datetime.utcnow,
-    )
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="RESTRICT"), primary_key=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     note = Column(Text, nullable=False, default="")
-
     movie = relationship("Movie", back_populates="favorite")
 
 
-# ---------------------------------------------------------------------------
-# SQLite engine
-# ---------------------------------------------------------------------------
-
 DATABASE_URL = get_database_url()
-
 engine = create_engine(
     DATABASE_URL,
-    connect_args={
-        "check_same_thread": False,
-        "timeout": 30,
-    },
+    connect_args={"check_same_thread": False, "timeout": 30},
     pool_pre_ping=True,
 )
 
 
 @event.listens_for(engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record) -> None:
-    """Configure SQLite connection behavior."""
     cursor = dbapi_connection.cursor()
-
     cursor.execute("PRAGMA foreign_keys = ON")
     cursor.execute("PRAGMA busy_timeout = 30000")
     cursor.execute("PRAGMA synchronous = NORMAL")
-
-    # Keep the per-connection SQLite page cache modest.
     cursor.execute("PRAGMA cache_size = -20000")
-
-    # Avoid excessive memory mapping on a small NAS.
     cursor.execute("PRAGMA mmap_size = 268435456")
-
     cursor.close()
 
 
-# Set WAL once when the engine is initialized.
-# WAL allows readers to continue while a writer commits a transaction.
-with engine.connect() as _connection:
-    _connection.exec_driver_sql("PRAGMA journal_mode = WAL")
-
-
 SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    expire_on_commit=False,
+    autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
 )
 
 
 def get_db() -> Generator[Session, None, None]:
-    """FastAPI database session dependency."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-

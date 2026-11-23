@@ -227,3 +227,35 @@ def test_audit_reports_duplicate_scout_ids_as_ambiguous(tmp_path):
     assert chart["scout_ambiguous"] == 1
     assert chart["ambiguous_douban_ids"] == ["1234567"]
     assert report["summary"]["scout_ambiguous"] == 1
+
+
+
+def test_audit_rejects_duplicate_chart_date_inputs_before_opening_scout(tmp_path):
+    snapshot = tmp_path / "annual.json"
+    snapshot.write_text(
+        json.dumps(
+            {
+                "slug": "annual-2025-chinese-movies",
+                "name": "2025 评分最高华语电影",
+                "source": "douban",
+                "category": "annual",
+                "period": "2025",
+                "snapshot_date": "2026-11-23",
+                "movies": [
+                    {
+                        "douban_id": "1234567",
+                        "rank": 1,
+                        "title": "Movie",
+                        "type": "movie",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    import pytest
+
+    with pytest.raises(ValueError, match="Duplicate chart/date"):
+        audit_chart_snapshots([snapshot, snapshot], tmp_path / "missing-scout.sqlite")

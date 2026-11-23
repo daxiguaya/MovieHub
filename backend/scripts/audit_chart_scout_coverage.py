@@ -37,6 +37,13 @@ def audit_chart_snapshots(
         LocalImportAdapter().load_snapshot(path)
         for path in snapshot_paths
     ]
+    chart_date_pairs = [
+        (snapshot.slug, snapshot.snapshot_date)
+        for snapshot in snapshots
+    ]
+    if len(chart_date_pairs) != len(set(chart_date_pairs)):
+        raise ValueError("Duplicate chart/date snapshot supplied to Scout coverage audit")
+
     source_path = Path(scout_db_path).expanduser().resolve()
     if not source_path.is_file():
         raise FileNotFoundError(f"Scout database not found: {source_path}")
@@ -91,6 +98,7 @@ def audit_chart_snapshots(
             "posters",
         )
         reports = []
+        total_field_counts = {name: 0 for name in field_names}
         for snapshot in snapshots:
             matched = [
                 (item, unique_rows[item.douban_id])
@@ -127,6 +135,9 @@ def audit_chart_snapshots(
                 for name in field_names:
                     if _present(values.get(name)):
                         field_counts[name] += 1
+
+            for name in field_names:
+                total_field_counts[name] += field_counts[name]
 
             missing_ids = [
                 item.douban_id

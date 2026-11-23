@@ -21,6 +21,7 @@ See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checkli
 - [Product scope and architecture](docs/PRODUCT-SCOPE.md)
 - [Chart snapshot import](docs/CHART-IMPORT.md)
 - [Chart source policy](docs/CHART-SOURCES.md)
+- [Scout import runbook](docs/SCOUT-IMPORT.md)
 
 ## Safety model
 

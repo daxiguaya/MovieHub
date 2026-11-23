@@ -215,12 +215,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
 - [ ] Implement an annual chart collector only if a stable public source and permitted acquisition path can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
-- [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
+- [x] Add opt-in 10k/100k SQLite LIKE-search benchmarks covering sparse Chinese-title matches, original-title matches, no-match scans and multi-term searches; report count/page latency and SQLite query plans without hardware-specific pass thresholds.
+- [x] Add a manually triggered GitHub Actions performance job that runs both the existing 10k/100k Scout import benchmarks and the new search benchmarks on isolated temporary SQLite databases.
+- [ ] Execute the manual performance workflow and record 10k/100k search/import timings; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [x] Add browser end-to-end tests for chart navigation, search, detail, favorites and Xiaoya handoff using Playwright Chromium and isolated API fixtures.
 - [x] Add a live browser integration test against a running FastAPI backend and a temporary initialized/seeded SQLite database.
 - [ ] Verify the complete deployment path through the user's NPM reverse proxy after deployment is separately authorized.
 - [x] Add reproducible opt-in 10k/100k synthetic import throughput benchmarks against temporary SQLite databases.
-- [ ] Execute 10k/100k throughput and memory measurements in a controlled environment; repeat on the target NAS only during an authorized pre-deployment test.
+- [ ] Execute the manual 10k/100k search and Scout import benchmark workflow and record timings/query plans; repeat on the target NAS only during an authorized pre-deployment test.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.
@@ -234,7 +236,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - CI #291 validates the four separate 2025 annual chart definitions; CI #305 additionally validates category/period/media-type preflight, including rejecting TV/movie mismatches before database access, and confirms the popular collector supplies its required realtime period. No unverified 2026 placeholder is exposed.
 - All browser tests run on Ubuntu 24.04; no NAS services, live Scout database or production data are used.
 - CI #305 backend validation includes the new built-in chart preflight tests; all three CI jobs (backend, frontend and frontend-e2e) completed successfully.
-- Benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. The two performance cases remain opt-in and require a controlled execution to produce throughput measurements.
+- Scout import benchmark harness commit: [\`ecd9f9f\`](https://github.com/daxiguaya/MovieHub/commit/ecd9f9fe2ad662472a9dc7357f98e86bc80d1ad0); CI [#269](https://github.com/daxiguaya/MovieHub/actions/runs/45139124417) — **success**. Added the complementary SQLite LIKE-search benchmark and a manual `workflow_dispatch` job to execute both suites together. Ordinary push CI intentionally skips the hardware-sensitive benchmarks; actual 10k/100k measurements are still pending.
 
 ## Scope and safety boundaries
 

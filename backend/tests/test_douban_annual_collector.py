@@ -156,3 +156,61 @@ def test_parser_rejects_duplicate_ids_and_out_of_range_ranks():
     invalid_rank = ARTICLE.replace("<td>1、</td>", "<td>11、</td>", 1)
     with pytest.raises(DoubanCollectionError, match="Unexpected annual rank"):
         parse_annual_article(invalid_rank, date(2026, 11, 23))
+
+
+def test_annual_snapshot_files_are_published_as_a_complete_set(tmp_path, monkeypatch):
+    from datetime import date
+    import scripts.collect_douban_annual as command
+
+    capture_date = date(2026, 11, 23)
+    snapshots = parse_annual_article(ARTICLE, capture_date)
+    output_dir = tmp_path / "annual"
+    real_replace = command.os.replace
+    calls = {"count": 0}
+
+    def fail_second_publish(source, target):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("simulated disk publication failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(command.os, "replace", fail_second_publish)
+
+    with pytest.raises(OSError, match="simulated disk publication failure"):
+        command.write_snapshots(snapshots, output_dir, capture_date)
+
+    assert list(output_dir.glob("annual-*.json")) == []
+    assert list(output_dir.glob(".moviehub-annual-*")) == []
+
+
+def test_annual_snapshot_overwrite_failure_restores_previous_files(tmp_path, monkeypatch):
+    from datetime import date
+    import scripts.collect_douban_annual as command
+
+    capture_date = date(2026, 11, 23)
+    snapshots = parse_annual_article(ARTICLE, capture_date)
+    output_dir = tmp_path / "annual"
+    output_dir.mkdir()
+    targets = {
+        slug: output_dir / f"{slug}-{capture_date.isoformat()}.json"
+        for slug in ANNUAL_CHARTS
+    }
+    for path in targets.values():
+        path.write_text("old-content", encoding="utf-8")
+
+    real_replace = command.os.replace
+    calls = {"count": 0}
+
+    def fail_second_publish(source, target):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("simulated overwrite failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(command.os, "replace", fail_second_publish)
+
+    with pytest.raises(OSError, match="simulated overwrite failure"):
+        command.write_snapshots(snapshots, output_dir, capture_date, overwrite=True)
+
+    assert all(path.read_text(encoding="utf-8") == "old-content" for path in targets.values())
+    assert list(output_dir.glob(".moviehub-annual-*")) == []

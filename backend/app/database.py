@@ -16,6 +16,10 @@ Base = declarative_base()
 DATABASE_NAME = "movies.db"
 
 
+class DatabaseNotInitializedError(RuntimeError):
+    """Raised when API access is attempted before explicit DB initialization."""
+
+
 def get_db_path() -> str:
     """Return the configured MovieHub database path."""
     return str(Path(settings.data_dir).expanduser().absolute() / "db" / DATABASE_NAME)
@@ -182,6 +186,14 @@ SessionLocal = sessionmaker(
 
 
 def get_db() -> Generator[Session, None, None]:
+    """Yield a session only after explicit database initialization."""
+    db_path = Path(get_db_path())
+    if not db_path.is_file():
+        raise DatabaseNotInitializedError(
+            "MovieHub database is not initialized. "
+            "Run 'python -m scripts.init_db' before using the API."
+        )
+
     db = SessionLocal()
     try:
         yield db

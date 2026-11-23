@@ -28,15 +28,14 @@ CREATE TABLE movies (
     overview TEXT,
     douban_url VARCHAR(512),
     updated_at INTEGER,
-    CONSTRAINT uq_movies_douban_id UNIQUE (douban_id),
-    CONSTRAINT uq_movies_imdb_id UNIQUE (imdb_id),
-    CONSTRAINT uq_movies_tmdb_id UNIQUE (tmdb_id),
-    CONSTRAINT ck_movies_rating CHECK (rating IS NULL OR (rating >= 0 AND rating <= 10))
+    CONSTRAINT ck_movies_rating CHECK (rating IS NULL OR (rating >= 0 AND rating <= 10)),
+    CONSTRAINT ck_movies_rating_count CHECK (rating_count >= 0),
+    CONSTRAINT ck_movies_type CHECK (type IN ('movie', 'tv'))
 );
 
-CREATE INDEX ix_movies_douban_id ON movies(douban_id);
-CREATE INDEX ix_movies_imdb_id ON movies(imdb_id);
-CREATE INDEX ix_movies_tmdb_id ON movies(tmdb_id);
+CREATE UNIQUE INDEX ix_movies_douban_id ON movies(douban_id);
+CREATE UNIQUE INDEX ix_movies_imdb_id ON movies(imdb_id);
+CREATE UNIQUE INDEX ix_movies_tmdb_id ON movies(tmdb_id);
 CREATE INDEX ix_movies_title ON movies(title);
 CREATE INDEX ix_movies_original_title ON movies(original_title);
 CREATE INDEX ix_movies_year ON movies(year);
@@ -49,15 +48,15 @@ CREATE INDEX ix_movies_rating_count_id ON movies(rating_count, id);
 
 CREATE TABLE genres (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(32) NOT NULL UNIQUE
+    name VARCHAR(32) NOT NULL
 );
-CREATE INDEX ix_genres_name ON genres(name);
+CREATE UNIQUE INDEX ix_genres_name ON genres(name);
 
 CREATE TABLE regions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(32) NOT NULL UNIQUE
+    name VARCHAR(32) NOT NULL
 );
-CREATE INDEX ix_regions_name ON regions(name);
+CREATE UNIQUE INDEX ix_regions_name ON regions(name);
 
 CREATE TABLE movie_genres (
     movie_id INTEGER NOT NULL,
@@ -84,7 +83,7 @@ CREATE TABLE movie_posters (
 
 CREATE TABLE lists (
     list_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug VARCHAR(96) NOT NULL UNIQUE,
+    slug VARCHAR(96) NOT NULL,
     name VARCHAR(160) NOT NULL,
     source VARCHAR(32) NOT NULL,
     category VARCHAR(32) NOT NULL,
@@ -96,7 +95,7 @@ CREATE TABLE lists (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
 );
-CREATE INDEX ix_lists_slug ON lists(slug);
+CREATE UNIQUE INDEX ix_lists_slug ON lists(slug);
 CREATE INDEX ix_lists_source ON lists(source);
 CREATE INDEX ix_lists_category ON lists(category);
 

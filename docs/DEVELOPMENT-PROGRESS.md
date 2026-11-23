@@ -163,16 +163,17 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 - [x] Review Cinéphile's chart taxonomy and scheduled-refresh concept without copying code or datasets.
 - [x] Add a one-shot Douban Top 250 collector that checks robots.txt, waits at least two seconds between pages, disables redirects, uses no cookies/proxies/retries, and stops on 403/429.
+- [x] Add one-shot popular and high-rated collectors using the site's undocumented JSON endpoint, with bounded result counts, robots checks, two-second pacing, no cookies/proxies/retries and strict URL validation.
 - [x] Review Douban iDatabase's multi-source metadata and ID-translation concepts without copying unlicensed code.
 - [x] Record that Scout is a read-only metadata source, not a chart collector.
 - [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
 - [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
 
-**Source review: complete. Top 250 one-shot collection is implemented. Other chart types and scheduled refresh remain pending an authorized, reliable source path.**
+**Source review: complete. Top 250, popular and high-rated one-shot collection is implemented. Annual charts and scheduled refresh remain pending an authorized, reliable source path.**
 
 ## Next work
 
-- [ ] Implement conservative collectors for popular, high-rated and annual charts; the Top 250 collector is one-shot and manual only.
+- [ ] Implement an annual chart collector if a stable public source can be validated; Top 250, popular and high-rated collectors are one-shot/manual only.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
 - [ ] Benchmark title/original-title LIKE search against realistic catalogue sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [ ] Add full-stack browser end-to-end tests against a running frontend/backend stack for chart navigation, search, detail, favorites and Xiaoya handoff.

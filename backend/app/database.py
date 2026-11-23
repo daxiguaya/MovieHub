@@ -15,7 +15,7 @@ from app.config import settings
 
 Base = declarative_base()
 DATABASE_NAME = "movies.db"
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 REQUIRED_DATABASE_TABLES = {
     "schema_migrations",
     "movies",
@@ -28,6 +28,7 @@ REQUIRED_DATABASE_TABLES = {
     "chart_snapshots",
     "list_items",
     "favorites",
+    "import_batch_receipts",
 }
 
 
@@ -206,6 +207,36 @@ class Favorite(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     note = Column(Text, nullable=False, default="")
     movie = relationship("Movie", back_populates="favorite")
+
+
+class ImportBatchReceipt(Base):
+    """Transactional proof that one Scout import batch committed."""
+
+    __tablename__ = "import_batch_receipts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(64), nullable=False)
+    batch_number = Column(Integer, nullable=False)
+    source_fingerprint = Column(String(64), nullable=False)
+    processed = Column(Integer, nullable=False)
+    total = Column(Integer, nullable=False)
+    imported = Column(Integer, nullable=False)
+    skipped = Column(Integer, nullable=False)
+    errors = Column(Integer, nullable=False)
+    last_douban_id = Column(String(32), nullable=False)
+    error_records = Column(Text, nullable=False, default="[]")
+    committed_at = Column(String(32), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", "batch_number", name="uq_import_batch_receipts_run_batch"),
+        CheckConstraint("batch_number >= 1", name="ck_import_batch_receipts_batch"),
+        CheckConstraint("processed >= 1 AND processed <= total", name="ck_import_batch_receipts_processed"),
+        CheckConstraint("total >= 1", name="ck_import_batch_receipts_total"),
+        CheckConstraint("imported >= 0 AND skipped >= 0 AND errors >= 0", name="ck_import_batch_receipts_counters"),
+        CheckConstraint("processed = imported + skipped", name="ck_import_batch_receipts_accounting"),
+        CheckConstraint("errors <= skipped", name="ck_import_batch_receipts_errors"),
+        Index("ix_import_batch_receipts_run_id", "run_id", "batch_number"),
+    )
 
 
 DATABASE_URL = get_database_url()

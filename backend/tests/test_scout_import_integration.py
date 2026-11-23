@@ -465,8 +465,16 @@ def test_scout_import_uses_one_consistent_source_snapshot(
     original_validate = import_service_module.ImportService._validate_source
     inserted = {"value": False}
 
-    def validate_then_write(source_conn, reject_duplicate_ids=False):
-        original_validate(source_conn, reject_duplicate_ids)
+    def validate_then_write(
+        source_conn,
+        reject_duplicate_ids=False,
+        reject_invalid_identity=False,
+    ):
+        original_validate(
+            source_conn,
+            reject_duplicate_ids,
+            reject_invalid_identity,
+        )
         if not inserted["value"]:
             with sqlite3.connect(source_path, timeout=5) as writer:
                 writer.execute(

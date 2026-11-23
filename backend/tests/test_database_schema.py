@@ -17,12 +17,7 @@ EXPECTED_TABLES = set(Base.metadata.tables) | {"schema_migrations"}
 
 
 def _migrated_database(path: Path) -> None:
-    conn = sqlite3.connect(str(path))
-    try:
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.executescript(MIGRATION.read_text(encoding="utf-8"))
-    finally:
-        conn.close()
+    initialize(path, MIGRATION)
 
 
 def test_initial_migration_builds_independent_schema(tmp_path):
@@ -45,7 +40,7 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         with engine.connect() as conn:
             assert conn.exec_driver_sql(
                 "SELECT MAX(version) FROM schema_migrations"
-            ).scalar_one() == 1
+            ).scalar_one() == 2
     finally:
         engine.dispose()
 

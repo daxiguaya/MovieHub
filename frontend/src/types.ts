@@ -69,3 +69,24 @@ export interface Favorite {
 export interface PublicConfig {
   xiaoyaSearchBaseUrl: string;
 }
+
+export interface ChartRankChange {
+  movie_id: number;
+  douban_id: string | null;
+  title: string;
+  year: number | null;
+  type: "movie" | "tv";
+  before_rank: number | null;
+  after_rank: number | null;
+  rank_change: number | null;
+  status: "new" | "removed" | "moved" | "unchanged";
+}
+
+export interface ChartCompareResponse {
+  chart: Chart;
+  from_date: string;
+  to_date: string;
+  total_before: number;
+  total_after: number;
+  items: ChartRankChange[];
+}

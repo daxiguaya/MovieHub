@@ -90,7 +90,7 @@ def test_parser_rejects_untrusted_subject_hosts_and_missing_chart_sections():
         "https://movie.douban.com/subject/36809864/",
         "https://evil.example/subject/36809864/",
     )
-    with pytest.raises(DoubanCollectionError, match="without a valid Douban subject link"):
+    with pytest.raises(DoubanCollectionError, match="has no valid Douban subject link"):
         parse_annual_article(unsafe, date(2026, 11, 23))
 
     with pytest.raises(DoubanCollectionError, match="did not yield entries"):

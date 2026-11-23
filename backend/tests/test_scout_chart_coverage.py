@@ -88,6 +88,7 @@ def test_audit_reports_match_missing_and_field_coverage_without_writes(tmp_path)
         "chart_count": 1,
         "chart_items": 2,
         "scout_matches": 1,
+        "scout_type_valid_matches": 1,
         "scout_missing": 1,
         "scout_ambiguous": 0,
         "type_mismatches": 0,
@@ -130,7 +131,12 @@ def test_audit_reports_media_type_mismatch(tmp_path):
 
     report = audit_chart_snapshots([snapshot], scout)
     assert report["summary"]["type_mismatches"] == 1
-    assert report["charts"][0]["type_mismatches"][0]["scout_type"] == "movie"
+    chart = report["charts"][0]
+    assert chart["type_mismatches"][0]["scout_type"] == "movie"
+    assert chart["scout_matches"] == 1
+    assert chart["scout_type_valid_matches"] == 0
+    assert chart["field_coverage"]["year"]["matched_total"] == 0
+    assert chart["field_coverage"]["year"]["present"] == 0
 
 
 
@@ -172,6 +178,9 @@ def test_audit_flags_unexpected_scout_media_type_instead_of_missing(tmp_path):
     assert chart["scout_missing"] == 0
     assert chart["type_mismatch_count"] == 1
     assert chart["type_mismatches"][0]["scout_type"] == "book"
+    assert chart["scout_type_valid_matches"] == 0
+    assert chart["field_coverage"]["year"]["matched_total"] == 0
+    assert chart["field_coverage"]["year"]["present"] == 0
 
 
 def test_audit_reports_duplicate_scout_ids_as_ambiguous(tmp_path):

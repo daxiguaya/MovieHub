@@ -14,7 +14,7 @@ Run from the backend directory:
 
 Optional:
     python -m scripts.migrate --db /path/to/movies.db
-    python -m scripts.migrate --migration /path/to/001_moviehub_core.sql
+    python -m scripts.migrate --migration /path/to/002_durable_import_batch_receipts.sql
     python -m scripts.migrate --check-only
 """
 

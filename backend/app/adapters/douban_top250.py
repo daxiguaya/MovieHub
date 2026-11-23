@@ -123,9 +123,13 @@ class _Top250PageParser(HTMLParser):
         assert self.current is not None
         titles = self.current.get("titles", [])
         if isinstance(titles, list):
-            self.current["title"] = titles[0].strip() if titles else ""
+            title_values = [
+                str(self.current.get(f"title_{index}", "")).strip()
+                for index in range(len(titles))
+            ]
+            self.current["title"] = title_values[0] if title_values else ""
             self.current["original_title"] = (
-                titles[1].strip() if len(titles) > 1 else ""
+                title_values[1] if len(title_values) > 1 else ""
             )
         self.items.append(self.current)
         self.current = None

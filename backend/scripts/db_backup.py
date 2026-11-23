@@ -167,7 +167,7 @@ def restore_backup(
     *,
     confirm: bool = False,
     service_stopped: bool = False,
-) -> Path:
+) -> Path | None:
     if not confirm or not service_stopped:
         raise RuntimeError(
             "Restore requires both --confirm and --service-stopped. "
@@ -209,6 +209,8 @@ def restore_backup(
     os.close(fd)
     temporary_path = Path(temporary_name)
 
+    had_existing_database = target_path.exists()
+
     try:
         shutil.copyfile(backup_file, temporary_path)
         _validate_database(temporary_path)
@@ -240,7 +242,7 @@ def restore_backup(
             backup_root,
             rollback_path if rollback_path.exists() else "not applicable",
         )
-        return rollback_path
+        return rollback_path if had_existing_database else None
     except Exception:
         temporary_path.unlink(missing_ok=True)
         raise

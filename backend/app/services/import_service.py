@@ -3,6 +3,7 @@
 
 import json
 import logging
+import math
 from itertools import islice
 import re
 import sqlite3
@@ -535,12 +536,27 @@ class ImportService:
 
     @staticmethod
     def _safe_int(value: Any, default: int | None = None) -> int | None:
+        # bool subclasses int; fractional floats must not be truncated.
+        if value is None or value == "" or isinstance(value, bool):
+            return default
+        if isinstance(value, float) and not value.is_integer():
+            return default
         try:
-            if value is None or value == "":
-                return default
             return int(value)
         except (TypeError, ValueError, OverflowError):
             return default
+
+    @staticmethod
+    def _safe_rating(value: Any) -> float | None:
+        if value is None or value == "" or isinstance(value, bool):
+            return None
+        try:
+            rating = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(rating) or not 0 <= rating <= 10:
+            return None
+        return rating
 
     @staticmethod
     def _safe_string(value: Any) -> str | None:
@@ -630,16 +646,13 @@ class ImportService:
         movie.type = row["type"]
 
         year = self._safe_int(row["year"])
-        rating = row["rating"]
+        rating = self._safe_rating(row["rating"])
 
-        if year is not None:
+        if year is not None and 1870 <= year <= 2200:
             movie.year = year
 
         if rating is not None:
-            try:
-                movie.rating = float(rating)
-            except (TypeError, ValueError):
-                pass
+            movie.rating = rating
 
         imdb_id = self._safe_string(row["imdb_id"])
         if imdb_id:

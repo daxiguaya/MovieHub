@@ -75,6 +75,12 @@ def _sqlite_online_copy(source_path: Path, destination_path: Path) -> None:
     try:
         source.backup(destination)
         destination.commit()
+        # Publish a self-contained SQLite file without WAL sidecars.
+        journal_mode = destination.execute(
+            "PRAGMA journal_mode=DELETE"
+        ).fetchone()
+        if not journal_mode or journal_mode[0].lower() != "delete":
+            raise RuntimeError("Could not finalize standalone backup database")
     finally:
         destination.close()
         source.close()
@@ -126,6 +132,8 @@ def create_backup(
     source_path = Path(database_path or get_db_path()).expanduser().resolve()
     root = Path(destination_root).expanduser().resolve()
 
+    if keep_last < 1:
+        raise ValueError("keep_last must be at least 1")
     _validate_database(source_path)
     root.mkdir(parents=True, exist_ok=True)
 
@@ -235,6 +243,8 @@ def restore_backup(
         except Exception:
             if rollback_path.exists():
                 os.replace(rollback_path, target_path)
+            else:
+                target_path.unlink(missing_ok=True)
             raise
 
         logger.warning(

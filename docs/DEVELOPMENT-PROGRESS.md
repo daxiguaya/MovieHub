@@ -81,7 +81,7 @@ Current phase: Frontend workflow implementation and chart acquisition
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 54%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 56%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -130,6 +130,16 @@ Current phase: Frontend workflow implementation and chart acquisition
 - [x] Document snapshot format, date-scoped replacement, metadata precedence and explicit non-automation boundary.
 
 **Snapshot import workflow: implemented and tested. This is a manual normalized-data import path, not an automated Douban collector.**
+
+## Phase C — historical rank comparison
+
+- [x] Add an API to compare two existing dated snapshots of the same chart.
+- [x] Match entries using MovieHub internal movie IDs, not Douban IDs.
+- [x] Report before/after rank, rank delta, new entries, removed entries, moved entries and unchanged entries.
+- [x] Validate same-date and missing-snapshot requests.
+- [x] Add comparison controls and rank movement display to the chart detail page.
+
+**Historical rank comparison: implemented; backend and frontend CI validation in progress.**
 
 ## Phase E — React frontend baseline
 

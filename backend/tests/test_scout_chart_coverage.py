@@ -276,3 +276,49 @@ def test_audit_rejects_duplicate_chart_date_inputs_before_opening_scout(tmp_path
 
     with pytest.raises(ValueError, match="Duplicate chart/date"):
         audit_chart_snapshots([snapshot, snapshot], tmp_path / "missing-scout.sqlite")
+
+
+
+def test_audit_aggregates_field_coverage_across_distinct_charts(tmp_path):
+    scout = tmp_path / "scout.sqlite"
+    _create_scout(scout)
+    snapshots = []
+    for slug, name in (
+        ("annual-2025-chinese-movies", "2025 评分最高华语电影"),
+        ("annual-2025-international-movies", "2025 评分最高外语电影"),
+    ):
+        path = tmp_path / f"{slug}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "slug": slug,
+                    "name": name,
+                    "source": "douban",
+                    "category": "annual",
+                    "period": "2025",
+                    "snapshot_date": "2026-11-23",
+                    "movies": [
+                        {
+                            "douban_id": "1234567",
+                            "rank": 1,
+                            "title": "Shared chart entry",
+                            "type": "movie",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        snapshots.append(path)
+
+    report = audit_chart_snapshots(snapshots, scout)
+
+    assert report["summary"]["chart_count"] == 2
+    assert report["summary"]["chart_items"] == 2
+    assert report["summary"]["scout_type_valid_matches"] == 2
+    assert report["summary"]["field_coverage"]["year"] == {
+        "present": 2,
+        "matched_total": 2,
+        "percent": 100.0,
+    }

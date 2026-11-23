@@ -50,11 +50,11 @@ def compare_chart_snapshots(
     slug: str,
     from_date: Annotated[
         str,
-        Query(pattern=r"^\\d{4}-\\d{2}-\\d{2}$"),
+        Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
     ],
     to_date: Annotated[
         str,
-        Query(pattern=r"^\\d{4}-\\d{2}-\\d{2}$"),
+        Query(pattern=r"^\d{4}-\d{2}-\d{2}$"),
     ],
     db: Session = Depends(get_db),
 ) -> ChartCompareResponse:

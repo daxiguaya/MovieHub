@@ -14,7 +14,7 @@ from app.services.import_service import ImportService
 SOURCE_COLUMNS = """
 SELECT douban_id, imdb_id, douban_title, year, rating, raw_data, type, update_time
 FROM item
-WHERE douban_id IN ({placeholders}) AND type IN ('movie', 'tv')
+WHERE douban_id IN ({placeholders})
 """
 
 
@@ -54,14 +54,27 @@ def audit_chart_snapshots(
     conn.row_factory = sqlite3.Row
     try:
         ImportService._validate_source(conn)
-        rows: dict[str, sqlite3.Row] = {}
+        rows: dict[str, list[sqlite3.Row]] = {}
         # Keep each query comfortably below SQLite's host-parameter limit.
+        # Do not filter by media type here: a matching ID with an unexpected
+        # Scout type must be reported as a type mismatch, not as a missing ID.
         for start in range(0, len(ids), 400):
             batch = ids[start:start + 400]
             placeholders = ",".join("?" for _ in batch)
             query = SOURCE_COLUMNS.format(placeholders=placeholders)
             for row in conn.execute(query, batch):
-                rows[str(row["douban_id"])] = row
+                rows.setdefault(str(row["douban_id"]), []).append(row)
+
+        unique_rows = {
+            douban_id: matches[0]
+            for douban_id, matches in rows.items()
+            if len(matches) == 1
+        }
+        ambiguous_ids = {
+            douban_id: len(matches)
+            for douban_id, matches in rows.items()
+            if len(matches) > 1
+        }
 
         extractor = ImportService()
         field_names = (
@@ -80,9 +93,14 @@ def audit_chart_snapshots(
         reports = []
         for snapshot in snapshots:
             matched = [
-                (item, rows[item.douban_id])
+                (item, unique_rows[item.douban_id])
                 for item in snapshot.movies
-                if item.douban_id in rows
+                if item.douban_id in unique_rows
+            ]
+            chart_ambiguous = [
+                item.douban_id
+                for item in snapshot.movies
+                if item.douban_id in ambiguous_ids
             ]
             field_counts = {name: 0 for name in field_names}
             type_mismatches = []
@@ -117,6 +135,8 @@ def audit_chart_snapshots(
                 "scout_matches": len(matched),
                 "scout_missing": len(missing_ids),
                 "missing_douban_ids": missing_ids,
+                "scout_ambiguous": len(chart_ambiguous),
+                "ambiguous_douban_ids": chart_ambiguous,
                 "type_mismatch_count": len(type_mismatches),
                 "type_mismatches": type_mismatches,
                 "field_coverage": {
@@ -132,6 +152,7 @@ def audit_chart_snapshots(
         total_items = sum(report["chart_items"] for report in reports)
         total_matches = sum(report["scout_matches"] for report in reports)
         total_mismatches = sum(report["type_mismatch_count"] for report in reports)
+        total_ambiguous = sum(report["scout_ambiguous"] for report in reports)
         return {
             "read_only": True,
             "scout_database": str(source_path),
@@ -140,7 +161,8 @@ def audit_chart_snapshots(
                 "chart_count": len(reports),
                 "chart_items": total_items,
                 "scout_matches": total_matches,
-                "scout_missing": total_items - total_matches,
+                "scout_missing": sum(report["scout_missing"] for report in reports),
+                "scout_ambiguous": total_ambiguous,
                 "type_mismatches": total_mismatches,
             },
             "next_step": (

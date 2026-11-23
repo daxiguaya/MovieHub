@@ -19,6 +19,7 @@ from app.schemas import (
     ChartMovieResponse,
     ChartMoviesListResponse,
     ChartResponse,
+    ChartSnapshotResponse,
     MovieResponse,
 )
 
@@ -134,6 +135,31 @@ class ChartService:
             )
             .one_or_none()
         )
+
+    def get_chart_snapshots(
+        self,
+        db: Session,
+        slug: str,
+    ) -> list[ChartSnapshotResponse] | None:
+        """List available historical snapshots for an enabled chart."""
+        chart = self.get_chart(db, slug)
+        if chart is None:
+            return None
+
+        snapshots = (
+            db.query(ChartSnapshot)
+            .filter(ChartSnapshot.list_id == chart.list_id)
+            .order_by(ChartSnapshot.snapshot_date.desc())
+            .all()
+        )
+        return [
+            ChartSnapshotResponse(
+                snapshot_date=item.snapshot_date,
+                imported_at=item.imported_at,
+                item_count=item.item_count,
+            )
+            for item in snapshots
+        ]
 
     def get_chart_movies(
         self,

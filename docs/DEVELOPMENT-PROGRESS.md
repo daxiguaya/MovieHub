@@ -517,3 +517,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Execute the new and existing backend suites in GitHub Actions and review the migration against a real v1 fixture before any deployment.
 
 **Atomic receipt recovery: implementation and regression tests committed; CI execution and migration acceptance remain pending. No NAS database, Scout source or production service was accessed.**
+
+## Backend CI failure remediation — schema v2 migration contract (2026-11-23)
+
+- [x] Retrieve and inspect the failing GitHub Actions backend job log rather than guessing from the red status.
+- [x] Confirm the run compiled the backend successfully; the failure was isolated to the pytest step (12 failed, 212 passed, 4 skipped).
+- [x] Align migration-runner tests with the actual supported v1 → v2 upgrade path; schema-v1 fixtures are now created explicitly from migration 001 and migration 002 is tested independently.
+- [x] Keep check-only behavior read-only for an empty, uninitialized database, and preserve a hard refusal for non-empty databases without a recognized MovieHub schema version.
+- [x] Update schema contract, initializer safety, and API readiness expectations to schema version 2; validate the full schema through the explicit initializer.
+- [ ] Re-run GitHub Actions on the updated branch head and resolve any remaining failures before marking this remediation CI-verified.
+
+**Root cause:** tests still treated the version-2 migration runner as an initial schema creator and asserted schema version 1, while production initialization had already moved to migration 001 + migration 002. No production database or Scout source was accessed.

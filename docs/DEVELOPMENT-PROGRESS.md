@@ -83,7 +83,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 61%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; annual/scheduled chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 62%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; annual/scheduled chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -197,9 +197,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend/frontend regression tests + Compose validation + dual container image builds
-- Run: [#237](https://github.com/daxiguaya/MovieHub/actions/runs/45133376536)
-- Tested commit: `7c69ed67bb0f7fe59fef4c467cdf16aa4e5dc766`
-- Result: **success** — **83 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#251](https://github.com/daxiguaya/MovieHub/actions/runs/45133687636)
+- Tested commit: `1d0b995f5767b1d440b82dca8fedbe0a39da1d65`
+- Result: **success** — **85 backend tests**, **5 frontend UI tests**, backend compilation, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

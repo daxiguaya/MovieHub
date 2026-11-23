@@ -6,7 +6,7 @@ A self-hosted movie discovery and chart-history service with its own SQLite data
 
 - Phase 4 database foundation: complete.
 - Application integration audit: complete.
-- Current work: frontend/full-stack validation and authorized chart data acquisition planning.
+- Current work: frontend/full-stack validation, opt-in Scout import performance benchmarks and authorized chart data acquisition planning.
 - Estimated first-release progress: about 62%; the frontend baseline is implemented, while automated chart collection, full-stack browser E2E and production rollout remain outstanding.
 - Backend and frontend regression/build checks run on GitHub Actions for pushes to the active development branch.
 

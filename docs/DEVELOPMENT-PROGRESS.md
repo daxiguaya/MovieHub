@@ -362,7 +362,21 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Opt-in annual data collection and performance validation (2026-11-23)
 
-- [ ] Execute the official 2025 four-chart collector from GitHub Actions and retain its normalized JSON artifact.
-- [ ] Run the opt-in 10k/100k synthetic Scout import and search benchmarks.
-- [ ] Inspect the generated artifact metadata and benchmark output before updating the release-readiness estimate.
-- [ ] Keep collection output separate from MovieHub persistence; no production database import or deployment is authorized by this run.
+- [x] Execute the official 2025 four-chart collector from GitHub Actions and retain its normalized JSON artifact.
+- [x] Run the opt-in 10k/100k synthetic Scout import and search benchmarks.
+- [x] Inspect the generated artifact metadata and benchmark output.
+- [x] Keep collection output separate from MovieHub persistence; no production database import or deployment was performed.
+
+**Full validation run:** [#392](https://github.com/daxiguaya/MovieHub/actions/runs/45183697856) — commit `ad865ffde7f6528cf509c830ad71d58379234f57`; all five jobs succeeded.
+
+- Backend: **151 passed, 4 skipped**; one Starlette/httpx deprecation warning. The four skips are opt-in benchmarks in the ordinary backend test invocation; the dedicated performance job ran them separately.
+- Frontend: **5 Vitest tests passed**, TypeScript/Vite production build and frontend container image build succeeded.
+- Browser: **4 Playwright Chromium E2E tests passed**, including a live FastAPI + temporary SQLite integration path.
+- Backend Compose validation and backend container image build succeeded.
+- Annual collection: four official 2025 Douban chart snapshots were collected and each passed the chart-import dry-run; 38 entries total (8/10/10/10). Artifact: [moviehub-douban-annual-2025](https://github.com/daxiguaya/MovieHub/actions/runs/45183697856/artifacts/14820729977), 4,321 bytes, SHA-256 `64fed1bef8a21fb4bd38b4c4739a782dff110caa8976694f9e3c033077c8e69e`, retained until 2026-12-07. The JSON remains an Actions artifact, not committed or imported.
+- LIKE search, 10k rows (COUNT / page): Chinese title 5.8 / 2.6 ms; original title 1.3 / 1.3 ms; no match 1.2 / 1.1 ms; multi-term 3.6 / 3.0 ms.
+- LIKE search, 100k rows (COUNT / page): Chinese title 17.9 / 4.2 ms; original title 10.8 / 2.5 ms; no match 9.9 / 10.2 ms; multi-term 21.8 / 5.0 ms. SQLite reported `SCAN movies` for all scenarios; this is expected for leading-wildcard LIKE and remains a measured optimization candidate, not a reason to add mandatory FTS5 now.
+- Scout synthetic import: 10k rows in 10.62 s (**941.6 rows/s**); 100k rows in 109.54 s (**912.9 rows/s**), batch size 500. These are GitHub-hosted runner results, not NAS performance or memory measurements.
+- The run emitted non-blocking dependency/toolchain deprecation warnings (Starlette/httpx, Node.js 20 action runtime, and Node URL/punycode warnings); no job failed.
+
+**Result:** acquisition, validation, benchmark execution and end-to-end CI are verified on the branch. Actual Scout ID/metadata coverage and deliberate import remain blocked on a separately staged, consistent Scout database copy. No production Scout DB, NAS service, deployment or NPM configuration was accessed or changed.

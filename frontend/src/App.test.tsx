@@ -225,4 +225,73 @@ describe("MovieHub frontend workflows", () => {
     )).toBe(true);
   });
 
+
+  it("adds and removes a favorite through the protected favorites API", async () => {
+    const requests: { url: string; method: string }[] = [];
+    installFetchMock((url, init) => {
+      const method = init?.method ?? "GET";
+      requests.push({ url, method });
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/movies/id/42") {
+        return {
+          id: 42,
+          douban_id: "1292052",
+          title: "Favorites Fixture",
+          original_title: null,
+          year: 2024,
+          rating: 8.0,
+          rating_count: 100,
+          type: "movie",
+          genres: [],
+          regions: [],
+          updated_at: null,
+          imdb_id: null,
+          tmdb_id: null,
+          directors: [],
+          actors: [],
+          overview: null,
+          douban_url: null,
+          posters: []
+        };
+      }
+      if (url === "/api/favorites" && method === "GET") return [];
+      if (url === "/api/favorites/42" && method === "PUT") {
+        return {
+          movie: {
+            id: 42,
+            douban_id: "1292052",
+            title: "Favorites Fixture",
+            original_title: null,
+            year: 2024,
+            rating: 8.0,
+            rating_count: 100,
+            type: "movie",
+            genres: [],
+            regions: [],
+            updated_at: null
+          },
+          created_at: "2026-11-23T00:00:00",
+          note: ""
+        };
+      }
+      if (url === "/api/favorites/42" && method === "DELETE") return undefined;
+      throw new Error(`Unexpected request: ${method} ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/movies/42"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { name: "Favorites Fixture" });
+    await userEvent.click(screen.getByRole("button", { name: "♡ 加入收藏" }));
+    expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "♥ 已收藏" }));
+    expect(await screen.findByRole("button", { name: "♡ 加入收藏" })).toBeInTheDocument();
+    expect(requests).toContainEqual({ url: "/api/favorites/42", method: "PUT" });
+    expect(requests).toContainEqual({ url: "/api/favorites/42", method: "DELETE" });
+  });
+
 });

@@ -282,6 +282,29 @@ def restore_backup(
         source.close()
 
     validate_sqlite_integrity(restore_path)
+
+    # A database that was using WAL may still have -wal/-shm files after a
+    # failed migration. Replacing only the main database file while leaving
+    # those sidecars behind can cause SQLite to replay stale pages against the
+    # restored backup. All migration connections are closed before this point.
+    for sidecar in (
+        Path(str(database_path) + "-wal"),
+        Path(str(database_path) + "-shm"),
+        Path(str(database_path) + "-journal"),
+    ):
+        try:
+            sidecar.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not remove SQLite sidecar: %s", sidecar)
+            raise
+
+    for sidecar in (
+        Path(str(restore_path) + "-wal"),
+        Path(str(restore_path) + "-shm"),
+        Path(str(restore_path) + "-journal"),
+    ):
+        sidecar.unlink(missing_ok=True)
+
     os.replace(restore_path, database_path)
 
     logger.warning("Original database restored from: %s", backup_path)

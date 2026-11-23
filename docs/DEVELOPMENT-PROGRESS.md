@@ -79,12 +79,35 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 
 **Estimated first-release implementation progress: about 40%.** This is a planning estimate, not a test metric: backend foundations and packaging are complete, but the user-facing frontend and several product workflows have not been built. Production deployment is intentionally excluded until separately authorized.
 
+## Phase B — Scout import hardening (in progress)
+
+- [x] Make `force_full` functional: incremental imports skip records whose Scout `update_time` is not newer than the last imported timestamp; forced full imports reprocess all valid records.
+- [x] Replace the catalogue-wide write transaction with bounded batches (500 records per transaction) to reduce SQLite writer-lock duration.
+- [x] Keep per-record SAVEPOINT isolation and make interrupted/partially committed imports safe to retry.
+- [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
+- [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
+
+**Import hardening milestone: implemented; CI validation in progress.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+
+## Phase D — poster-fetch security hardening
+
+- [x] Restrict poster sources to HTTPS `imgN.doubanio.com` image CDN hosts.
+- [x] Reject URL credentials, non-standard ports, non-HTTPS schemes, IP literals and arbitrary hosts.
+- [x] Disable automatic redirects and validate every redirect target against the same host policy.
+- [x] Resolve allowed CDN hostnames and reject DNS answers containing private, loopback, link-local or reserved IP addresses.
+- [x] Restrict responses to raster image MIME types and enforce an 8 MiB maximum using both Content-Length and streamed byte counting.
+- [x] Add regression tests for URL allowlisting, private DNS answers and size policy.
+
+**Poster-fetch security milestone: implemented; CI validation in progress.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
+
 ## Next work
 
-- [ ] Implement FTS5 as a versioned MovieHub migration, with a tested LIKE fallback where FTS5 is unavailable.
+- [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
 - [ ] Add favorites list/add/remove API endpoints and integration tests.
 - [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
 - [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
+- [ ] Formalize Scout field-level merge precedence and test empty-field preservation, newer timestamps, and source-row deletion behavior.
+- [ ] Validate import throughput, memory use and batch-lock duration with a larger synthetic fixture.
 - [ ] Before any NAS rollout, verify the actual NPM Docker network, Scout export path/read permissions, and host data/backup directory ownership.
 - [ ] Prefer a separate physical volume or off-site destination for backups; same-volume backups do not protect against disk failure.
 - [ ] Keep production database initialization, Scout import, deployment and NPM changes as separately reviewed operator actions.

@@ -658,6 +658,10 @@ class ChartImportService:
         results: list[dict[str, Any]] = []
         try:
             with db.begin():
+                # sqlite3 legacy transaction mode does not BEGIN for a SAVEPOINT.
+                # Force a real outer transaction before the first nested savepoint,
+                # otherwise releasing that savepoint can commit independently.
+                db.connection().exec_driver_sql("BEGIN")
                 for snapshot in snapshots:
                     results.append(
                         self.import_snapshot(

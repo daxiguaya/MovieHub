@@ -73,11 +73,15 @@ Current phase: Frontend workflow implementation and chart acquisition
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import, favorites) | 80% |
 | Scout import hardening | Implementation and merge/partial-retry tests complete; large-fixture performance pending |
-| Manual normalized chart snapshot import | Complete |\n| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
+| Manual normalized chart snapshot import | Complete |
+| Automatic chart collection and history comparison | 0% |
+| Favorites API and frontend UI | Implemented; browser E2E pending |
+| Xiaoya handoff | UI/config implemented; real NPM verification pending |
+| React frontend and user workflows | Baseline implemented; browser E2E and visual QA pending |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 54%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, frontend UI, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 54%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 

@@ -161,7 +161,7 @@ def test_tagged_collector_validates_chart_and_request_bounds():
 
 def test_tagged_collector_honors_robots_crawl_delay():
     client = FakeClient(
-        robots_text="User-agent: *\\nAllow: /\\nCrawl-delay: 4"
+        robots_text="User-agent: *\nAllow: /\nCrawl-delay: 4"
     )
     sleeps = []
     DoubanTaggedChartCollector(

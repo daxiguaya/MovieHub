@@ -98,7 +98,7 @@ Do not implement these in MovieHub first release:
 | Movie search/filter API | Exists; title matching uses SQL LIKE | Benchmark with realistic fixture sizes; keep FTS5 optional |
 | Movie detail API | Exists | Frontend detail view and Xiaoya handoff |
 | Poster cache/API | Exists; source URL allowlist, redirect validation, public-DNS check and 8 MiB streaming cap added | Frontend image states and cache UX |
-| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs | Frontend UI |
+| Favorites | Protected list/add/update-note/remove API implemented using MovieHub internal IDs; 70-test CI passed | Frontend UI |
 | Scout import | Read-only import, timestamp-based incremental skip, forced full reprocessing, 500-record transaction batches, per-record SAVEPOINT isolation; merge and partial-retry tests | Large-fixture performance and operator workflow |
 | React frontend | Not present yet | Build frontend application and container |
 | Frontend/backend Compose topology | Backend-only Compose exists | Add separate frontend service and same-origin NPM route documentation |

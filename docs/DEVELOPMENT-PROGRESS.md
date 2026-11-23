@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Application integration audit (after Phase 4)
+Current phase: Post-Phase-4 application integration audit
 
 ## Phase 4 — independent database foundation
 
@@ -25,14 +25,23 @@ Current phase: Application integration audit (after Phase 4)
 - [x] Verify chart snapshot import, same-date replacement, historical-date listing and latest-snapshot reads through the HTTP API.
 - [x] Remove wildcard credentialed CORS; cross-origin access is disabled by default and configurable through an explicit origin allowlist.
 - [x] Add a read-only /api/ready check that verifies all required tables and schema version; keep /api/health as the process liveness check.
-- [ ] Review logging and shutdown lifecycle.
-- [ ] Review repository hygiene and deployment packaging (including tracked repair-backup artifacts).
+- [x] Review console logging configuration and graceful cancellation of the poster-cache cleanup task; no service restart or deployment performed.
+- [x] Remove obsolete tracked Phase 3 repair-backup copies and the one-off source-repair script; add ignore rules for local repair and migration artifacts.
+- [x] Add configuration documentation, safe backend environment template and project README links.
+
+**Application integration audit: complete.**
+
+## Next work
+
+- [ ] Decide and implement deployment packaging (Dockerfile/Compose, mounts, health checks and reverse-proxy assumptions) after the runtime/frontend layout is finalized.
+- [ ] Continue feature/API work on the independent MovieHub database; keep all development validation on temporary fixtures.
+- [ ] Keep production database creation, migration, import and deployment as a separately reviewed operation.
 
 ## Latest code validation
 
 - Workflow: Backend tests
-- Run: [#49](https://github.com/daxiguaya/MovieHub/actions/runs/45124990712)
-- Tested commit: `ae29ee5af14a977c422d06c5b22dc323c99667ba`
+- Run: [#62](https://github.com/daxiguaya/MovieHub/actions/runs/45125409205)
+- Tested commit: `7f14f7f564621f2acb5c9b53936c5bf2674a83de`
 - Result: **success** — backend compilation passed; **32 tests passed**. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries

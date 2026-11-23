@@ -100,3 +100,36 @@ def test_restore_rejects_modified_backup_before_touching_current_database(tmp_pa
         )
 
     assert _movie_titles(database) == ["Current", "Original"]
+
+
+def test_backup_retention_keeps_only_the_requested_number_of_generations(tmp_path):
+    database = tmp_path / "data" / "movies.db"
+    backup_root = tmp_path / "backups"
+    _initialize_database(database)
+
+    first = create_backup(database, backup_root, keep_last=1)
+    second = create_backup(database, backup_root, keep_last=1)
+
+    remaining = [
+        path
+        for path in backup_root.iterdir()
+        if path.is_dir() and path.name.startswith("moviehub-")
+    ]
+    assert first != second
+    assert remaining == [second]
+
+
+def test_backup_rejects_database_with_incomplete_schema(tmp_path):
+    incomplete = tmp_path / "incomplete.db"
+    connection = sqlite3.connect(incomplete)
+    try:
+        connection.execute(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)"
+        )
+        connection.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(RuntimeError, match="missing required tables"):
+        create_backup(incomplete, tmp_path / "backups")

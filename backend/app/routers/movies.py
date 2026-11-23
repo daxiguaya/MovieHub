@@ -191,6 +191,29 @@ def get_stats(
     return movie_service.get_stats(db)
 
 
+@router.get("/id/{movie_id:int}", response_model=MovieDetailResponse)
+@limiter.limit(settings.rate_limit_search)
+def get_movie_detail_by_internal_id(
+    request: Request,
+    movie_id: int,
+    db: Session = Depends(get_db),
+) -> MovieDetailResponse:
+    """Get a movie detail by MovieHub's stable internal ID."""
+    movie = (
+        db.query(Movie)
+        .options(
+            selectinload(Movie.genres).selectinload(MovieGenre.genre_obj),
+            selectinload(Movie.regions).selectinload(MovieRegion.region_obj),
+            selectinload(Movie.posters),
+        )
+        .filter(Movie.id == movie_id)
+        .first()
+    )
+    if movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return _get_movie_detail(movie)
+
+
 @router.get("/{douban_id}", response_model=MovieDetailResponse)
 @limiter.limit(settings.rate_limit_search)
 def get_movie_detail(

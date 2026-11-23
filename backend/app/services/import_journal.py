@@ -35,14 +35,14 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
         end = os.lseek(descriptor, 0, os.SEEK_END)
         if end:
             os.lseek(descriptor, end - 1, os.SEEK_SET)
-            if os.read(descriptor, 1) not in (b"\\n", b"\\r"):
+            if os.read(descriptor, 1) not in (b"\n", b"\r"):
                 cursor = end
                 truncate_at = 0
                 while cursor > 0:
                     start = max(0, cursor - 4096)
                     os.lseek(descriptor, start, os.SEEK_SET)
                     chunk = os.read(descriptor, cursor - start)
-                    boundary = max(chunk.rfind(b"\\n"), chunk.rfind(b"\\r"))
+                    boundary = max(chunk.rfind(b"\n"), chunk.rfind(b"\r"))
                     if boundary >= 0:
                         truncate_at = start + boundary + 1
                         break

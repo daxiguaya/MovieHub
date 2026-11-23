@@ -499,3 +499,80 @@ def test_scout_import_processes_synthetic_catalogue_across_multiple_batches(
         if service._run_lock.locked():
             service._run_lock.release()
         engine.dispose()
+
+def test_scout_import_rejects_invalid_ratings_and_implausible_years(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-invalid-numbers.sqlite"
+    target_path = tmp_path / "moviehub-invalid-numbers.sqlite"
+    _create_scout_fixture(source_path)
+
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "UPDATE item SET rating = ?, year = ? WHERE douban_id = '1234567'",
+            (10.5, 1800),
+        )
+        source.execute(
+            "UPDATE item SET rating = ?, year = ? WHERE douban_id = '7654321'",
+            (float("inf"), 2201),
+        )
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+
+    with TargetSession() as db:
+        existing = Movie(
+            douban_id="1234567",
+            title="Existing enriched movie",
+            year=1999,
+            rating=9.2,
+            rating_count=100,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        db.add(existing)
+        db.commit()
+
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+
+        with TargetSession() as db:
+            existing = db.scalar(
+                select(Movie).where(Movie.douban_id == "1234567")
+            )
+            new_tv = db.scalar(
+                select(Movie).where(Movie.douban_id == "7654321")
+            )
+            # Invalid source values must not erase previously valid metadata.
+            assert existing.year == 1999
+            assert existing.rating == 9.2
+            # Invalid values on a new row remain absent, not persisted.
+            assert new_tv.year is None
+            assert new_tv.rating is None
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+        engine.dispose()
+
+
+def test_scout_integer_normalization_rejects_booleans_and_fractional_values():
+    service = import_service_module.ImportService()
+    assert service._safe_int(True, default=7) == 7
+    assert service._safe_int(2020.5, default=7) == 7
+    assert service._safe_int("2020", default=7) == 2020
+

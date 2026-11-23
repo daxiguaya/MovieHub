@@ -6,6 +6,7 @@ from app.routers.movies import (
     POSTER_MAX_BYTES,
     _all_resolved_addresses_are_public,
     _is_allowed_poster_url,
+    _poster_bytes_match_content_type,
 )
 
 
@@ -73,3 +74,37 @@ def test_poster_dns_accepts_only_public_ip_addresses(addresses):
 )
 def test_poster_dns_rejects_private_or_mixed_ip_addresses(addresses):
     assert not _all_resolved_addresses_are_public(addresses)
+
+
+@pytest.mark.parametrize(
+    "content_type,content",
+    [
+        ("image/jpeg", b"\\xff\\xd8\\xff\\xe0poster"),
+        ("image/png", b"\\x89PNG\\r\\n\\x1a\\nposter"),
+        ("image/gif", b"GIF89aposter"),
+        ("image/webp", b"RIFF\\x00\\x00\\x00\\x00WEBPposter"),
+        ("image/avif", b"\\x00\\x00\\x00\\x18ftypavifposter"),
+        ("image/avif", b"\\x00\\x00\\x00\\x18ftypavisposter"),
+    ],
+)
+def test_poster_file_signature_matches_declared_content_type(content_type, content):
+    assert _poster_bytes_match_content_type(content, content_type)
+
+
+@pytest.mark.parametrize(
+    "content_type,content",
+    [
+        ("image/jpeg", b"<html>not an image</html>"),
+        ("image/png", b"GIF89a"),
+        ("image/gif", b"\\x89PNG\\r\\n\\x1a\\n"),
+        ("image/webp", b"RIFF\\x00\\x00\\x00\\x00NOPE"),
+        ("image/avif", b"\\x00\\x00\\x00\\x18ftypmp42"),
+        ("image/svg+xml", b"<svg></svg>"),
+        ("image/jpeg", b""),
+    ],
+)
+def test_poster_file_signature_rejects_mismatched_or_unsupported_payloads(
+    content_type,
+    content,
+):
+    assert not _poster_bytes_match_content_type(content, content_type)

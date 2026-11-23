@@ -561,3 +561,10 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Prepare a deployment checklist and rollback plan; only after review and explicit approval create the production MovieHub database, configure NPM and deploy. No production deployment, database import, NPM change or service restart is authorized by this checklist.
 
 **Progress accounting:** the 75% estimate counts implementation and automated validation as substantially complete, but does not count real Scout data validation, live annual data import, NPM verification or production rollout as complete. Annual-chart collection and performance benchmark Actions jobs were skipped in the latest CI and remain separately unverified.
+
+
+## On-demand validation requested (2026-11-24)
+
+- [ ] Run the official 2025 annual collector and four-file dry-run through the opt-in Actions job.
+- [ ] Run the synthetic 10k/100k SQLite search and Scout import benchmarks through the opt-in Actions job.
+- [ ] Review actual collector output and benchmark measurements; neither result is assumed successful until the jobs finish.

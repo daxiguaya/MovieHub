@@ -72,12 +72,12 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 |---|---:|
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
-| Product feature completion (FTS5, favorites API, Xiaoya handoff) | 0% of remaining items |
-| React frontend and user workflows | 0% |
+| Scout import hardening | 100% of current implementation milestone; additional merge/performance validation pending |
+| Automatic chart collection and history comparison | 0% |\n| Favorites API and Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 40%.** This is a planning estimate, not a test metric: backend foundations and packaging are complete, but the user-facing frontend and several product workflows have not been built. Production deployment is intentionally excluded until separately authorized.
+**Estimated first-release implementation progress: about 45%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, favorites API, frontend, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -115,9 +115,9 @@ Current phase: First-release product architecture agreed; FTS5 and feature APIs 
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#96](https://github.com/daxiguaya/MovieHub/actions/runs/45127748257)
-- Tested commit: `a94302f6ecaa367d6a5d92a8a7868c11b4d8341c`
-- Result: **success** — backend compilation, all 37 tests, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#105](https://github.com/daxiguaya/MovieHub/actions/runs/45128516067)
+- Tested commit: `15e71d201c6563125ad2537a0c65912dd932d836`
+- Result: **success** — backend compilation, **65 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

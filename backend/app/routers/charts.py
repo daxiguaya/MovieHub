@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.limiter import limiter
-from app.schemas import ChartMoviesListResponse, ChartResponse
+from app.schemas import ChartMoviesListResponse, ChartResponse, ChartSnapshotResponse
 from app.services.chart_service import chart_service
 
 router = APIRouter(
@@ -37,6 +37,23 @@ def get_charts(
         db=db,
         category=category,
     )
+
+
+@router.get(
+    "/{slug}/snapshots",
+    response_model=list[ChartSnapshotResponse],
+)
+@limiter.limit(settings.rate_limit_search)
+def get_chart_snapshots(
+    request: Request,
+    slug: str,
+    db: Session = Depends(get_db),
+) -> list[ChartSnapshotResponse]:
+    """List available historical dates for one chart."""
+    result = chart_service.get_chart_snapshots(db=db, slug=slug)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return result
 
 
 @router.get(

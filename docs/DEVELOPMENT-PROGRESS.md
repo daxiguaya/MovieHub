@@ -357,4 +357,12 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add CLI regression tests for strict-mode failure and clean strict-mode success.
 - [x] Document the exit-code contract for pre-import and automation use.
 
-**Strict Scout coverage gate: implemented; latest full CI run is pending.** This remains a read-only audit and does not access or modify the NAS Scout database.
+**Strict Scout coverage gate: implemented and CI-verified in run #45183094457.** Backend: 151 passed, 4 skipped; frontend, Chromium E2E and both Docker image builds passed. The annual collector and performance benchmark jobs were skipped by their opt-in conditions in that run. This remains a read-only audit and does not access or modify the NAS Scout database.
+
+
+## Opt-in annual data collection and performance validation (2026-11-23)
+
+- [ ] Execute the official 2025 four-chart collector from GitHub Actions and retain its normalized JSON artifact.
+- [ ] Run the opt-in 10k/100k synthetic Scout import and search benchmarks.
+- [ ] Inspect the generated artifact metadata and benchmark output before updating the release-readiness estimate.
+- [ ] Keep collection output separate from MovieHub persistence; no production database import or deployment is authorized by this run.

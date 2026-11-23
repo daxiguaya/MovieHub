@@ -89,6 +89,7 @@ def test_audit_reports_match_missing_and_field_coverage_without_writes(tmp_path)
         "chart_items": 2,
         "scout_matches": 1,
         "scout_missing": 1,
+        "scout_ambiguous": 0,
         "type_mismatches": 0,
     }
     chart = report["charts"][0]
@@ -130,3 +131,90 @@ def test_audit_reports_media_type_mismatch(tmp_path):
     report = audit_chart_snapshots([snapshot], scout)
     assert report["summary"]["type_mismatches"] == 1
     assert report["charts"][0]["type_mismatches"][0]["scout_type"] == "movie"
+
+
+
+def test_audit_flags_unexpected_scout_media_type_instead_of_missing(tmp_path):
+    scout = tmp_path / "scout.sqlite"
+    snapshot = tmp_path / "annual-book-mismatch.json"
+    _create_scout(scout)
+    with sqlite3.connect(scout) as db:
+        db.execute(
+            "UPDATE item SET type = 'book' WHERE douban_id = '1234567'"
+        )
+        db.commit()
+    snapshot.write_text(
+        json.dumps(
+            {
+                "slug": "annual-2025-chinese-movies",
+                "name": "2025 评分最高华语电影",
+                "source": "douban",
+                "category": "annual",
+                "period": "2025",
+                "snapshot_date": "2026-11-23",
+                "movies": [
+                    {
+                        "douban_id": "1234567",
+                        "rank": 1,
+                        "title": "Movie",
+                        "type": "movie",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    report = audit_chart_snapshots([snapshot], scout)
+    chart = report["charts"][0]
+    assert chart["scout_matches"] == 1
+    assert chart["scout_missing"] == 0
+    assert chart["type_mismatch_count"] == 1
+    assert chart["type_mismatches"][0]["scout_type"] == "book"
+
+
+def test_audit_reports_duplicate_scout_ids_as_ambiguous(tmp_path):
+    scout = tmp_path / "scout.sqlite"
+    snapshot = tmp_path / "annual-ambiguous.json"
+    _create_scout(scout)
+    with sqlite3.connect(scout) as db:
+        db.execute(
+            "INSERT INTO item VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "1234567", "tt7654321", "Duplicate row", 2021, 7.5,
+                json.dumps({"detail": {"summary": "Second row"}}),
+                "movie", 1790000001,
+            ),
+        )
+        db.commit()
+    snapshot.write_text(
+        json.dumps(
+            {
+                "slug": "annual-2025-chinese-movies",
+                "name": "2025 评分最高华语电影",
+                "source": "douban",
+                "category": "annual",
+                "period": "2025",
+                "snapshot_date": "2026-11-23",
+                "movies": [
+                    {
+                        "douban_id": "1234567",
+                        "rank": 1,
+                        "title": "Movie",
+                        "type": "movie",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    report = audit_chart_snapshots([snapshot], scout)
+    chart = report["charts"][0]
+    assert chart["scout_matches"] == 0
+    assert chart["scout_missing"] == 0
+    assert chart["scout_ambiguous"] == 1
+    assert chart["ambiguous_douban_ids"] == ["1234567"]
+    assert report["summary"]["scout_ambiguous"] == 1

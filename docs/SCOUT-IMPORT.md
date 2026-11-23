@@ -50,3 +50,16 @@ Only one import can run at a time. The service processes 500 records per transac
 ## Production boundary
 
 This runbook documents the operator procedure only. It does not authorize importing the user's live Scout database, creating a production MovieHub database, changing NPM, or restarting any NAS service. Perform those actions only after a separate review and explicit approval.
+
+
+## Optional synthetic import benchmark
+
+The repository includes opt-in 10,000-row and 100,000-row synthetic import benchmarks. They generate temporary Scout-shaped SQLite source files and import into temporary MovieHub SQLite databases through the production `ImportService`; no real Scout or MovieHub database is opened.
+
+Run from the `backend/` directory:
+
+```sh
+MOVIEHUB_RUN_IMPORT_BENCHMARKS=1 pytest -q -s tests/test_import_performance.py
+```
+
+The output reports elapsed time, rows per second and the configured transaction batch size. These cases are skipped by default in CI because throughput and memory behavior depend on the runner and storage hardware. Run them first on a controlled test machine; repeat on the NAS only as part of a separately authorized pre-deployment test. The benchmark does not deploy the application or touch production data.

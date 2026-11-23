@@ -93,7 +93,7 @@ def validate_database(path: Path) -> None:
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     try:
         inspector = inspect(engine)
-        orm_tables = set(Base.metadata.tables) | {"schema_migrations"}
+        # The initializer intentionally creates schema v1; later numbered migrations\n        # add newer tables such as import_batch_receipts.\n        core_tables = set(Base.metadata.tables) - {"import_batch_receipts"}\n        orm_tables = core_tables | {"schema_migrations"}
         db_tables = set(inspector.get_table_names())
         if orm_tables != db_tables:
             raise RuntimeError(
@@ -101,7 +101,7 @@ def validate_database(path: Path) -> None:
                 f"DB-only={sorted(db_tables-orm_tables)}"
             )
 
-        for table_name, table in Base.metadata.tables.items():
+        for table_name, table in Base.metadata.tables.items():\n            if table_name == "import_batch_receipts":\n                continue
             orm_columns = set(table.columns.keys())
             db_columns = {
                 column["name"]

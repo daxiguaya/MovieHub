@@ -1040,7 +1040,9 @@ def test_scout_import_resume_rejects_changed_source_before_target_writes(
             service._run_lock.release()
 
     assert service.status.status == "failed"
-    assert "Source data changed" in service.status.message
+    from app.services.import_journal import read_import_events
+    events = read_import_events(journal_path)
+    assert events[-1]["event"] == "run_failed"
     with TargetSession() as db:
         assert db.query(Movie).count() == 0
     engine.dispose()

@@ -176,6 +176,12 @@ class ImportService:
         run_id = resume_run_id or run_id or uuid.uuid4().hex
         with self._status_lock:
             self._status.run_id = run_id
+            self._status.status = "running"
+            self._status.processed = 0
+            self._status.total = 0
+            self._status.errors = 0
+            self._status.percentage = 0.0
+            self._status.message = "Import started or resuming"
         source_conn: sqlite3.Connection | None = None
         committed_batches = 0
 

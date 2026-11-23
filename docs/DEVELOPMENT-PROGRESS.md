@@ -503,3 +503,16 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Test successful readiness, early blocking without target access, read-only behavior and report permissions.
 
 **One-command readiness preparation implemented; CI verification pending.**
+
+
+## Scout import transactionally durable receipts (2026-11-23)
+
+- [x] Add schema-v2 `import_batch_receipts`, with a unique run/batch key, source fingerprint, cumulative counters, source cursor and bounded error details.
+- [x] Add migration 002 with the existing backup, integrity-check and rollback migration runner; build new databases directly at schema v2.
+- [x] Write each batch receipt in the same target-database transaction as its movie and metadata changes.
+- [x] Advance in-memory counters only after the batch transaction commits, preventing rolled-back work from leaking into run totals.
+- [x] Recover from database receipts, validate source fingerprint/cursor/counters, reject journal-only or conflicting checkpoints, and repair missing journal/error-manifest appends.
+- [x] Add regression tests for the lost-journal-checkpoint crash window, transaction rollback atomicity and duplicate receipt rejection.
+- [ ] Execute the new and existing backend suites in GitHub Actions and review the migration against a real v1 fixture before any deployment.
+
+**Atomic receipt recovery: implementation and regression tests committed; CI execution and migration acceptance remain pending. No NAS database, Scout source or production service was accessed.**

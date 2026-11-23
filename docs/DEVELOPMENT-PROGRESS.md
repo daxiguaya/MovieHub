@@ -177,11 +177,12 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Run the official collector in CI with robots.txt permission; generated 8/10/10/10 entries and all four JSON files passed `import_chart --dry-run`.
 - [x] Upload the four normalized snapshots as a 14-day GitHub Actions artifact; keep generated data out of Git.
 - [x] Add a read-only Scout coverage audit for chart JSON: ID match rate, metadata field coverage and media-type mismatches, with synthetic SQLite regression tests.
+- [x] Download and independently review the four 2025 annual snapshots: 38/38 IDs unique across lists, ranks unique and ordered, expected 8/10/10/10 counts, and media types consistent; record the review without committing scraped JSON.
 - [ ] Run the audit against a separately staged Scout copy only after that source is explicitly made available; import only after the independent MovieHub database is initialized.
 - [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 
-**Top 250, popular/high-rated and official 2025 annual one-shot collectors are implemented. Annual snapshots still require a successful robots-permitted collection, four dry-runs and explicit import; 2026 category verification and scheduling remain pending.**
+**Top 250, popular/high-rated and official 2025 annual one-shot collectors are implemented. The 2025 annual collection, four dry-runs, artifact retention and independent structural review are complete. Scout metadata coverage and deliberate snapshot imports remain pending; 2026 category verification and scheduling remain pending.**
 
 ## Phase E — React frontend baseline
 
@@ -213,11 +214,11 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
 - [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
 
-**Source review: complete. Top 250, popular/high-rated and official 2025 annual one-shot collection are implemented. Live annual collection/import remains pending a robots-permitted run; 2026 taxonomy verification and scheduling remain pending.**
+**Source review: complete. Top 250, popular/high-rated and official 2025 annual one-shot collection are implemented. The 2025 annual run and artifact review are complete; Scout enrichment/import, 2026 taxonomy verification and any scheduling decision remain pending.**
 
 ## Next work
 
-- [ ] Prepare and import the four 2025 annual categories from verified normalized source data; do not merge Chinese, international, hidden-gem and TV rankings. The local dry-run now enforces each built-in chart's category, period and media type.
+- [ ] Run the read-only Scout coverage audit against a separately staged, consistent Scout copy; review ID matches, media-type mismatches and metadata coverage before deciding whether to enrich/import the four separate 2025 snapshots. The local dry-run already enforces each built-in chart's category, period and media type.
 - [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
 - [x] Implement a one-shot official 2025 annual article collector that emits four separate normalized JSON snapshots and refuses collection when robots.txt or access controls do not permit it.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
@@ -244,7 +245,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Latest code validation
 
-- Latest full validation: [#314](https://github.com/daxiguaya/MovieHub/actions/runs/45152308824) — **success**, on commit `535900b5`.
+- Latest annual-collection validation: [#325](https://github.com/daxiguaya/MovieHub/actions/runs/45166104334) — backend, annual collection/dry-runs, frontend build/tests and Chromium E2E jobs succeeded. The opt-in performance job was skipped in this run; the 10k/100k performance measurements remain from successful CI #314.
+- The read-only Scout coverage audit and its synthetic SQLite tests were added after the #325 artifact-producing commit. They require a subsequent CI run; do not treat #325 as validation of those later additions.
+- Latest full performance validation: [#314](https://github.com/daxiguaya/MovieHub/actions/runs/45152308824) — **success**, on commit `535900b5`.
 - Backend: **110 passed, 4 skipped**; the four skips are the opt-in 10k/100k search and Scout-import benchmark cases. Frontend: **5 Vitest tests passed**; browser: **4 Playwright Chromium E2E tests passed**.
 - Compose validation, backend/frontend production builds and both container image builds passed.
 - The browser job starts a real FastAPI process against a fresh temporary SQLite database, seeds a test chart/movie and runs one unmocked chart → detail → search workflow. Three additional browser tests use isolated API fixtures for favorite and Xiaoya handoff interactions.

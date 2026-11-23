@@ -446,6 +446,32 @@ class ChartImportService:
                     for movie in existing_movies
                 }
 
+                # A chart must never silently point at a movie record whose
+                # stored media type contradicts the snapshot. Do not rewrite
+                # Scout-owned movie identity/type from chart data.
+                for item in items:
+                    douban_id = self._clean_string(
+                        self._value(item, "douban_id")
+                    )
+                    item_type = self._clean_string(
+                        self._value(item, "type")
+                    ) or "movie"
+                    if item_type not in ("movie", "tv"):
+                        raise ChartImportError(
+                            f"Movie {douban_id} has an invalid media type"
+                        )
+
+                    existing_movie = movie_map.get(douban_id)
+                    if (
+                        existing_movie is not None
+                        and existing_movie.type != item_type
+                    ):
+                        raise ChartImportError(
+                            f"Movie {douban_id} media type mismatch: "
+                            f"MovieHub has {existing_movie.type!r}, "
+                            f"snapshot has {item_type!r}; snapshot was not imported"
+                        )
+
                 imported_movie_ids: dict[str, int] = {}
 
                 for item in items:

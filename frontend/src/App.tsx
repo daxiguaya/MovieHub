@@ -313,20 +313,29 @@ function SearchPage() {
   const [keyword, setKeyword] = useState(searchParams.get("search") ?? "");
   const [type, setType] = useState(searchParams.get("type") ?? "");
   const [minRating, setMinRating] = useState(searchParams.get("min_rating") ?? "");
+  const [maxRating, setMaxRating] = useState(searchParams.get("max_rating") ?? "");
+  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "");
   const [minYear, setMinYear] = useState(searchParams.get("min_year") ?? "");
+  const [maxYear, setMaxYear] = useState(searchParams.get("max_year") ?? "");
+  const [genres, setGenres] = useState(searchParams.get("genres") ?? "");
+  const [excludeGenres, setExcludeGenres] = useState(searchParams.get("exclude_genres") ?? "");
+  const [regions, setRegions] = useState(searchParams.get("regions") ?? "");
   const [sortBy, setSortBy] = useState(searchParams.get("sort_by") ?? "rating_count");
+  const [sortOrder, setSortOrder] = useState(searchParams.get("sort_order") ?? "desc");
   const [results, setResults] = useState<Movie[]>([]);
   const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function runSearch(params: URLSearchParams) {
+  async function runSearch(params: URLSearchParams, append = false) {
     setLoading(true);
     setError("");
     try {
       const data = await api.movies(params);
-      setResults(data.items);
+      setResults((current) => append ? [...current, ...data.items] : data.items);
       setTotal(data.total);
+      setNextCursor(data.next_cursor);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -335,39 +344,70 @@ function SearchPage() {
   }
 
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    void runSearch(params);
-    // Search is intentionally driven by the URL query string.
+    void runSearch(new URLSearchParams(searchParams));
+    // The first request is initialized from the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
-    if (keyword.trim()) params.set("search", keyword.trim());
-    if (type) params.set("type", type);
-    if (minRating) params.set("min_rating", minRating);
-    if (minYear) params.set("min_year", minYear);
-    params.set("sort_by", sortBy);
+    const values: Record<string, string> = {
+      search: keyword.trim(),
+      type,
+      min_rating: minRating,
+      max_rating: maxRating,
+      min_rating_count: minRatingCount,
+      min_year: minYear,
+      max_year: maxYear,
+      genres: genres.trim(),
+      exclude_genres: excludeGenres.trim(),
+      regions: regions.trim(),
+      sort_by: sortBy,
+      sort_order: sortOrder
+    };
+    for (const [key, value] of Object.entries(values)) {
+      if (value) params.set(key, value);
+    }
     setSearchParams(params);
     void runSearch(params);
   }
 
+  function loadMore() {
+    if (!nextCursor) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("cursor", nextCursor);
+    void runSearch(params, true);
+  }
+
   return (
     <>
-      <PageHeading eyebrow="MOVIE LIBRARY" title="找到下一部想看的" description="按片名、年份、类型和评分筛选 MovieHub 已收录的电影与剧集。" />
+      <PageHeading eyebrow="MOVIE LIBRARY" title="找到下一部想看的" description="按片名、年份、类型、评分、类型标签和地区筛选 MovieHub 已收录的电影与剧集。" />
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索中文片名或原名…" /></label>
-        <label>类型<select value={type} onChange={(e) => setType(e.target.value)}><option value="">全部</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
+        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value)}><option value="">全部</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option><option value="9">9.0+</option></select></label>
-        <label>年份<input type="number" min="1870" max="2200" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="起始年份" /></label>
-        <label>排序<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="rating_count">热度</option><option value="rating">评分</option><option value="year">年份</option></select></label>
+        <label>最高评分<select value={maxRating} onChange={(e) => setMaxRating(e.target.value)}><option value="">不限</option><option value="7">≤ 7.0</option><option value="8">≤ 8.0</option><option value="9">≤ 9.0</option><option value="10">≤ 10.0</option></select></label>
+        <label>评价人数不少于<input type="number" min="0" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="例如 1000" /></label>
+        <label>起始年份<input type="number" min="1870" max="2200" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
+        <label>结束年份<input type="number" min="1870" max="2200" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
+        <label>包含类型<input value={genres} onChange={(e) => setGenres(e.target.value)} placeholder="剧情,科幻" /></label>
+        <label>排除类型<input value={excludeGenres} onChange={(e) => setExcludeGenres(e.target.value)} placeholder="恐怖,情色" /></label>
+        <label>地区<input value={regions} onChange={(e) => setRegions(e.target.value)} placeholder="中国大陆,日本" /></label>
+        <label>排序依据<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="rating_count">评价人数</option><option value="rating">评分</option><option value="year">年份</option></select></label>
+        <label>排序方向<select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}><option value="desc">从高到低</option><option value="asc">从低到高</option></select></label>
         <button className="primary-button" type="submit">搜索电影 <span>→</span></button>
       </form>
       <div className="result-caption"><span>搜索结果</span><span>{total.toLocaleString()} 部作品</span></div>
-      {loading ? <Loading /> : error ? <ErrorState message={error} /> : results.length === 0 ? (
-        <EmptyState title="没有找到匹配的电影" detail="试试更短的片名，或放宽评分与年份条件。" />
-      ) : <div className="movie-grid">{results.map((movie) => <MovieCard key={movie.id} movie={movie} />)}</div>}
+      {error ? <ErrorState message={error} /> : results.length === 0 && loading ? <Loading /> : results.length === 0 ? (
+        <EmptyState title="没有找到匹配的电影" detail="试试更短的片名，或放宽评分、年份和类型条件。" />
+      ) : (
+        <>
+          <div className="movie-grid">{results.map((movie) => <MovieCard key={movie.id} movie={movie} />)}</div>
+          {loading && <Loading label="正在加载更多…" />}
+          {!loading && nextCursor && <button className="secondary-button load-more" onClick={loadMore}>加载更多</button>}
+        </>
+      )}
     </>
   );
 }

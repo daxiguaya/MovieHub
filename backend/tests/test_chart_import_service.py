@@ -115,10 +115,14 @@ def test_chart_import_replaces_only_the_requested_date_and_preserves_scout_data(
         assert len(snapshots) == 1
         assert snapshots[0].snapshot_date == "2026-11-23"
         assert snapshots[0].item_count == 1
-        assert snapshots[0].id != original_snapshot_id
+        # SQLite may reuse an INTEGER PRIMARY KEY after its previous row is deleted.
         assert db.scalar(
             select(func.count()).select_from(ChartItem)
         ) == 1
+        current_movie = db.scalar(
+            select(Movie).join(ChartItem, ChartItem.movie_id == Movie.id)
+        )
+        assert current_movie.douban_id == '10003'
 
         # A different date creates a second history record.
         db.commit()

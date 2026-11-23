@@ -269,5 +269,6 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 - The read-only Scout coverage audit now looks up all Scout media types for requested Douban IDs, so unexpected types are reported as mismatches rather than incorrectly classified as missing.
 - Duplicate Scout rows for one Douban ID are reported as ambiguous and excluded from metadata field-coverage calculations; the audit never chooses an arbitrary duplicate.
-- Added synthetic regression tests for unexpected Scout types and duplicate IDs. These tests are included in the normal backend pytest suite.
-- Validation status: these latest changes have been committed to the Phase 4 branch; a GitHub Actions run for the new head is still required before treating the changes as CI-verified.
+- Metadata field coverage now uses only unique ID matches whose Scout media type agrees with the chart item. Wrong-type rows remain visible as ID matches and explicit mismatches, but cannot inflate the field-coverage numerator or denominator.
+- Added synthetic regression assertions for wrong-type records being excluded from field coverage, in addition to the unexpected-type and duplicate-ID cases.
+- Validation status: implementation and regression tests are committed; a GitHub Actions run for the latest head is still required before treating these changes as CI-verified.

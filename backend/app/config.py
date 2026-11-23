@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/data")
     import_dir: Path = Path("/imports")
     api_key: str = ""
+    cors_origins: list[str] = Field(default_factory=list)
 
     rate_limit_search: str = "120/minute"
     rate_limit_genres: str = "60/minute"

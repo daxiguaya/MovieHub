@@ -12,6 +12,7 @@ class ChartDefinition:
     period: str | None
     description: str
     display_order: int
+    media_type: str = "movie"
 
 
 INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
@@ -77,6 +78,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period="2025",
         description="豆瓣 2025 年度华语剧集榜单",
         display_order=70,
+        media_type="tv",
     ),
 )
 

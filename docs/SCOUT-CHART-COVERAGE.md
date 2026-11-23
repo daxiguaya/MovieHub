@@ -21,6 +21,11 @@ The report shows how many chart entries have Scout matches and how many matched
 records contain year, rating, rating count, original title, overview, Douban
 URL, directors, actors, genres, regions and poster URLs. It also flags a
 movie/TV type mismatch rather than silently treating it as valid metadata.
+If Scout contains more than one row for the same Douban ID, the audit reports
+that ID as ambiguous and excludes it from field-coverage calculations rather
+than selecting an arbitrary row. Unexpected Scout media types are included in
+the ID lookup so they are reported as mismatches, not incorrectly counted as
+missing.
 
 Use a consistent SQLite backup/copy with required WAL sidecars staged when
 necessary. Do not point the audit at an actively changing database if a

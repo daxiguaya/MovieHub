@@ -17,6 +17,7 @@ See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checkli
 - [Configuration and database lifecycle](docs/CONFIGURATION.md)
 - [Backend container deployment](docs/DEPLOYMENT.md)
 - [Database backup and restore](docs/BACKUP-RESTORE.md)
+- [Product scope and architecture](docs/PRODUCT-SCOPE.md)
 
 ## Safety model
 

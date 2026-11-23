@@ -184,6 +184,14 @@ def audit_chart_snapshots(
                 "scout_missing": sum(report["scout_missing"] for report in reports),
                 "scout_ambiguous": total_ambiguous,
                 "type_mismatches": total_mismatches,
+                "field_coverage": {
+                    name: {
+                        "present": count,
+                        "matched_total": total_type_valid_matches,
+                        "percent": round(count * 100 / total_type_valid_matches, 1) if total_type_valid_matches else 0.0,
+                    }
+                    for name, count in total_field_counts.items()
+                },
             },
             "next_step": (
                 "Review coverage and type mismatches. This audit does not import "

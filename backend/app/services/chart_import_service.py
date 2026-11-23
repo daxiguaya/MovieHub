@@ -90,6 +90,8 @@ class ChartImportService:
         # year/rating count/rank in an imported catalogue.
         if value is None or value == "" or isinstance(value, bool):
             return None
+        if isinstance(value, float) and not value.is_integer():
+            return None
 
         try:
             return int(value)

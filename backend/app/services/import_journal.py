@@ -1,5 +1,6 @@
 """Durable append-only journal for committed Scout import batches."""
 
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -24,18 +25,41 @@ def append_import_event(path: str | Path, event: dict[str, Any]) -> None:
     ).encode("utf-8")
     descriptor = os.open(
         journal_path,
-        os.O_CREAT | os.O_APPEND | os.O_WRONLY,
+        os.O_CREAT | os.O_APPEND | os.O_RDWR,
         0o600,
     )
     try:
-        # One append write per JSONL event prevents interleaving between
-        # independent writers; fsync makes each committed-batch marker durable.
+        # Serialize independent writers and repair only an unterminated tail
+        # left by a killed writer before appending the next complete event.
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        end = os.lseek(descriptor, 0, os.SEEK_END)
+        if end:
+            os.lseek(descriptor, end - 1, os.SEEK_SET)
+            if os.read(descriptor, 1) not in (b"\\n", b"\\r"):
+                cursor = end
+                truncate_at = 0
+                while cursor > 0:
+                    start = max(0, cursor - 4096)
+                    os.lseek(descriptor, start, os.SEEK_SET)
+                    chunk = os.read(descriptor, cursor - start)
+                    boundary = max(chunk.rfind(b"\\n"), chunk.rfind(b"\\r"))
+                    if boundary >= 0:
+                        truncate_at = start + boundary + 1
+                        break
+                    cursor = start
+                os.ftruncate(descriptor, truncate_at)
+
+        # One append write plus fsync makes each event durable and prevents
+        # interleaving. A torn trailing event is discarded before the next write.
         written = os.write(descriptor, payload)
         if written != len(payload):
             raise OSError("Incomplete import journal write")
         os.fsync(descriptor)
     finally:
-        os.close(descriptor)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
 
 
 def read_import_events(path: str | Path) -> list[dict[str, Any]]:

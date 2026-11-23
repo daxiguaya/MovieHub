@@ -9,7 +9,8 @@ RUN npm run build
 
 FROM nginx:alpine
 
-RUN addgroup -S -g 10001 moviehub \
+RUN rm -f /etc/nginx/conf.d/default.conf \
+    && addgroup -S -g 10001 moviehub \
     && adduser -S -D -H -u 10001 -G moviehub moviehub \
     && mkdir -p /tmp/client_temp /tmp/proxy_temp \
     && chown -R 10001:10001 /tmp /usr/share/nginx/html

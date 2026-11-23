@@ -47,3 +47,17 @@ The initializer creates and validates a temporary database before atomically pub
 - Data APIs return HTTP 503 until the MovieHub database has been initialized.
 
 Do not run initialization or migrations against production data until a separate deployment and backup procedure has been reviewed.
+
+## Frontend runtime configuration
+
+The frontend reads the public Xiaoya search URL from `/config.json`. In Compose, `MOVIEHUB_FRONTEND_CONFIG_PATH` mounts the host JSON file at that path. The example file is `deploy/frontend-config.json`:
+
+```json
+{
+  "xiaoyaSearchBaseUrl": "https://your-xiaoya-host.example/search"
+}
+```
+
+The value is a public navigation URL, not a credential. MovieHub appends the selected movie title as the URL-encoded `box` query parameter. Keep the real NAS hostname in this runtime config rather than hardcoding it in the React source.
+
+Never put `MOVIEHUB_API_KEY` or any other secret in this file. The frontend must not contain server credentials.

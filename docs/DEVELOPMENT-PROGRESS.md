@@ -101,7 +101,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 66%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 68%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -176,7 +176,8 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Add parser/collector regression tests for all four sections, ID/rank duplicates, untrusted subject hosts, robots denial and HTTP 429.
 - [x] Run the official collector in CI with robots.txt permission; generated 8/10/10/10 entries and all four JSON files passed `import_chart --dry-run`.
 - [x] Upload the four normalized snapshots as a 14-day GitHub Actions artifact; keep generated data out of Git.
-- [ ] Review/enrich metadata through the read-only Scout path and import only after the independent MovieHub database is explicitly initialized.
+- [x] Add a read-only Scout coverage audit for chart JSON: ID match rate, metadata field coverage and media-type mismatches, with synthetic SQLite regression tests.
+- [ ] Run the audit against a separately staged Scout copy only after that source is explicitly made available; import only after the independent MovieHub database is initialized.
 - [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 

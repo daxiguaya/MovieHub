@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.cache import cache_manager
 from app.database import (
     Genre,
+    ImportBatchReceipt,
     Movie,
     MovieGenre,
     MoviePoster,
@@ -245,17 +246,21 @@ class ImportService:
                     raise ValueError(
                         "Source data changed since the interrupted run; refusing checkpoint resume"
                     )
-                checkpoints = [
-                    event for event in run_events
-                    if event.get("event") == "batch_committed"
-                ]
-                from app.services.import_checkpoints import validate_resume_checkpoints
+                from app.services.import_receipts import restore_from_batch_receipts
 
-                restored = validate_resume_checkpoints(
-                    source_conn,
-                    checkpoints,
-                    total,
-                )
+                # The target database receipt is authoritative because it was
+                # committed atomically with this run's movie rows. The JSONL
+                # journal is repaired from receipts if the process died after
+                # the SQLite commit but before the journal append.
+                with SessionLocal() as receipt_db:
+                    restored = restore_from_batch_receipts(
+                        receipt_db,
+                        source_conn,
+                        journal_path,
+                        run_id,
+                        source_fingerprint,
+                        total,
+                    )
                 processed = restored["processed"]
                 imported = restored["imported"]
                 skipped = restored["skipped"]
@@ -306,6 +311,11 @@ class ImportService:
                     # A failed batch rolls back as a unit; committed batches
                     # remain safe to retry because the importer is idempotent.
                     batch_errors: list[dict[str, Any]] = []
+                    batch_imported = batch_skipped = batch_errors_count = 0
+                    batch_processed = len(rows)
+                    batch_number = committed_batches + 1
+                    committed_at = datetime.now().isoformat()
+                    receipt_event: dict[str, Any] = {}
                     with db.begin():
                         genre_map = self._ensure_genres(db)
                         region_map = self._ensure_regions(db)
@@ -321,14 +331,14 @@ class ImportService:
                                         force_full=force_full,
                                     )
                                 if changed:
-                                    imported += 1
+                                    batch_imported += 1
                                 else:
-                                    skipped += 1
+                                    batch_skipped += 1
                             except Exception as exc:
-                                record_errors += 1
+                                batch_errors_count += 1
                                 batch_errors.append({
                                     "run_id": run_id,
-                                    "batch": committed_batches + 1,
+                                    "batch": batch_number,
                                     "douban_id": str(row["douban_id"]),
                                     "title": str(row["douban_title"] or "")[:300],
                                     "error_type": type(exc).__name__[:120],
@@ -343,36 +353,60 @@ class ImportService:
                                     item.name: item.id
                                     for item in db.scalars(select(Region)).all()
                                 }
-                                skipped += 1
+                                batch_skipped += 1
                                 if error_logs < self._MAX_ERROR_LOGS:
                                     logger.exception(
                                         "Failed to process source record douban_id=%s",
                                         row["douban_id"],
                                     )
                                     error_logs += 1
-                            processed += 1
 
-                    # Persist the per-record failure manifest only after the
-                    # containing target batch commits. A crash before the
-                    # checkpoint can replay the batch; the report layer
-                    # de-duplicates identical run/batch/record/error entries.
+                        # The receipt and all movie/metadata writes share this
+                        # exact transaction. A crash can commit both or neither.
+                        receipt = ImportBatchReceipt(
+                            run_id=run_id,
+                            batch_number=batch_number,
+                            source_fingerprint=source_fingerprint,
+                            processed=processed + batch_processed,
+                            total=total,
+                            imported=imported + batch_imported,
+                            skipped=skipped + batch_skipped,
+                            errors=record_errors + batch_errors_count,
+                            last_douban_id=str(rows[-1]["douban_id"]),
+                            error_records=json.dumps(
+                                batch_errors,
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                            ),
+                            committed_at=committed_at,
+                        )
+                        db.add(receipt)
+                        receipt_event = {
+                            "event": "batch_committed",
+                            "run_id": run_id,
+                            "batch": batch_number,
+                            "processed": receipt.processed,
+                            "total": total,
+                            "last_douban_id": receipt.last_douban_id,
+                            "imported": receipt.imported,
+                            "skipped": receipt.skipped,
+                            "errors": receipt.errors,
+                            "committed_at": committed_at,
+                        }
+
+                    # Counters advance only after the transaction containing
+                    # both target rows and their receipt has committed.
+                    processed += batch_processed
+                    imported += batch_imported
+                    skipped += batch_skipped
+                    record_errors += batch_errors_count
+                    committed_batches = batch_number
+
                     if batch_errors:
                         from app.services.import_errors import append_import_errors
                         append_import_errors(journal_path, batch_errors)
 
-                    committed_batches += 1
-                    append_import_event(journal_path, {
-                        "event": "batch_committed",
-                        "run_id": run_id,
-                        "batch": committed_batches,
-                        "processed": processed,
-                        "total": total,
-                        "last_douban_id": str(rows[-1]["douban_id"]),
-                        "imported": imported,
-                        "skipped": skipped,
-                        "errors": record_errors,
-                        "committed_at": datetime.now().isoformat(),
-                    })
+                    append_import_event(journal_path, receipt_event)
                     self._set_progress(
                         processed,
                         total,

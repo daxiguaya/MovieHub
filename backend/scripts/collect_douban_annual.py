@@ -28,6 +28,8 @@ def write_snapshots(
     a complete annual collection.
     """
     output_dir = Path(output_dir).expanduser()
+    if set(snapshots) != set(ANNUAL_CHARTS):
+        raise ValueError("Annual collection must contain exactly the four configured charts")
     output_dir.mkdir(parents=True, exist_ok=True)
     targets = {
         slug: output_dir / f"{slug}-{capture_date.isoformat()}.json"
@@ -111,6 +113,18 @@ def main() -> int:
     try:
         capture_date = date.fromisoformat(args.date)
         output_dir = Path(args.output_dir).expanduser()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        expected = [
+            output_dir / f"{slug}-{capture_date.isoformat()}.json"
+            for slug in ANNUAL_CHARTS
+        ]
+        existing = [str(path) for path in expected if path.exists()]
+        if existing and not args.overwrite:
+            raise FileExistsError(
+                "Output file(s) already exist; pass --overwrite to replace: "
+                + ", ".join(existing)
+            )
+
         snapshots = DoubanAnnualChartCollector().collect(capture_date)
         results = write_snapshots(
             snapshots,

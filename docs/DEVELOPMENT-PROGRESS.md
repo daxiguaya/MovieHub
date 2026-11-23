@@ -101,7 +101,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 62%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; annual/scheduled chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 62%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; 2025 annual ranking-data import, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -174,7 +174,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 
-**Top 250, popular and high-rated one-shot collection: implemented. Annual charts and scheduling remain pending.**
+**Top 250, popular and high-rated one-shot collection: implemented. 2025 annual chart categories are defined separately; annual data import, 2026 category verification and scheduling remain pending.**
 
 ## Phase E — React frontend baseline
 
@@ -206,7 +206,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Record the manual normalized snapshot workflow and explicitly distinguish it from automatic chart collection.
 - [x] Document why legacy/unauthorized API keys and mandatory third-party proxy APIs are not accepted as the default acquisition path.
 
-**Source review: complete. Top 250, popular and high-rated one-shot collection is implemented. Annual charts and scheduled refresh remain pending an authorized, reliable source path.**
+**Source review: complete. Top 250, popular and high-rated one-shot collection is implemented. The official 2025 annual taxonomy is verified and modeled; importing its ranking data, verifying the 2026 categories and any scheduled refresh remain pending.**
 
 ## Next work
 

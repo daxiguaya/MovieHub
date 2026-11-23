@@ -103,6 +103,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 **Estimated first-release implementation progress: about 68%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline, dual-container packaging and official 2025 annual chart acquisition path are substantially in place; importing the collected annual snapshots, 2026 category verification, scheduled chart refresh, NAS/NPM verification and production rollout remain unfinished.
 
+## Chart and Scout import numeric integrity (2026-11-23)
+
+- [x] Reject boolean and fractional values where integer ranks, years, or counts are expected.
+- [x] Reject non-finite and out-of-range ratings before persistence.
+- [x] Enforce the 1870–2200 year range in both the Pydantic chart schema and the service layer, including raw mapping callers that bypass schema validation.
+- [x] Preserve existing Scout-owned year/rating metadata when incoming source values are invalid or absent.
+- [x] Cover malformed Scout numeric metadata and raw chart-import year/rating edge cases with regression tests.
+
 ## Phase B — Scout import hardening (in progress)
 
 - [x] Make `force_full` functional: incremental imports skip records whose Scout `update_time` is not newer than the last imported timestamp; forced full imports reprocess all valid records.

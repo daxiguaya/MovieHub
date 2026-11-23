@@ -24,14 +24,15 @@ Current phase: Application integration audit (after Phase 4)
 - [x] Verify protected import endpoints reject missing API keys and block absolute-path and symlink escapes from the configured import directory.
 - [x] Verify chart snapshot import, same-date replacement, historical-date listing and latest-snapshot reads through the HTTP API.
 - [x] Remove wildcard credentialed CORS; cross-origin access is disabled by default and configurable through an explicit origin allowlist.
-- [ ] Review health/readiness behavior, logging and shutdown lifecycle.
+- [x] Add a read-only /api/ready check that verifies all required tables and schema version; keep /api/health as the process liveness check.
+- [ ] Review logging and shutdown lifecycle.
 - [ ] Review repository hygiene and deployment packaging (including tracked repair-backup artifacts).
 
 ## Latest code validation
 
 - Workflow: Backend tests
-- Run: [#43](https://github.com/daxiguaya/MovieHub/actions/runs/45124683386)
-- Tested commit: `f238ade6ca7df53d39809fe528a0d23f1cff1b72`
+- Run: [#49](https://github.com/daxiguaya/MovieHub/actions/runs/45124990712)
+- Tested commit: `ae29ee5af14a977c422d06c5b22dc323c99667ba`
 - Result: **success** — backend compilation passed; **32 tests passed**. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries

@@ -68,7 +68,7 @@ def test_douban_tagged_collection_flows_into_internal_movie_ids_and_chart_snapsh
         result = ChartImportService().import_snapshot(db, snapshot)
         db.commit()
 
-        assert result.imported_count == 3
+        assert result["imported_count"] == 3
         stored_snapshot = db.scalar(
             select(ChartSnapshot).where(
                 ChartSnapshot.snapshot_date == "2026-11-23"

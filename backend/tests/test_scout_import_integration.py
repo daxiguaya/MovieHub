@@ -1017,7 +1017,8 @@ def test_scout_import_resume_rejects_changed_source_before_target_writes(
     TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
     monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
-    append_import_event(get_import_journal_path(TargetSession), {
+    journal_path = get_import_journal_path(TargetSession)
+    append_import_event(journal_path, {
         "event": "run_started",
         "run_id": "changed-source-run",
         "source_path": str(source_path.resolve()),

@@ -49,6 +49,32 @@ docker compose exec moviehub python -m scripts.import_chart \
 
 If robots.txt disallows the path, Douban returns 403/429, a redirect occurs, or page markup/ranks are incomplete, collection stops without producing a partial snapshot. Do not work around those restrictions. The collector has no scheduler and is not run automatically.
 
+## Collect popular and high-rated snapshots
+
+A second one-shot collector uses Douban's web-application `/j/search_subjects` JSON endpoint for the `热门` and `豆瓣高分` tags. This is an undocumented web endpoint, not an official public API; its response and availability can change.
+
+Collect up to 100 popular movies:
+
+```sh
+docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
+  --chart popular \
+  --date 2026-11-23 \
+  --output /tmp/moviehub-popular-2026-11-23.json
+```
+
+Collect up to 100 high-rated movies:
+
+```sh
+docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
+  --chart high-rated \
+  --date 2026-11-23 \
+  --output /tmp/moviehub-high-rated-2026-11-23.json
+```
+
+The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. The endpoint provides only list-level fields (ID, title, rating and cover); run the read-only Scout metadata import as needed to enrich year, rating count, genres, regions and details.
+
+Then use the same `import_chart --dry-run` and import commands above. Annual charts are not covered by this collector yet.
+
 ## Snapshot format
 
 The file must be UTF-8 JSON and conform to `ChartSnapshotImport`. Minimal example:

@@ -60,6 +60,8 @@ def audit_chart_snapshots(
     conn = sqlite3.connect(uri, uri=True, timeout=10)
     conn.row_factory = sqlite3.Row
     try:
+        # Keep schema validation and every coverage query on one WAL snapshot.
+        conn.execute("BEGIN")
         ImportService._validate_source(conn)
         rows: dict[str, list[sqlite3.Row]] = {}
         # Keep each query comfortably below SQLite's host-parameter limit.

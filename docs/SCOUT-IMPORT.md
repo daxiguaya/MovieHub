@@ -76,3 +76,18 @@ python -m scripts.audit_scout_import --scout-db /path/to/staged-scout.sqlite --s
 ```
 
 The report uses one read-only SQLite transaction snapshot and streams movie/TV rows. It reports media-type totals, invalid/duplicate identities, invalid ratings and years, malformed `raw_data`, and coverage for every metadata field consumed by the importer. Strict mode exits with code 2 when invalid identities or duplicate Douban IDs exist; numeric and raw-data anomalies remain visible warnings for review. It never opens the MovieHub target database and never modifies Scout.
+
+
+## Combined Scout import preflight (recommended)
+
+Run the whole-catalogue quality audit and annual-chart coverage audit together to get one import decision:
+
+```sh
+cd backend
+python -m scripts.audit_scout_preflight \
+  --scout-db /path/to/staged-scout.sqlite \
+  --input /path/to/annual-movies.json \
+  --input /path/to/annual-tv.json
+```
+
+Repeat `--input` for every normalized chart snapshot. Exit code 0 means the combined identity and chart-coverage gates passed and the data is ready for operator review. Exit code 2 means one or more blocking issues were found; exit code 1 means the audit could not be completed. The JSON report contains both detailed audits, one consolidated blocking-issues object, and non-blocking numeric/raw-data warnings. Use a consistent staged SQLite backup and keep it unchanged for the duration of the command. A passing report does not itself authorize or perform an import.

@@ -402,3 +402,13 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Reuse the importer's source schema and normalization logic; audit does not open or write the MovieHub database.
 - [x] Add synthetic regression tests, including a SHA-256 before/after check proving the Scout fixture is unchanged.
 - Validation: awaiting the CI run for this commit. Actual coverage figures remain unknown until a consistent staged Scout DB copy is made available; no NAS or production database was accessed.
+
+
+## Combined Scout import preflight (2026-11-23)
+
+- [x] Combine whole-catalogue Scout quality and annual-chart coverage into one JSON report and strict decision gate.
+- [x] Block on invalid identities, duplicate IDs, chart IDs missing from Scout, ambiguous IDs, and media-type mismatches.
+- [x] Keep invalid ratings, years, and malformed raw JSON visible as warnings rather than silently discarding them.
+- [x] Pin chart schema validation and lookup queries to one read-only SQLite transaction snapshot.
+- [x] Add synthetic integration tests proving pass/block decisions and unchanged Scout source bytes.
+- Validation: awaiting CI. The source DB is audited twice through separate read-only transactions; use a stable staged backup unchanged during execution. Actual coverage values remain unknown until a staged Scout copy is supplied.

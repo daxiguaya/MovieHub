@@ -104,6 +104,12 @@ Do not implement these in MovieHub first release:
 | Frontend/backend Compose topology | Separate frontend and backend services; same-origin NPM routing documented | Verify actual NPM locations and server-side favorites-key injection during authorized rollout |
 | Backup/restore | Utility, tests and runbook exist | Validate real backup destination only during an authorized rollout |
 
+## Chart acquisition policy
+
+- Use normalized snapshot imports until an authorized and reliable chart provider is selected.
+- Do not rely on deprecated public API keys, mandatory paid proxies, or high-frequency scraping.
+- Keep source adapters isolated and preserve source attribution, pacing, cache and retry boundaries.
+
 ## Delivery order
 
 1. Benchmark existing LIKE search on realistic fixtures; only add optional FTS5 if measurements show it is needed.

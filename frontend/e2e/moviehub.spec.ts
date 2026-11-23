@@ -162,3 +162,24 @@ test("adds a favorite and opens the configured Xiaoya search in a new tab", asyn
   expect(new URL(popup.url()).searchParams.get("box")).toBe("星际穿越");
   await expect(popup).toHaveTitle("Xiaoya handoff fixture");
 });
+
+
+test("connects the browser to the real FastAPI service and temporary SQLite database", async ({ page }) => {
+  // This test deliberately removes the API fixture installed by beforeEach.
+  // The dedicated CI job starts a real FastAPI process backed by a temporary DB.
+  await page.unroute("**/api/**");
+
+  await page.goto("/");
+  await page.locator('a.chart-tile[href="/charts/top250"]').click();
+  await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
+  await expect(page.locator("a.movie-title", { hasText: "星际穿越" })).toBeVisible();
+
+  await page.locator("a.movie-title", { hasText: "星际穿越" }).click();
+  await expect(page.getByRole("heading", { name: "星际穿越" })).toBeVisible();
+  await expect(page.getByText("A journey through space and time.")).toBeVisible();
+
+  await page.goto("/search");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际穿越");
+  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await expect(page.locator("a.movie-title", { hasText: "星际穿越" })).toBeVisible();
+});

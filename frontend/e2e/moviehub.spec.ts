@@ -148,9 +148,17 @@ test("adds a favorite and opens the configured Xiaoya search in a new tab", asyn
   await page.getByRole("button", { name: "♡ 加入收藏" }).click();
   await expect(page.getByRole("button", { name: "♥ 已收藏" })).toBeVisible();
 
+  await context.route("https://xiaoya.example/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<title>Xiaoya handoff fixture</title>"
+    })
+  );
   const popupPromise = context.waitForEvent("page");
   await page.getByRole("button", { name: /在小雅中搜索/ }).click();
   const popup = await popupPromise;
   await expect(popup).toHaveURL(/https:\/\/xiaoya\.example\/search\?box=/);
-  await expect(popup).toHaveURL(/box=%E6%98%9F%E9%99%85%E7%A9%BF%E8%B6%8A/);
+  expect(new URL(popup.url()).searchParams.get("box")).toBe("星际穿越");
+  await expect(popup).toHaveTitle("Xiaoya handoff fixture");
 });

@@ -81,7 +81,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 56%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 58%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, frontend baseline and dual-container packaging are substantially in place; automatic chart collection, browser E2E validation and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -153,9 +153,10 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Make Xiaoya search URL runtime-configurable; the title is URL-encoded into the existing `box` parameter and opens in a new tab.
 - [x] Keep the API key out of frontend assets; document server-side NPM header injection only for the favorites path.
 - [x] Add a separate non-root Nginx frontend container, read-only root filesystem, 128 MiB limit and Compose service.
+- [x] Add five frontend regression tests covering chart navigation, search filters, Xiaoya handoff, rank comparison and favorite add/remove.
 - [x] Add CI type-check, Vite production build and frontend Docker image build.
 
-**Frontend baseline: implemented and build-validated.** Browser end-to-end tests, real chart data, final visual tuning and actual NPM integration remain outstanding.
+**Frontend baseline: implemented, five UI regression tests passed, and both frontend build and image build passed.** Full browser E2E against a running stack, real chart data, final visual tuning and actual NPM integration remain outstanding.
 
 ## Chart source review and acquisition policy
 
@@ -182,9 +183,9 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#201](https://github.com/daxiguaya/MovieHub/actions/runs/45131963712)
-- Tested commit: `30130d452c69f05e691cf19aea71d85e069fd1d5`
-- Result: **success** — backend compilation, **73 tests passed**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#217](https://github.com/daxiguaya/MovieHub/actions/runs/45132485377)
+- Tested commit: `1c296e323afac3e85f6b4b2080619c034a864c07`
+- Result: **success** — backend compilation, **73 backend tests**, **5 frontend UI tests**, Compose validation, backend image build, frontend TypeScript/Vite production build and frontend Docker image build all passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

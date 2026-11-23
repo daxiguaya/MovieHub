@@ -273,6 +273,15 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Added synthetic regression assertions for wrong-type records being excluded from field coverage, in addition to the unexpected-type and duplicate-ID cases.
 - Validation status: implementation and regression tests are committed; a GitHub Actions run for the latest head is still required before treating these changes as CI-verified.
 
+
+## Chart import raw-input integrity hardening (2026-11-23)
+
+- The service now validates rank values and duplicate ranks before opening its write transaction, including for mapping-based internal callers that bypass the Pydantic request schema.
+- Integer normalization rejects booleans and fractional numeric values instead of silently treating `True` as rank 1 or truncating 1.5 to rank 1.
+- Rating normalization rejects booleans, NaN and positive/negative infinity; invalid raw values are stored as absent rather than contaminating movie or chart-item rating columns.
+- Added regression coverage for duplicate ranks, boolean/fractional ranks, and non-finite movie/source ratings. These cases also exercise the service's lower-level mapping input path.
+- Validation status: implementation and tests are committed; GitHub Actions validation for the current head is pending.
+
 ## Chart import identity/type integrity hardening (2026-11-23)
 
 - The chart importer now preflights every existing MovieHub movie referenced by an incoming snapshot and rejects a movie/TV type conflict before updating movie metadata or replacing the chart/date snapshot.

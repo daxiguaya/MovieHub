@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-23
-Current phase: Backend feature APIs and security hardening; frontend implementation next
+Current phase: Backend feature APIs and data-source workflow; frontend implementation next
 
 ## Phase 4 — independent database foundation
 
@@ -73,11 +73,11 @@ Current phase: Backend feature APIs and security hardening; frontend implementat
 | Database foundation and Scout-safe import boundary | 100% |
 | Backend API baseline (charts, movie search/filter, details, posters, import) | 70% |
 | Scout import hardening | 100% of current implementation milestone; additional merge/performance validation pending |
-| Automatic chart collection and history comparison | 0% |\n| Favorites API and Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
+| Automatic chart collection and history comparison | 0% |\n| Favorites API | 100% of API milestone; frontend UI remains\n| Xiaoya handoff | 0% |\n| React frontend and user workflows | 0% |
 | Container packaging and backup/restore preparation | 100% |
 | Actual NAS deployment and end-to-end production verification | 0% |
 
-**Estimated first-release implementation progress: about 45%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, favorites API, frontend, Xiaoya handoff, and production rollout remain unfinished.
+**Estimated first-release implementation progress: about 47%.** This is a planning estimate, not a test metric. The independent database, core backend APIs, import hardening, poster security, and backend packaging are substantially in place; automatic chart collection, favorites API, frontend, Xiaoya handoff, and production rollout remain unfinished.
 
 ## Phase B — Scout import hardening (in progress)
 
@@ -87,7 +87,7 @@ Current phase: Backend feature APIs and security hardening; frontend implementat
 - [x] Invalidate MovieHub caches only after committed changes; report when earlier batches were committed before a later failure.
 - [x] Add regression coverage proving incremental skip and forced full reprocessing behavior.
 
-**Import hardening milestone: implemented; 65-test CI passed before the favorites API additions.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
+**Import hardening milestone: implemented; 66-test CI passed including favorites API integration.** Remaining Phase B work includes explicit merge-policy tests, operator workflow, and larger-fixture performance validation. Source deletions remain non-destructive: absent Scout rows do not delete MovieHub movies.
 
 ## Phase D — poster-fetch security hardening
 
@@ -98,12 +98,14 @@ Current phase: Backend feature APIs and security hardening; frontend implementat
 - [x] Restrict responses to raster image MIME types and enforce an 8 MiB maximum using both Content-Length and streamed byte counting.
 - [x] Add regression tests for URL allowlisting, private DNS answers and size policy.
 
-**Poster-fetch security milestone: implemented; 65-test CI passed before the favorites API additions.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
+**Poster-fetch security milestone: implemented; 66-test CI passed including favorites API integration.** No external poster URL is fetched unless it passes the allowlist and DNS checks.
 
 ## Next work
 
 - [ ] Benchmark title/original-title LIKE search against realistic fixture sizes; keep FTS5 optional rather than a hard runtime dependency, and add it only if measurements justify it.
-- [ ] Complete favorites API regression tests and document the NPM-side API-key injection required for browser access.
+- [x] Add protected favorites list/add/update-note/remove endpoints using internal MovieHub IDs, with idempotent writes and API-key enforcement.
+- [x] Add favorites API integration tests for authentication, duplicate writes, note updates, internal-ID enforcement and removal.
+- [x] Document that the browser must not embed the API key; the reverse proxy must inject it server-side.
 - [ ] Build the React + TypeScript + Vite frontend in a separate container; implement charts, search/filter, movie detail, favorites and Xiaoya handoff.
 - [ ] Define stable frontend API client behavior, including loading, empty, validation and error states.
 - [ ] Formalize Scout field-level merge precedence and test empty-field preservation, newer timestamps, and source-row deletion behavior.
@@ -115,9 +117,9 @@ Current phase: Backend feature APIs and security hardening; frontend implementat
 ## Latest code validation
 
 - Workflow: Backend tests + Compose validation + Docker image build
-- Run: [#105](https://github.com/daxiguaya/MovieHub/actions/runs/45128516067)
-- Tested commit: `15e71d201c6563125ad2537a0c65912dd932d836`
-- Result: **success** — backend compilation, **65 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
+- Run: [#113](https://github.com/daxiguaya/MovieHub/actions/runs/45128900397)
+- Tested commit: `799a41796f7360ea557578bb9a619ad3dbf7b54d`
+- Result: **success** — backend compilation, **66 tests passed**, Compose configuration validation and backend Docker image build passed. One non-blocking Starlette/httpx TestClient deprecation warning remains.
 
 ## Scope and safety boundaries
 

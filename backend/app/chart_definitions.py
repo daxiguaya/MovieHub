@@ -1,4 +1,3 @@
-
 """Initial MovieHub chart definitions."""
 
 from dataclasses import dataclass
@@ -44,22 +43,40 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         display_order=30,
     ),
     ChartDefinition(
-        slug="annual-2026",
-        name="2026 年度电影",
-        source="douban",
-        category="annual",
-        period="2026",
-        description="2026 年度电影榜单",
-        display_order=40,
-    ),
-    ChartDefinition(
-        slug="annual-2025",
-        name="2025 年度电影",
+        slug="annual-2025-chinese-movies",
+        name="2025 评分最高华语电影",
         source="douban",
         category="annual",
         period="2025",
-        description="2025 年度电影榜单",
+        description="豆瓣 2025 年度华语电影榜单",
+        display_order=40,
+    ),
+    ChartDefinition(
+        slug="annual-2025-international-movies",
+        name="2025 评分最高外语电影",
+        source="douban",
+        category="annual",
+        period="2025",
+        description="豆瓣 2025 年度外语电影榜单",
         display_order=50,
+    ),
+    ChartDefinition(
+        slug="annual-2025-hidden-gems",
+        name="2025 年度冷门佳片",
+        source="douban",
+        category="annual",
+        period="2025",
+        description="豆瓣 2025 年度冷门佳片榜单",
+        display_order=60,
+    ),
+    ChartDefinition(
+        slug="annual-2025-chinese-tv",
+        name="2025 评分最高华语剧集",
+        source="douban",
+        category="annual",
+        period="2025",
+        description="豆瓣 2025 年度华语剧集榜单",
+        display_order=70,
     ),
 )
 
@@ -70,4 +87,3 @@ def get_chart_definition(slug: str) -> ChartDefinition | None:
         (chart for chart in INITIAL_CHARTS if chart.slug == slug),
         None,
     )
-

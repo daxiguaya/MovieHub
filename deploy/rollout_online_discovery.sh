@@ -33,10 +33,19 @@ docker compose version >/dev/null 2>&1 || { echo "[FAIL] Docker Compose v2 unava
 
 echo "[1/6] Fetching main and checking tracked-file safety..."
 git fetch origin main
-if ! git diff --quiet origin/main -- .; then
-  echo "[FAIL] Tracked working-tree content differs from origin/main." >&2
-  echo "No files were changed. Review local edits before retrying." >&2
+if ! git diff --cached --quiet HEAD -- .; then
+  echo "[FAIL] Staged tracked changes exist; refusing to overwrite them." >&2
   git status --short >&2
+  exit 1
+fi
+if ! git diff --quiet HEAD -- . ':(exclude)docker-compose.yml'; then
+  echo "[FAIL] Unexpected tracked local edits exist outside docker-compose.yml." >&2
+  git status --short >&2
+  exit 1
+fi
+if ! git diff --quiet origin/main -- docker-compose.yml; then
+  echo "[FAIL] Local docker-compose.yml does not exactly match origin/main." >&2
+  echo "Review the Compose difference before retrying." >&2
   exit 1
 fi
 if ! git merge-base --is-ancestor HEAD origin/main; then

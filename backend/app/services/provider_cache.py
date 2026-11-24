@@ -62,6 +62,18 @@ class ProviderResponseCache:
                     CREATE INDEX IF NOT EXISTS ix_provider_cache_expiry
                     ON provider_response_cache(expires_at)
                 """)
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS external_favorites (
+                        provider TEXT NOT NULL,
+                        media_type TEXT NOT NULL,
+                        provider_id INTEGER NOT NULL,
+                        snapshot_json TEXT NOT NULL,
+                        note TEXT NOT NULL DEFAULT '',
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        PRIMARY KEY (provider, media_type, provider_id)
+                    )
+                """)
             self._initialized = True
 
     @staticmethod
@@ -157,6 +169,51 @@ class ProviderResponseCache:
                 (int(time.time()),),
             ).fetchone()
         return {"entries": int(row[0]), "bytes": int(row[1]), "fresh_entries": int(row[2])}
+
+    def save_favorite(self, media_type: str, provider_id: int, snapshot: dict[str, Any], note: str = "") -> dict[str, Any]:
+        self._init()
+        now = int(time.time())
+        serialized = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > 16 * 1024:
+            raise ValueError("Favorite snapshot is too large")
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """INSERT INTO external_favorites
+                   (provider, media_type, provider_id, snapshot_json, note, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(provider, media_type, provider_id) DO UPDATE SET
+                     snapshot_json=excluded.snapshot_json, note=excluded.note, updated_at=excluded.updated_at""",
+                ("tmdb", media_type, int(provider_id), serialized, note[:1000], now, now),
+            )
+            row = connection.execute(
+                """SELECT snapshot_json, note, created_at, updated_at FROM external_favorites
+                   WHERE provider=? AND media_type=? AND provider_id=?""",
+                ("tmdb", media_type, int(provider_id)),
+            ).fetchone()
+        return {"provider": "tmdb", "media_type": media_type, "provider_id": int(provider_id),
+                "snapshot": json.loads(row[0]), "note": row[1], "created_at": row[2], "updated_at": row[3]}
+
+    def list_favorites(self) -> list[dict[str, Any]]:
+        self._init()
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """SELECT media_type, provider_id, snapshot_json, note, created_at, updated_at
+                   FROM external_favorites WHERE provider=? ORDER BY created_at DESC, provider_id DESC""",
+                ("tmdb",),
+            ).fetchall()
+        return [{"provider": "tmdb", "media_type": row[0], "provider_id": row[1],
+                 "snapshot": json.loads(row[2]), "note": row[3], "created_at": row[4], "updated_at": row[5]}
+                for row in rows]
+
+    def delete_favorite(self, media_type: str, provider_id: int) -> bool:
+        self._init()
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                """DELETE FROM external_favorites
+                   WHERE provider=? AND media_type=? AND provider_id=?""",
+                ("tmdb", media_type, int(provider_id)),
+            )
+            return cursor.rowcount > 0
 
     def clear_expired(self) -> int:
         self._init()

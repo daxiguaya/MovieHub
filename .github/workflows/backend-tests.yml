@@ -349,7 +349,7 @@ jobs:
       contents: read
     env:
       MOVIEHUB_DATA_DIR: /tmp/moviehub-first-launch-browser
-      MOVIEHUB_REAL_ANNUAL_E2E: "1"
+      MOVIEHUB_REAL_ANNUAL_E2E: "1"\n      MOVIEHUB_API_KEY: "ci-only-real-data-e2e-key"\n      MOVIEHUB_E2E_PROXY_API_KEY: "ci-only-real-data-e2e-key"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

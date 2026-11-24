@@ -637,3 +637,14 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] Add a CLI-order regression test proving an output/input collision is rejected before the expensive Scout audit starts. This new test is committed as `65b4cf2`; its CI result is pending.
 
 **Safety boundary:** report output validation happens before any source audit, and report writing independently refuses symlink/temp-file hazards. The new CLI-order regression test is awaiting CI. No real Scout source, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed. Overall first-release estimate remains about 75%; real staged-data and operational acceptance gates remain open.
+
+## First inspection of an actual collected dataset (2026-11-24)
+
+- [x] Download and inspect the real four-file Douban 2025 annual-chart artifact from run [#45213246118](https://github.com/daxiguaya/MovieHub/actions/runs/45213246118), SHA-256 `d7d050a5816dcf645d367de4dc3182f5e629060ef70f95e498a75ac60b8de689`.
+- [x] Audit **38 actual entries** across four charts: 8 Chinese movies, 10 international movies, 10 hidden gems and 10 Chinese TV entries; 38/38 unique IDs within files, zero cross-chart duplicate IDs, all titles/IDs present and ranks continuous within each collected list.
+- [x] Measure metadata coverage: directors 38/38; year, rating_count, IMDb/TMDB IDs, actors, genres, regions, posters and overview all 0/38.
+- [x] Record the data-quality finding and next-stage requirements in [REAL-DATA-AUDIT-2025-ANNUAL.md](reports/REAL-DATA-AUDIT-2025-ANNUAL.md).
+- [x] The CLI-order regression test from commit `65b4cf2` is included in run [#45309959771](https://github.com/daxiguaya/MovieHub/actions/runs/45309959771): backend **247 passed, 4 skipped, 1 warning**.
+- [ ] In run #45309959771, frontend and Playwright E2E were still running at the time of this update; annual-chart-collection and performance-benchmarks were skipped.
+
+**Real-data conclusion:** the actual annual snapshot is adequate for an isolated chart import rehearsal but is not a complete catalogue and cannot replace Scout. Do not infer missing release years from `period=2025`, and do not invent missing ranks or metadata. The next real-data gate is a consistent read-only staged Scout SQLite copy. Its concrete source path was not established in the earlier NAS scan; no NAS connection or source-file access occurred in this round. No production MovieHub database, NPM configuration or service was touched. Overall first-release estimate remains about 75%.

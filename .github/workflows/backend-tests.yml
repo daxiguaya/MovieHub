@@ -164,7 +164,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('frontend/package.json') }}
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
         working-directory: frontend
       - name: Run browser end-to-end tests
         run: npm run test:e2e
@@ -413,7 +413,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('frontend/package.json') }}
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --only-shell chromium
         working-directory: frontend
       - name: Run the combined real first-launch browser journeys
         run: npm run test:e2e -- --grep "real (Top 250 first-launch snapshot|2025 annual snapshots|first-launch dataset remains usable|imported Top 250 movie can be favorited and removed through the live API)"

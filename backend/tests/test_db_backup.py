@@ -133,3 +133,33 @@ def test_backup_rejects_database_with_incomplete_schema(tmp_path):
 
     with pytest.raises(RuntimeError, match="missing required tables"):
         create_backup(incomplete, tmp_path / "backups")
+
+
+
+def test_backup_retention_does_not_delete_unrecognized_directories(tmp_path):
+    database = tmp_path / "data" / "movies.db"
+    backup_root = tmp_path / "backups"
+    _initialize_database(database)
+
+    owned = create_backup(database, backup_root, keep_last=1)
+
+    foreign = backup_root / "moviehub-third-party-export"
+    foreign.mkdir()
+    (foreign / "movies.db").write_bytes(b"not a MovieHub backup")
+    (foreign / "manifest.json").write_text(
+        '{"format_version": 99, "database_file": "movies.db", '
+        '"schema_version": 2}',
+        encoding="utf-8",
+    )
+
+    malformed = backup_root / "moviehub-incomplete"
+    malformed.mkdir()
+    (malformed / "movies.db").write_bytes(b"partial")
+    (malformed / "manifest.json").write_text("{not-json", encoding="utf-8")
+
+    newer = create_backup(database, backup_root, keep_last=1)
+
+    assert owned != newer
+    assert newer.is_dir()
+    assert foreign.is_dir()
+    assert malformed.is_dir()

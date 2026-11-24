@@ -148,12 +148,12 @@ test("paginates a chart to its last page without losing the first page", async (
   await page.goto("/charts/top250");
   await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
   await expect(page.getByText("3 部作品", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "第一页电影" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "第二部电影" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第一页电影", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第二部电影", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "加载更多" }).click();
-  await expect(page.getByRole("link", { name: "第三部电影" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "第一页电影" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第三部电影", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第一页电影", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "加载更多" })).toHaveCount(0);
   expect(requests.some((request) => request.includes("cursor=page-2"))).toBe(true);
 });
@@ -162,14 +162,14 @@ test("switches to a historical snapshot and resets the visible page", async ({ p
   const requests = await installChartApi(page);
 
   await page.goto("/charts/top250");
-  await expect(page.getByRole("link", { name: "第一页电影" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第一页电影", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "加载更多" }).click();
-  await expect(page.getByRole("link", { name: "第三部电影" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第三部电影", exact: true })).toBeVisible();
 
   await page.getByLabel("历史日期").selectOption("2026-11-23");
-  await expect(page.getByRole("link", { name: "历史快照电影" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "第一页电影" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "第三部电影" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "历史快照电影", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "第一页电影", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "第三部电影", exact: true })).toHaveCount(0);
   await expect(page.getByText("2 部作品", { exact: true })).toBeVisible();
   expect(requests.some((request) => request.includes("snapshot_date=2026-11-23"))).toBe(true);
 });
@@ -181,7 +181,7 @@ test("compares two dated snapshots and displays rank movement and new entries", 
   await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
   await page.getByRole("button", { name: "比较排名" }).click();
 
-  await expect(page.getByText("第一页电影")).toBeVisible();
+  await expect(page.getByText("第一页电影", { exact: true })).toBeVisible();
   await expect(page.getByText("排名变动 · ↑1")).toBeVisible();
   await expect(page.getByText("新上榜")).toBeVisible();
 });

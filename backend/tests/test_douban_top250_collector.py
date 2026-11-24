@@ -167,3 +167,37 @@ def test_top250_collector_honors_robots_crawl_delay():
 
     assert len(sleeps) == PAGE_COUNT - 1
     assert all(delay == 5.0 for delay in sleeps)
+
+
+def test_top250_parser_falls_back_to_visible_text_for_rating_count_and_credits():
+    html = f"""
+    <div class="item">
+      <div class="pic">
+        <em>1</em>
+        <a href="{DOUBAN_BASE_URL}/subject/1292052/">
+          <img src="https://img1.doubanio.com/poster.jpg" />
+        </a>
+      </div>
+      <div class="info">
+        <div class="hd">
+          <a href="{DOUBAN_BASE_URL}/subject/1292052/">
+            <span class="title">肖申克的救赎</span>
+          </a>
+        </div>
+        <div class="bd">
+          <p>导演: 弗兰克·德拉邦特 Frank Darabont 主演: 蒂姆·罗宾斯 Tim Robbins / 摩根·弗里曼 Morgan Freeman<br/>1994 / 美国 / 犯罪 剧情</p>
+          <span class="rating_num">9.7</span>
+          <span>3367640人评价</span>
+        </div>
+      </div>
+    </div>
+    """
+
+    [movie] = parse_top250_page(html)
+
+    assert movie.rating_count == 3367640
+    assert movie.directors == ["弗兰克·德拉邦特 Frank Darabont"]
+    assert movie.actors == [
+        "蒂姆·罗宾斯 Tim Robbins",
+        "摩根·弗里曼 Morgan Freeman",
+    ]

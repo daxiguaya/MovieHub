@@ -595,7 +595,7 @@ jobs:
         run: |
           mkdir -p "$MOVIEHUB_DATA_PATH" "$MOVIEHUB_BACKUP_PATH"
           sudo chown -R 10001:10001 "$RUNNER_TEMP/moviehub-compose-smoke"
-          docker network create chatgpt-browser_default
+          docker network create nginx-proxy-manager_default
       - name: Validate isolated Compose configuration
         run: docker compose -p moviehub-ci-smoke config --quiet
       - name: Start both containers before database initialization

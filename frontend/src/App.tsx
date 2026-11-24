@@ -389,7 +389,7 @@ function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
       <div className="movie-card-info">
         <Link to={`/movies/${movie.id}`} className="movie-title">{movie.title}</Link>
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
-        <div className="movie-rating"><span>★</span> {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count.toLocaleString()})</small></div>
+        <div className="movie-rating"><span>★</span> 豆瓣 {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count.toLocaleString()})</small></div>
       </div>
     </article>
   );
@@ -822,7 +822,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
       .finally(() => { if (active) setLoading(false); });
     api.favorites()
       .then((items) => { if (active) setIsFavorite(items.some((item) => item.movie.id === id)); })
-      .catch(() => { /* Favorites are protected separately by the reverse proxy. */ });
+      .catch(() => { /* Favorites require the configured API key; detail data remains available. */ });
     return () => { active = false; };
   }, [id]);
 
@@ -843,7 +843,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
 
   return (
     <>
-      <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><Link to="/search">电影库</Link><span>/</span><span>{movie.title}</span></div>
+      <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><Link to="/search">全网搜索</Link><span>/</span><span>{movie.title}</span></div>
       <section className="detail-layout">
         <div className="detail-poster-wrap">
           <MoviePoster movie={movie} />
@@ -853,7 +853,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <div className="eyebrow">{movie.type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? "YEAR UNKNOWN"}</div>
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
-          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>{movie.rating_count.toLocaleString()} 人评价</span></div>
+          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count.toLocaleString()} 人评价</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag}>{tag}</span>)}{movie.regions.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchBaseUrl, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>

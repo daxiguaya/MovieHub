@@ -553,7 +553,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Verify the 2026 chart definitions/categories against current official source publications; do not infer missing rankings.
 - [ ] Perform visual QA on chart home, chart history/comparison, search/filter, detail/poster states and favorites using realistic but non-production fixtures; fix responsive/layout/empty/error states.
 - [ ] Validate the Xiaoya handoff and same-origin API plus protected favorites-key injection in an isolated NPM test host; verify import endpoints remain inaccessible to browser clients.
-- [ ] Run the opt-in 10k/100k search/import benchmarks on a controlled machine and record latency/throughput/memory. NAS-specific measurements remain a later authorized task.
+- [x] Run the opt-in 10k/100k search/import benchmarks on GitHub-hosted runners and record latency/throughput. NAS-specific measurements remain a later authorized task.
 
 ### P2 — deployment readiness (requires separate explicit approval)
 - [ ] Verify NAS paths, UID/GID permissions, Docker network reachability, resource limits and dedicated backup destination without touching existing services.
@@ -568,3 +568,34 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [ ] Run the official 2025 annual collector and four-file dry-run through the opt-in Actions job.
 - [ ] Run the synthetic 10k/100k SQLite search and Scout import benchmarks through the opt-in Actions job.
 - [ ] Review actual collector output and benchmark measurements; neither result is assumed successful until the jobs finish.
+
+
+## Latest opt-in validation results (2026-11-24)
+
+**Run:** [GitHub Actions #45213246118](https://github.com/daxiguaya/MovieHub/actions/runs/45213246118)  
+**Commit:** `d29363d55c3f76d2c5cd694f956704ad97525e35`
+
+All five jobs completed successfully: backend, frontend, annual-chart-collection, performance-benchmarks and frontend-e2e. The four Playwright tests passed, including Chinese-title search, chart-to-detail navigation, favorites/Xiaoya handoff, and a live FastAPI + temporary SQLite integration path. These are isolated CI checks, not NAS acceptance.
+
+### Measured synthetic performance
+
+| Workload | Dataset | Result |
+| --- | ---: | ---: |
+| LIKE search, Chinese title | 10k | COUNT 5.6 ms; page 2.7 ms |
+| LIKE search, original title | 10k | COUNT 1.3 ms; page 1.3 ms |
+| LIKE search, no match | 10k | COUNT 1.2 ms; page 1.2 ms |
+| LIKE search, multi-term | 10k | COUNT 3.9 ms; page 3.1 ms |
+| LIKE search, Chinese title | 100k | COUNT 20.3 ms; page 4.3 ms |
+| LIKE search, original title | 100k | COUNT 12.5 ms; page 2.8 ms |
+| LIKE search, no match | 100k | COUNT 11.4 ms; page 12.1 ms |
+| LIKE search, multi-term | 100k | COUNT 24.2 ms; page 5.6 ms |
+| Scout import | 10k | 18.41 s; 543.3 rows/s |
+| Scout import | 100k | 184.80 s; 541.1 rows/s |
+
+SQLite reports `SCAN movies` for all LIKE scenarios because the current contains-search uses leading-wildcard matching. At 100k synthetic rows, measured COUNT latency was 11.4–24.2 ms on the hosted runner. This is recorded as a measured future optimization candidate; it does not justify making FTS5 mandatory without checking tokenizer compatibility (especially Chinese search) and SQLite build support on the target NAS. Import throughput is approximately 541 rows/s on this runner; NAS-specific throughput and memory remain unmeasured.
+
+### 2025 annual artifact
+
+The same run collected all four official 2025 annual charts and all four normalized files passed dry-run. Artifact: [moviehub-douban-annual-2025](https://github.com/daxiguaya/MovieHub/actions/runs/45213246118/artifacts/14835864058), 4,321 bytes, SHA-256 `d7d050a5816dcf645d367de4dc3182f5e629060ef70f95e498a75ac60b8de689`, retained until 2026-12-07. This job collected and validated files only; it did not import them into any database.
+
+**Safety boundary:** no Scout database, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed. The 75% first-release estimate is unchanged because the remaining critical gates require staged real-source data, visual/NPM acceptance and separately approved operational work.

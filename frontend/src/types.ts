@@ -14,6 +14,7 @@ export interface Chart {
 export interface Movie {
   id: number;
   douban_id: string | null;
+  tmdb_id?: string | null;
   title: string;
   original_title: string | null;
   year: number | null;

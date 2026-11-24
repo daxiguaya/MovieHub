@@ -121,7 +121,7 @@ Sources:
 - Remaining 30 records were rejected/empty: 3 ambiguous, 4 insufficient identity, 21 no strict match, 2 matched but empty overview.
 - No synopsis body was included in the report and no MovieHub database was opened or changed.
 
-The four annual charts contain a separate 38 unique movie/TV records dated 2026-11-23. Their zh-CN/zh-TW coverage is **not yet measured**; the next audit run will include them as a separate report rather than blending them with Top 250 statistics.
+The four annual charts contain a separate 38 unique movie/TV records dated 2026-11-23. The expanded audit completed with 76/76 `insufficient_identity` (38 per locale) because these source rows do not include release years; the audit correctly refused to perform title-only matching. This is not a measured zero-coverage result. PR [#2](https://github.com/daxiguaya/MovieHub/pull/2) adds exact-title plus director-credit verification for yearless rows and preserves multi-word director names. Rerun the annual report after CI and merge.
 
 ## Revised next work order
 
@@ -131,3 +131,8 @@ The four annual charts contain a separate 38 unique movie/TV records dated 2026-
 4. If authorized, design schema v4 with explicit language, provider ID, terms basis, attribution, modification marker, source URL, and an enforceable expiry/retention policy; then add a separate NULL-only importer and About/Credits attribution UI.
 5. Continue true multi-date history only when a second genuine Top 250 capture date exists. Current dated annual charts are different chart slugs, not historical Top 250 snapshots; do not fabricate historical movement by cloning a snapshot.
 6. Complete Scout read-only integration rehearsal and final frontend edge-state QA. Production/NAS deployment remains a separate approval stage.
+
+
+### Annual-chart identity follow-up (2026-11-24)
+
+The annual chart source provides Douban subject ID, title, rating and director, but not release year or IMDb/TMDB IDs. The first expanded audit therefore produced 76 `insufficient_identity` records rather than issuing potentially unsafe title-only matches. The remediation in PR #2 uses exact normalized title plus an intersecting director name verified against TMDB credits. It does not infer a year or accept ambiguous candidates. If source director data is absent or inconsistent, the record remains rejected for manual review. This increases lookup rigor, not the legal permission to persist synopsis text; the existing legal hold remains unchanged.

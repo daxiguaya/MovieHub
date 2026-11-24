@@ -36,6 +36,7 @@ function installFetchMock(handler: (url: string, init?: RequestInit) => unknown)
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.sessionStorage.removeItem("moviehubApiKey");
 });
 
 describe("MovieHub frontend workflows", () => {
@@ -333,5 +334,39 @@ describe("MovieHub frontend workflows", () => {
     expect(requests).toContainEqual({ url: "/api/favorites/42", method: "PUT" });
     expect(requests).toContainEqual({ url: "/api/favorites/42", method: "DELETE" });
   });
+
+  it("connects the protected favorites APIs with a tab-session API key", async () => {
+    const fetchMock = installFetchMock((url, init) => {
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/favorites" || url === "/api/discovery/favorites") {
+        const headers = new Headers(init?.headers);
+        if (headers.get("X-API-Key") !== "local-test-key") {
+          throw new Error("Invalid or missing API key");
+        }
+        return [];
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/favorites"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { name: "连接收藏功能" });
+    await userEvent.type(
+      screen.getByPlaceholderText("输入 NAS 上配置的 MovieHub API Key"),
+      "local-test-key"
+    );
+    await userEvent.click(screen.getByRole("button", { name: "连接收藏" }));
+
+    expect(await screen.findByText("收藏夹还是空的")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("moviehubApiKey")).toBe("local-test-key");
+    expect(fetchMock.mock.calls.some(([, init]) =>
+      new Headers(init?.headers).get("X-API-Key") === "local-test-key"
+    )).toBe(true);
+  });
+
 
 });

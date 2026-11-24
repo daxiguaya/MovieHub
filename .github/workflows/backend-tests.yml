@@ -214,7 +214,7 @@ jobs:
       actions: read
       contents: read
     env:
-      MOVIEHUB_DATA_DIR: ${{ runner.temp }}/moviehub-real-annual-data
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-real-annual-data
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

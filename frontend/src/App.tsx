@@ -59,12 +59,14 @@ function App() {
           <Route path="/movies/:movieId" element={<MoviePage config={publicConfig} />} />
           <Route path="/tmdb/:mediaType/:providerId" element={<ExternalMoviePage config={publicConfig} />} />
           <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/credits" element={<CreditsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       <footer className="site-footer">
         <span>MovieHub</span>
         <span>发现好电影，剩下的交给小雅与 Jellyfin。</span>
+        <Link to="/credits">关于与数据来源</Link>
       </footer>
     </div>
   );
@@ -1044,6 +1046,34 @@ function FavoritesPage() {
         </>
       )}
       <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </>
+  );
+}
+
+function CreditsPage() {
+  return (
+    <>
+      <PageHeading eyebrow="ABOUT & CREDITS" title="关于与数据来源" description="MovieHub 使用公开数据服务辅助电影与剧集发现；各数据来源保持独立标注。" />
+      <section className="credits-panel">
+        <a className="tmdb-logo-link" href="https://www.themoviedb.org" target="_blank" rel="noreferrer">
+          <img
+            src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg"
+            alt="The Movie Database (TMDB)"
+          />
+        </a>
+        <div className="credits-copy">
+          <h2>The Movie Database (TMDB)</h2>
+          <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+          <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer">Visit The Movie Database ↗</a>
+        </div>
+      </section>
+      <section className="credits-panel">
+        <div className="credits-copy">
+          <h2>豆瓣</h2>
+          <p>现有豆瓣榜单数据按榜单来源单独展示。MovieHub 不代表豆瓣官方，也不将豆瓣评分与 TMDB 评分合并。</p>
+          <a href="https://movie.douban.com" target="_blank" rel="noreferrer">访问豆瓣电影 ↗</a>
+        </div>
+      </section>
     </>
   );
 }

@@ -181,7 +181,8 @@ test("compares two dated snapshots and displays rank movement and new entries", 
   await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
   await page.getByRole("button", { name: "比较排名" }).click();
 
-  await expect(page.getByText("第一页电影", { exact: true })).toBeVisible();
-  await expect(page.getByText("排名变动 · ↑1")).toBeVisible();
-  await expect(page.getByText("新上榜")).toBeVisible();
+  const movedRow = page.locator(".rank-change-row").filter({ hasText: "第一页电影" });
+  await expect(movedRow).toHaveCount(1);
+  await expect(movedRow.locator(".rank-status")).toHaveText("排名变动 · ↑1");
+  await expect(page.locator(".rank-change-row").filter({ hasText: "第三部电影" }).locator(".rank-status")).toHaveText("新上榜");
 });

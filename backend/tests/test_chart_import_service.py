@@ -7,7 +7,10 @@ from sqlalchemy import create_engine, event, select, func
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.database import Base, Chart, ChartSnapshot, ChartItem, Movie
+from app.database import (
+    Base, Chart, ChartSnapshot, ChartItem, Movie,
+    Genre, Region, MovieGenre, MovieRegion,
+)
 from app.schemas_chart_import import ChartMovieImport, ChartSnapshotImport
 from app.services.chart_import_service import ChartImportError, ChartImportService
 
@@ -445,6 +448,43 @@ def test_multi_chart_import_rejects_duplicate_chart_date_pairs():
         with pytest.raises(ChartImportError, match="duplicate chart/date"):
             service.import_snapshots(db, [one, two])
         assert db.scalar(select(func.count()).select_from(Chart)) == 0
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_new_movie_metadata_associations_receive_generated_movie_id():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        snapshot = _snapshot(
+            date(2026, 11, 24),
+            [
+                ChartMovieImport(
+                    douban_id="120001",
+                    rank=1,
+                    title="New movie with metadata",
+                    genres=["Drama", "Thriller"],
+                    regions=["China"],
+                )
+            ],
+        )
+        service.import_snapshot(db, snapshot)
+
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "120001"))
+        assert movie is not None and movie.id is not None
+        genre_names = set(db.scalars(
+            select(Genre.name)
+            .join(MovieGenre, MovieGenre.genre_id == Genre.id)
+            .where(MovieGenre.movie_id == movie.id)
+        ).all())
+        region_names = set(db.scalars(
+            select(Region.name)
+            .join(MovieRegion, MovieRegion.region_id == Region.id)
+            .where(MovieRegion.movie_id == movie.id)
+        ).all())
+        assert genre_names == {"Drama", "Thriller"}
+        assert region_names == {"China"}
     finally:
         db.close()
         engine.dispose()

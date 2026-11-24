@@ -24,6 +24,12 @@ class TrustedProxyValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "never be '\*'"):
             PREFLIGHT.validate_trusted_proxy_ips("*")
 
+    def test_rejects_default_routes(self):
+        for value in ("0.0.0.0/0", "::/0"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "default route"):
+                    PREFLIGHT.validate_trusted_proxy_ips(value)
+
     def test_rejects_empty_value(self):
         with self.assertRaisesRegex(ValueError, "at least one"):
             PREFLIGHT.validate_trusted_proxy_ips(" , ")

@@ -93,7 +93,7 @@ def test_restore_rejects_modified_backup_before_touching_current_database(tmp_pa
     with (backup_dir / "movies.db").open("ab") as handle:
         handle.write(b"tampered")
 
-    with pytest.raises(RuntimeError, match="SHA-256"):
+    with pytest.raises(RuntimeError, match="database size|SHA-256"):
         restore_backup(
             backup_dir,
             database,

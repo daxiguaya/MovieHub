@@ -270,3 +270,18 @@ The official terms page was not machine-readable in this research session, so th
 - [ ] Wait for PR checks, merge only after CI passes, then rerun the annual read-only audit and report measured coverage separately by locale.
 
 The PR changes only read-only matching and parsing. No synopsis text is persisted; no production database or NAS was accessed.
+
+
+## 2026-11-24 — Localized annual director matching: real audit and merge
+
+- [x] PR [#5](https://github.com/daxiguaya/MovieHub/pull/5) merged to `main` as squash commit `a70d2a38f6edf35856acd8b018a9c1faf238eaf9`.
+- [x] The PR's backend, frontend, Compose smoke, and frontend E2E checks passed. Optional first-launch collection, annual collection, performance and browser real-data jobs were skipped in that PR check suite and are not counted as passed.
+- [x] Read-only TMDB audit [#45366496227](https://github.com/daxiguaya/MovieHub/actions/runs/45366496227) completed successfully against the retained first-launch artifact: Top 250 (250 titles × zh-CN/zh-TW) and 2025 annual charts (38 titles × zh-CN/zh-TW).
+- [x] Top 250 result: zh-CN 238/250 (95.2%), zh-TW 232/250 (92.8%); combined 470/500 (94.0%). Remaining statuses include ambiguous identity, no exact match, and missing localized overview; none were force-matched.
+- [x] Annual chart result after localized TMDB person-name resolution: zh-CN 31/38 (81.6%), zh-TW 31/38 (81.6%); combined 62/76 (81.6%). This improves on the previous 76/76 `insufficient_identity` result. The remaining 14 records remain `no_exact_match`; exact title/alternative-title and director identity checks remain enforced.
+- [x] Audit artifact contains coverage reports only, no synopsis text. The run did not write to any database and did not access the NAS.
+- [ ] Continue the legal hold: do not persist or redistribute TMDB overview text until the current official terms, retention/cache limits, attribution, logo and display requirements are reviewed and explicitly approved.
+- [ ] Finish deployment gate: verify NAS-specific Docker network existence/IP trust boundary, UID/GID and directory ownership, secrets, protected import endpoints, logs, resource budget and backup destination before any deployment.
+- [ ] Perform first deployment only after explicit go-ahead; initialize a new MovieHub database (never Scout's database), import verified data, then test readiness, NPM routing, backups and rollback.
+
+**Current delivery estimate remains approximately 87%.** The matching fix and real-data audit are complete and merged; the estimate does not include NAS deployment. MovieHub still has no production database or NAS instance.

@@ -75,7 +75,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 当前明确待补：
 - [x] 对新采集的 Top 250 JSON artifact 复核评价人数实际覆盖率；已修复当前页面文本解析并在真实数据中验证 250/250。
-- [ ] 选择允许访问、稳定且可核验的来源补充剧情简介；Top 250 已提供评价人数、导演、演员的真实采集值。
+- [x] 完成剧情简介来源专项初步研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [ ] 取得 TMDB API read token 后，在 250 条 Top 250 + 38 条年度榜单上运行只读 dry-run；先验证匹配准确率和 zh-CN/zh-TW overview 覆盖，不写库。
 - [x] 导入时仅填补空字段，不覆盖已有来源数据；字段级来源、来源 URL、采集时间和内容指纹已落库并通过真实数据验证。
 - [ ] 对多来源冲突制定优先级与审计规则；缺失值仍允许为空。
 - [x] 收藏/取消收藏的真实 API 与 SQLite 写入、读取、删除流程已通过 Playwright。
@@ -85,7 +85,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 ### P0 — 首发内容与体验收尾
 - [x] 复核 Top 250 评价人数真实覆盖率并修复解析器与真实页面结构的差异。
-- [ ] 选择合规来源补充剧情简介；导演、演员已从 Top 250 页面提取。
+- [x] 完成来源许可/稳定性/匹配方案研究；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [ ] 完成 TMDB API 非商业/缓存展示条款核验、取得只读 token，并对 288 条真实影片执行只读匹配与中文简介覆盖率试验。
 - [x] schema v3 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与真实数据持久化检查。
 - [x] 真实数据收藏/取消收藏：通过 Playwright 经可信代理注入密钥，验证 live API 与临时 SQLite 的写入、列表读取、删除。
 - [ ] 真实多日期历史快照选择、排名比较、分页和异常状态流程验收。
@@ -125,4 +125,4 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | 容器、备份恢复和运维文档 | 已实现；隔离部署演练待做 |
 | NAS/NPM 实际联调与生产部署 | 未开始 |
 
-**整体进度更新为约 83%。** schema v3、字段级 provenance、真实 288 条数据导入、完整性/外键检查和元数据持久化校验均已通过。最新 run [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的后端、前端、首发数据采集/导入和真实数据浏览器 E2E 核心 job 已通过；真实浏览器测试 4/4 通过，新增收藏/取消收藏也已覆盖。性能基准、独立年度采集和旧年度 rehearsal 本轮按条件跳过，不计为通过。下一阶段重点是合规补充剧情简介、补齐多日期历史/分页/异常状态验收，以及隔离部署演练。
+**整体进度仍约 83%。** 本轮完成了剧情简介来源的许可、稳定性和匹配路径专项研究，新增 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。TMDB 是首选试验候选，但尚未批准批量导入：免费开发 API 仅适用于非商业用途、要求署名且无 SLA，中文覆盖率及实际缓存/展示条款仍须实测/核验；Wikipedia 是带 CC BY-SA 义务的逐条备用；OMDb 因索引/归档/分发限制排除。简介仍为 0/250，不虚报进度。下一步先运行 TMDB 只读 dry-run（需 API read token），核验 288 条匹配与中文简介覆盖，再决定是否做 schema v4 与导入。随后继续真实数据分页、多日期历史/排名比较、筛选和异常状态验收。最新真实数据浏览器 CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的核心 job 通过，真实浏览器 4/4 通过；被 skip 的 job 不计通过。

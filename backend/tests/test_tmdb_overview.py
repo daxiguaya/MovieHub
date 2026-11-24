@@ -225,3 +225,44 @@ def test_tmdb_lookup_uses_requested_locale_for_search_and_details():
 
     assert result.status == "overview_available"
     assert result.language == "zh-TW"
+
+def test_tmdb_lookup_prioritizes_existing_tmdb_id_and_cross_checks_identity():
+    requests = []
+
+    def handler(request):
+        requests.append(request.url.path)
+        assert request.url.params["language"] == "zh-CN"
+        return httpx.Response(200, json={
+            "id": 278,
+            "title": "肖申克的救赎",
+            "original_title": "The Shawshank Redemption",
+            "release_date": "1994-09-23",
+            "overview": "真实剧情简介。",
+        })
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(tmdb_id="278"))
+
+    assert result.status == "overview_available"
+    assert result.match_method == "tmdb_id"
+    assert result.tmdb_id == 278
+    assert requests == ["/3/movie/278"]
+
+
+def test_tmdb_lookup_rejects_existing_tmdb_id_when_title_or_year_conflicts():
+    def handler(request):
+        return httpx.Response(200, json={
+            "id": 278,
+            "title": "Different Movie",
+            "original_title": "Different Movie",
+            "release_date": "1994-09-23",
+            "overview": "Do not accept this overview.",
+        })
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(tmdb_id="278"))
+
+    assert result.status == "tmdb_id_identity_mismatch"
+    assert result.overview_sha256 is None

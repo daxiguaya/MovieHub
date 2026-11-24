@@ -540,6 +540,6 @@ jobs:
           name: moviehub-first-launch-douban
           path: |
             ${{ runner.temp }}/moviehub-first-launch/*.json
-          ${{ runner.temp }}/moviehub-annual-2025/*.json
+            ${{ runner.temp }}/moviehub-annual-2025/*.json
           if-no-files-found: error
           retention-days: 14

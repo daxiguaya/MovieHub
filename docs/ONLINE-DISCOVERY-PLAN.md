@@ -51,13 +51,13 @@ MovieHub is an online-first movie and TV discovery experience. Search covers the
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Product decisions, resource guardrails, and delivery plan | Complete |
-| 1 | Persistent bounded provider-response cache and TMDB client | Complete (backend tests passed; final CI rerun pending) |
+| 1 | Persistent bounded provider-response cache and TMDB client | Complete (backend unit/API tests passed; final CI rerun pending) |
 | 2 | Online search/discover/details/genre-region APIs and backend tests | Complete (backend tests passed; final CI rerun pending) |
 | 3 | Frontend online search, multi-select filters, paging, cancellation | Pending |
-| 4 | Prominent horror/thriller sections and four curated lists | In progress (homepage sections and four Discover feeds implemented; visual/API acceptance pending) |
+| 4 | Prominent horror/thriller sections and four curated lists | In progress (homepage sections and four bounded Discover feeds implemented; visual/API acceptance pending) |
 | 5 | Attribution, operational metrics, resource/load tests, full acceptance | Pending |
 
-## Implementation notes (2026-11-24)\n\n- PR #10: https://github.com/daxiguaya/MovieHub/pull/10\n- Backend CI completed successfully on the earlier PR revision; frontend type-check and one legacy UI test failed on that revision. Fixes were committed afterward; a fresh complete CI run is required before merge.\n- Online favorites are stored separately from the evictable response-cache table in the discovery SQLite file. Cache eviction never removes them. Verify backup/restore coverage before production rollout.\n- The frontend currently relies on the existing protected favorites API; the browser-to-API key/session flow must be verified before treating favorite actions as production-ready.\n\n## Deployment constraints
+## Implementation notes (2026-11-24)\n\n- PR #10: https://github.com/daxiguaya/MovieHub/pull/10\n- Backend CI completed successfully on the earlier PR revision; frontend type-check and one legacy UI test failed on that revision. Fixes were committed afterward; a fresh complete CI run is required before merge.\n- Online favorites are stored separately from the evictable response-cache table in the discovery SQLite file. Cache eviction never removes them. The discovery DB is backed up with SQLite backup API once per day (7-day retention), and the daily snapshot is refreshed immediately after a favorite add/remove.\n- The frontend currently relies on the existing protected favorites API; the browser-to-API key/session flow must be verified before treating favorite actions as production-ready.\n- The previous browser E2E run exposed outdated assertions from the old search form; those tests have been rewritten for online search, Discover filters and the new empty/error states. Final browser E2E rerun is pending.\n\n## Deployment constraints
 
 - Do not restart Nginx Proxy Manager or the frontend during backend-only changes.
 - Do not deploy to the NAS production directory until CI and review pass.

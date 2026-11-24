@@ -12,7 +12,7 @@ FROM nginx:alpine
 RUN rm -f /etc/nginx/conf.d/default.conf \
     && addgroup -S -g 10001 moviehub \
     && adduser -S -D -H -u 10001 -G moviehub moviehub \
-    && mkdir -p /tmp/client_temp /tmp/proxy_temp \
+    && mkdir -p /tmp/client_temp /tmp/proxy_temp /tmp/fastcgi_temp /tmp/uwsgi_temp /tmp/scgi_temp \
     && chown -R 10001:10001 /tmp /usr/share/nginx/html
 
 COPY nginx.conf /etc/nginx/nginx.conf

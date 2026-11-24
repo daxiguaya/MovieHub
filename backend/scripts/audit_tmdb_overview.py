@@ -10,6 +10,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from app.adapters.local_import import LocalImportAdapter
 from app.adapters.tmdb_overview import TMDBOverviewClient
 
@@ -61,6 +63,19 @@ def build_report(snapshots: list[Any], client: TMDBOverviewClient, languages: li
                     "overview_sha256": result.overview_sha256,
                     "source_url": result.source_url,
                     "candidate_count": result.candidate_count,
+                }
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code in {401, 403}:
+                    raise
+                status = "provider_error"
+                record = {
+                    "douban_id": douban_id,
+                    "title": item.title,
+                    "year": item.year,
+                    "media_type": item.type,
+                    "language_requested": language,
+                    "status": status,
+                    "error_type": type(exc).__name__,
                 }
             except Exception as exc:  # keep the audit moving; never leak token/header
                 status = "provider_error"

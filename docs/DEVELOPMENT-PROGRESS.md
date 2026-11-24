@@ -738,3 +738,10 @@ This closes an API edge case: a typo or tampered cursor previously restarted pag
 - [ ] Latest branch-head CI pending.
 
 The initial strict-cursor CI attempt reported 264 passed / 1 failed / 4 skipped because a legacy unit test still encoded the old behavior. The test now expects a cursor validation error; re-run is underway. Overall progress remains **83%** and nothing was deployed.
+
+
+## Isolated deployment lifecycle rehearsal (2026-11-24)
+
+Added integrated regression coverage for the complete database lifecycle using only temporary paths: initialize a fresh MovieHub database, verify readiness, create a checksum-verified backup, introduce a post-backup change, restore, verify that the rollback copy preserves the newer state, and re-check readiness/schema/integrity/foreign keys. A separate test proves the initializer refuses an existing external SQLite database without changing its source records or adding MovieHub tables.
+
+This is a database lifecycle rehearsal, not a live Docker/NPM/NAS deployment. CI verification is pending. No production data or running services were accessed.

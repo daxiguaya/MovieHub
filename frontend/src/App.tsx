@@ -54,6 +54,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/charts/:slug" element={<ChartPage />} />
+          <Route path="/discover/:slug" element={<DiscoveryListPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/movies/:movieId" element={<MoviePage config={publicConfig} />} />
           <Route path="/tmdb/:mediaType/:providerId" element={<ExternalMoviePage config={publicConfig} />} />
@@ -172,6 +173,112 @@ function HomePage() {
         <div className="note-icon">↗</div>
         <div><strong>发现电影，然后交给小雅</strong><p>MovieHub 专注发现与整理。搜索资源、下载和播放仍由你现有的小雅与 Jellyfin 负责。</p></div>
       </section>
+    </>
+  );
+}
+
+const DISCOVERY_LISTS: Record<string, {
+  title: string;
+  description: string;
+  genre: string;
+  minVotes: number;
+  maxVotes?: number;
+  minRating: number;
+}> = {
+  "horror-high": {
+    title: "恐怖片高分榜",
+    description: "投票量充足、口碑稳定的恐怖电影",
+    genre: "27",
+    minVotes: 500,
+    minRating: 7
+  },
+  "horror-gems": {
+    title: "恐怖片冷门佳作",
+    description: "投票量适中、评分优秀的恐怖片遗珠",
+    genre: "27",
+    minVotes: 50,
+    maxVotes: 5000,
+    minRating: 6.5
+  },
+  "thriller-high": {
+    title: "惊悚片高分榜",
+    description: "投票量充足、口碑稳定的惊悚电影",
+    genre: "53",
+    minVotes: 500,
+    minRating: 7
+  },
+  "thriller-gems": {
+    title: "惊悚片冷门佳作",
+    description: "投票量适中、评分优秀的惊悚片遗珠",
+    genre: "53",
+    minVotes: 50,
+    maxVotes: 5000,
+    minRating: 6.5
+  }
+};
+
+function DiscoveryListPage() {
+  const { slug = "" } = useParams();
+  const definition = DISCOVERY_LISTS[slug];
+  const [items, setItems] = useState<DiscoveryItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function load(nextPage: number, append = false) {
+    if (!definition) return;
+    setLoading(true);
+    setError("");
+    const params = new URLSearchParams({
+      media_type: "movie",
+      page: String(nextPage),
+      with_genres: definition.genre,
+      min_votes: String(definition.minVotes),
+      min_rating: String(definition.minRating),
+      sort_by: "vote_average.desc"
+    });
+    if (definition.maxVotes) params.set("max_votes", String(definition.maxVotes));
+    try {
+      const data = await api.discoveryDiscover(params);
+      setItems((current) => append ? current.concat(data.items) : data.items);
+      setPage(data.page);
+      setTotalPages(data.total_pages);
+      setTotal(data.total_results);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setItems([]);
+    setPage(1);
+    setTotalPages(0);
+    setTotal(0);
+    if (definition) void load(1);
+    else setLoading(false);
+    // The selected definition is derived from the route slug.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
+
+  if (!definition) return <ErrorState message="没有找到这份专题榜单" />;
+
+  return (
+    <>
+      <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><span>恐怖与惊悚专题</span></div>
+      <PageHeading eyebrow="HORROR & THRILLER" title={definition.title} description={definition.description + "。按页在线获取，不做全量导入。"} />
+      <div className="result-caption"><span>TMDB 在线精选</span><span>{total.toLocaleString()} 部 · 第 {page} / {Math.max(totalPages, 1)} 页</span></div>
+      {error && <div className="inline-error">{error}</div>}
+      {items.length > 0 ? (
+        <>
+          <div className="movie-grid">{items.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}</div>
+          {page < totalPages && <button className="secondary-button load-more" onClick={() => void load(page + 1, true)} disabled={loading}>{loading ? "正在加载…" : "加载下一页"}</button>}
+        </>
+      ) : loading ? <Loading /> : <EmptyState title="暂时没有符合条件的作品" detail="可以稍后再试，或降低投票数门槛。" />}
+      <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </>
   );
 }

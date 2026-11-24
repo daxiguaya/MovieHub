@@ -574,3 +574,82 @@ jobs:
             ${{ runner.temp }}/moviehub-annual-2025/*.json
           if-no-files-found: error
           retention-days: 14
+
+  compose-smoke:
+    # Start the real two-container Compose stack on an isolated GitHub runner.
+    # This never uses NAS paths, external NPM networks, or production data.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MOVIEHUB_DATA_PATH: ${{ runner.temp }}/moviehub-compose-smoke/data
+      MOVIEHUB_BACKUP_PATH: ${{ runner.temp }}/moviehub-compose-smoke/backups
+      MOVIEHUB_IMPORT_PATH: ${{ github.workspace }}/deploy/empty-imports
+      MOVIEHUB_FRONTEND_CONFIG_PATH: ${{ github.workspace }}/deploy/frontend-config.json
+      MOVIEHUB_API_KEY: ci-only-compose-smoke-key
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare disposable bind mounts and external proxy network
+        run: |
+          mkdir -p "$MOVIEHUB_DATA_PATH" "$MOVIEHUB_BACKUP_PATH"
+          sudo chown -R 10001:10001 "${RUNNER_TEMP}/moviehub-compose-smoke"
+          docker network create chatgpt-browser_default
+      - name: Validate isolated Compose configuration
+        run: docker compose -p moviehub-ci-smoke config --quiet
+      - name: Start both containers before database initialization
+        run: docker compose -p moviehub-ci-smoke up --build -d
+      - name: Verify liveness and that readiness correctly blocks an uninitialized database
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          from urllib.error import HTTPError
+          from urllib.request import urlopen
+
+          with urlopen("http://127.0.0.1:8000/api/health", timeout=5) as response:
+              assert response.status == 200
+              assert json.load(response)["status"] == "healthy"
+
+          try:
+              urlopen("http://127.0.0.1:8000/api/ready", timeout=5)
+          except HTTPError as error:
+              assert error.code == 503, error.code
+          else:
+              raise AssertionError("Readiness must reject an uninitialized database")
+          PY
+      - name: Explicitly initialize the disposable MovieHub database
+        run: docker compose -p moviehub-ci-smoke run --rm --no-deps moviehub python -m scripts.init_db
+      - name: Verify API readiness, seeded chart API, and frontend container
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          from urllib.request import urlopen
+
+          with urlopen("http://127.0.0.1:8000/api/ready", timeout=10) as response:
+              assert response.status == 200
+              ready = json.load(response)
+              assert ready["status"] == "ready", ready
+
+          with urlopen("http://127.0.0.1:8000/api/charts", timeout=10) as response:
+              assert response.status == 200
+              charts = json.load(response)
+              assert isinstance(charts, list) and charts, charts
+              assert any(chart.get("slug") == "top250" for chart in charts), charts
+          PY
+          docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
+            'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'
+      - name: Verify both container health checks report healthy
+        run: |
+          for attempt in $(seq 1 45); do
+            backend_health="$(docker inspect --format '{{.State.Health.Status}}' moviehub-backend)"
+            frontend_health="$(docker inspect --format '{{.State.Health.Status}}' moviehub-web)"
+            if [ "$backend_health" = healthy ] && [ "$frontend_health" = healthy ]; then
+              echo "backend=$backend_health frontend=$frontend_health"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -p moviehub-ci-smoke ps
+          docker compose -p moviehub-ci-smoke logs --no-color
+          exit 1
+      - name: Stop and remove only the isolated Compose project
+        if: always()
+        run: docker compose -p moviehub-ci-smoke down --volumes --remove-orphans

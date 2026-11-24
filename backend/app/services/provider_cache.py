@@ -21,6 +21,7 @@ logger = logging.getLogger("moviehub.provider_cache")
 
 MAX_CACHE_ROWS = 1500
 MAX_CACHE_BYTES = 32 * 1024 * 1024
+MAX_CACHE_DB_BYTES = 48 * 1024 * 1024
 MAX_ENTRY_BYTES = 1024 * 1024
 STALE_GRACE_SECONDS = 24 * 60 * 60
 
@@ -59,6 +60,9 @@ class ProviderResponseCache:
             if self._initialized:
                 return
             with self._connection() as connection:
+                if connection.execute("PRAGMA auto_vacuum").fetchone()[0] == 0:
+                    connection.execute("PRAGMA auto_vacuum=INCREMENTAL")
+                    connection.execute("VACUUM")
                 connection.execute("""
                     CREATE TABLE IF NOT EXISTS provider_response_cache (
                         cache_key TEXT PRIMARY KEY,
@@ -159,6 +163,7 @@ class ProviderResponseCache:
             )
             self._evict(connection)
             self._writes += 1
+        self._compact_if_needed()
         return True
 
     @staticmethod
@@ -189,7 +194,11 @@ class ProviderResponseCache:
                    FROM provider_response_cache""",
                 (int(time.time()),),
             ).fetchone()
+        database_bytes = self.path.stat().st_size if self.path.exists() else 0
+        wal_path = Path(str(self.path) + "-wal")
+        wal_bytes = wal_path.stat().st_size if wal_path.exists() else 0
         return {"entries": int(row[0]), "bytes": int(row[1]), "fresh_entries": int(row[2]),
+                "database_bytes": database_bytes, "wal_bytes": wal_bytes,
                 "hits": self._hits, "misses": self._misses,
                 "stale_hits": self._stale_hits, "writes": self._writes}
 
@@ -297,7 +306,18 @@ class ProviderResponseCache:
                 "DELETE FROM provider_response_cache WHERE stale_until <= ?",
                 (int(time.time()),),
             )
-            return int(cursor.rowcount)
+            removed = int(cursor.rowcount)
+        self._compact_if_needed()
+        return removed
+
+    def _compact_if_needed(self) -> None:
+        if not self.path.exists() or self.path.stat().st_size <= MAX_CACHE_DB_BYTES:
+            return
+        with self._lock, self._connection() as connection:
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            connection.execute("PRAGMA incremental_vacuum")
+            if self.path.stat().st_size > MAX_CACHE_DB_BYTES:
+                connection.execute("VACUUM")
 
 
 provider_response_cache = ProviderResponseCache()

@@ -14,7 +14,7 @@ const resultMovie = {
   updated_at: null
 };
 
-async function installSearchApi(page, handler: (url: URL) => Promise<void> | void) {
+test("submits combined movie filters and preserves every selected condition in the URL", async ({ page }) => {
   const requests: string[] = [];
   await page.route("**/config.json", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify({ xiaoyaSearchBaseUrl: "" }) })
@@ -22,22 +22,19 @@ async function installSearchApi(page, handler: (url: URL) => Promise<void> | voi
   await page.route("**/api/movies**", async (route) => {
     const url = new URL(route.request().url());
     requests.push(url.search);
-    await handler(url);
-  });
-  return requests;
-}
-
-test("submits combined movie filters and preserves every selected condition in the URL", async ({ page }) => {
-  const requests = await installSearchApi(page, async (url) => {
-    if (url.searchParams.get("genres") === "剧情,科幻") {
-      await page.route("**/api/movies**", (route) => route.fulfill({
-        json: { items: [resultMovie], next_cursor: null, total: 1 }
-      }));
-    }
+    const p = url.searchParams;
+    const matches = p.get("genres") === "剧情,科幻";
+    await route.fulfill({
+      json: {
+        items: matches ? [resultMovie] : [],
+        next_cursor: null,
+        total: matches ? 1 : 0
+      }
+    });
   });
 
   await page.goto("/search");
-  await page.getByLabel("搜索中文片名或原名…").fill("星际");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际");
   await page.getByLabel("影视类型").selectOption("movie");
   await page.getByLabel("最低评分").selectOption("8");
   await page.getByLabel("评价人数不少于").fill("1000");
@@ -68,15 +65,15 @@ test("submits combined movie filters and preserves every selected condition in t
 });
 
 test("shows a useful empty state when combined filters match no movies", async ({ page }) => {
-  await installSearchApi(page, async (url) => {
-    await url;
-    await page.route("**/api/movies**", (route) => route.fulfill({
-      json: { items: [], next_cursor: null, total: 0 }
-    }));
-  });
+  await page.route("**/config.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ xiaoyaSearchBaseUrl: "" }) })
+  );
+  await page.route("**/api/movies**", (route) =>
+    route.fulfill({ json: { items: [], next_cursor: null, total: 0 } })
+  );
 
   await page.goto("/search");
-  await page.getByLabel("搜索中文片名或原名…").fill("不存在的影片");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill("不存在的影片");
   await page.getByRole("button", { name: /搜索电影/ }).click();
 
   await expect(page.getByText("没有找到匹配的电影")).toBeVisible();

@@ -143,6 +143,7 @@ async def discover_online(
     max_year: int | None = Query(None, ge=1870, le=2100),
     min_rating: float | None = Query(None, ge=0, le=10),
     min_votes: int = Query(100, ge=0, le=10000000),
+    max_votes: int | None = Query(None, ge=0, le=10000000),
     sort_by: Literal["popularity.desc", "vote_average.desc", "primary_release_date.desc", "vote_count.desc"] = Query("popularity.desc"),
     language: str = Query("zh-CN", min_length=2, max_length=12),
 ) -> dict:
@@ -155,6 +156,7 @@ async def discover_online(
         "primary_release_date.lte" if media_type == "movie" else "first_air_date.lte": (str(max_year) + "-12-31") if max_year is not None and year is None else None,
         "vote_average.gte": min_rating,
         "vote_count.gte": min_votes,
+        "vote_count.lte": max_votes,
         "sort_by": sort_by,
         "language": language,
         "include_adult": "false",

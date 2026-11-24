@@ -11,7 +11,7 @@ Compose now defines two application containers: a static React frontend and the 
 - Dedicated backup destination: host path `MOVIEHUB_BACKUP_PATH` mounted at `/backups`.
   - SQLite database: `/data/db/movies.db`.
   - Poster cache: `/data/posters/`.
-- Scout import source: `MOVIEHUB_IMPORT_PATH` mounted at `/imports:ro`.
+- Optional Scout import source: when `MOVIEHUB_IMPORT_PATH` is set, that host directory is mounted at `/imports:ro`; when omitted, Compose mounts the tracked empty directory `./deploy/empty-imports`. MovieHub's own database initialization and normal runtime do not require Scout.
 - Nginx Proxy Manager: the frontend and backend join the existing external Docker network `chatgpt-browser_default`; configure the default upstream as `moviehub-web:8080` and API custom locations as `moviehub:8000`.
 
 The source mount is read-only at the container boundary. Keep the MovieHub database and Scout source in separate host directories. Never point `MOVIEHUB_DATA_PATH` at the Scout database directory.

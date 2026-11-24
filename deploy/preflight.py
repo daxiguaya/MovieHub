@@ -123,7 +123,7 @@ def main() -> int:
     try:
         validate_trusted_proxy_ips(trusted_proxy_ips)
         if trusted_proxy_ips.strip() == "127.0.0.1":
-            warnings.append("MOVIEHUB_TRUSTED_PROXY_IPS still trusts loopback only; set the exact NPM IP or a dedicated subnet after confirming the NPM container.")
+            warnings.append("MOVIEHUB_TRUSTED_PROXY_IPS still trusts loopback only; set the exact MovieHub frontend proxy IP or a dedicated subnet after confirming the frontend container.")
         else:
             print("[OK] Forwarded-header trust list contains valid explicit IP/CIDR entries.")
     except ValueError as exc:

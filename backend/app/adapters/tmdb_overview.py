@@ -148,6 +148,87 @@ class TMDBOverviewClient:
             return False
         return bool(item_names & cls._title_names(candidate, media_type))
 
+    def _search_by_title_and_directors(
+        self,
+        item: Any,
+        media_type: str,
+        language: str,
+    ) -> tuple[dict[str, Any] | None, str, int]:
+        """Resolve yearless source rows only when exact title and director agree.
+
+        Annual charts may omit release years. In that case a title-only result
+        is never accepted: every exact-title candidate is cross-checked against
+        TMDB credits and the source's director names. Multiple matches remain
+        ambiguous and missing director evidence remains insufficient identity.
+        """
+        query_values = []
+        for value in (
+            getattr(item, "original_title", None),
+            getattr(item, "title", None),
+        ):
+            value = (value or "").strip()
+            if value and value not in query_values:
+                query_values.append(value)
+
+        source_directors = {
+            normalize_title(name)
+            for name in (getattr(item, "directors", None) or [])
+            if normalize_title(name)
+        }
+        if not query_values or not source_directors:
+            return None, "insufficient_identity", 0
+
+        candidates_by_id: dict[int, dict[str, Any]] = {}
+        for query in query_values:
+            payload = self._get(
+                f"/search/{media_type}",
+                {
+                    "query": query,
+                    "include_adult": "false",
+                    "language": language,
+                    "page": 1,
+                },
+            )
+            results = payload.get("results", [])
+            if not isinstance(results, list):
+                continue
+            for candidate in results:
+                if not isinstance(candidate, dict) or candidate.get("id") is None:
+                    continue
+                if normalize_title(getattr(item, "title", None)) in self._title_names(candidate, media_type) or normalize_title(getattr(item, "original_title", None)) in self._title_names(candidate, media_type):
+                    candidates_by_id[int(candidate["id"])] = candidate
+
+        if not candidates_by_id:
+            return None, "no_exact_match", 0
+
+        verified: list[dict[str, Any]] = []
+        for candidate_id, candidate in candidates_by_id.items():
+            credits = self._get(
+                f"/{media_type}/{candidate_id}/credits",
+                {},
+            )
+            crew = credits.get("crew", [])
+            if not isinstance(crew, list):
+                continue
+            tmdb_directors = {
+                normalize_title(person.get("name"))
+                for person in crew
+                if isinstance(person, dict)
+                and (
+                    person.get("job") == "Director"
+                    or (media_type == "tv" and person.get("department") == "Directing")
+                )
+                and normalize_title(person.get("name"))
+            }
+            if source_directors & tmdb_directors:
+                verified.append(candidate)
+
+        if len(verified) == 1:
+            return verified[0], "exact_title_director", 1
+        if len(verified) > 1:
+            return None, "ambiguous", len(verified)
+        return None, "no_exact_match", len(candidates_by_id)
+
     def _find_by_imdb_id(
         self,
         item: Any,
@@ -252,7 +333,12 @@ class TMDBOverviewClient:
         else:
             candidate, method, candidate_count = self._find_by_imdb_id(item, media_type)
             if candidate is None and method == "no_external_id":
-                candidate, method, candidate_count = self._search_by_title(item, media_type, language)
+                if getattr(item, "year", None) is None:
+                    candidate, method, candidate_count = self._search_by_title_and_directors(
+                        item, media_type, language
+                    )
+                else:
+                    candidate, method, candidate_count = self._search_by_title(item, media_type, language)
             elif candidate is None:
                 return OverviewLookup(
                     status=method,

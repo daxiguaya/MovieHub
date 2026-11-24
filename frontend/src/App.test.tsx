@@ -68,9 +68,21 @@ describe("MovieHub frontend workflows", () => {
     );
   });
 
-  it("submits Chinese title, year, genre and region filters to the API", async () => {
+  it("searches the online catalog and uses dynamic multi-select genre and region filters", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/discovery/regions") {
+        return { provider: "tmdb", regions: [{ code: "US", name: "美国" }] };
+      }
+      if (url.includes("/api/discovery/genres")) {
+        return { provider: "tmdb", media_type: "movie", genres: [{ id: 878, name: "科幻" }] };
+      }
+      if (url.startsWith("/api/discovery/search?")) {
+        return {
+          provider: "tmdb", query: "星际穿越", page: 1, total_pages: 1,
+          total_results: 1, items: [], attribution: "TMDB"
+        };
+      }
       if (url.startsWith("/api/movies?")) {
         return { items: [], next_cursor: null, total: 0 };
       }
@@ -83,30 +95,30 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByText("搜索结果");
+    await screen.findByText("在线搜索结果");
     await userEvent.type(
-      screen.getByPlaceholderText("搜索中文片名或原名…"),
+      screen.getByPlaceholderText("输入片名，例如：异形、蝙蝠侠…"),
       "星际穿越"
     );
     await userEvent.selectOptions(screen.getByLabelText("影视类型"), "movie");
     await userEvent.type(screen.getByLabelText("起始年份"), "2010");
     await userEvent.type(screen.getByLabelText("结束年份"), "2020");
-    await userEvent.type(screen.getByLabelText("包含类型"), "科幻");
-    await userEvent.type(screen.getByLabelText("排除类型"), "恐怖");
-    await userEvent.type(screen.getByLabelText("地区"), "美国");
-    await userEvent.click(screen.getByRole("button", { name: /搜索电影/ }));
+    await screen.findByRole("option", { name: "科幻" });
+    await userEvent.selectOptions(screen.getByLabelText("类型（可多选）"), "878");
+    await screen.findByRole("option", { name: "美国" });
+    await userEvent.selectOptions(screen.getByLabelText("制作地区（可多选）"), "US");
+    await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
 
     await waitFor(() => {
-      const requestUrl = fetchMock.mock.calls
-        .map(([input]) => String(input))
-        .find((url) => url.includes("search=%E6%98%9F%E9%99%85%E7%A9%BF%E8%B6%8A"));
-      expect(requestUrl).toBeTruthy();
-      const params = new URLSearchParams(requestUrl!.split("?")[1]);
+      const urls = fetchMock.mock.calls.map(([input]) => String(input));
+      const onlineUrl = urls.find((url) => url.includes("/api/discovery/search?"));
+      const localUrl = urls.find((url) => url.startsWith("/api/movies?"));
+      expect(onlineUrl).toContain("q=%E6%98%9F%E9%99%85%E7%A9%BF%E8%B6%8A");
+      const params = new URLSearchParams(localUrl!.split("?")[1]);
       expect(params.get("type")).toBe("movie");
       expect(params.get("min_year")).toBe("2010");
       expect(params.get("max_year")).toBe("2020");
       expect(params.get("genres")).toBe("科幻");
-      expect(params.get("exclude_genres")).toBe("恐怖");
       expect(params.get("regions")).toBe("美国");
     });
   });

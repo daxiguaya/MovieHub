@@ -472,9 +472,11 @@ jobs:
       - name: Verify persisted chart and movie counts
         run: |
           python - <<'PY'
+          import os
           from sqlalchemy import func, select
           from app.database import Chart, ChartItem, ChartSnapshot, Movie, SessionLocal
 
+          capture_date = os.environ["MOVIEHUB_CAPTURE_DATE"]
           with SessionLocal() as db:
               expected = {"top250": 250}
               for slug, minimum in expected.items():
@@ -483,7 +485,7 @@ jobs:
                   snapshot = db.scalar(
                       select(ChartSnapshot).where(
                           ChartSnapshot.list_id == chart.list_id,
-                          ChartSnapshot.snapshot_date == "${MOVIEHUB_CAPTURE_DATE}",
+                          ChartSnapshot.snapshot_date == capture_date,
                       )
                   )
                   assert snapshot is not None, f"missing snapshot {slug}"

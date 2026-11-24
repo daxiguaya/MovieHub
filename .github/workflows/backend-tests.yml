@@ -580,18 +580,19 @@ jobs:
     # This never uses NAS paths, external NPM networks, or production data.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    env:
-      MOVIEHUB_DATA_PATH: ${{ runner.temp }}/moviehub-compose-smoke/data
-      MOVIEHUB_BACKUP_PATH: ${{ runner.temp }}/moviehub-compose-smoke/backups
-      MOVIEHUB_IMPORT_PATH: ${{ github.workspace }}/deploy/empty-imports
-      MOVIEHUB_FRONTEND_CONFIG_PATH: ${{ github.workspace }}/deploy/frontend-config.json
-      MOVIEHUB_API_KEY: ci-only-compose-smoke-key
     steps:
       - uses: actions/checkout@v4
+      - name: Configure disposable Compose environment
+        run: |
+          echo "MOVIEHUB_DATA_PATH=$RUNNER_TEMP/moviehub-compose-smoke/data" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_BACKUP_PATH=$RUNNER_TEMP/moviehub-compose-smoke/backups" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_IMPORT_PATH=$GITHUB_WORKSPACE/deploy/empty-imports" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_FRONTEND_CONFIG_PATH=$GITHUB_WORKSPACE/deploy/frontend-config.json" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_API_KEY=ci-only-compose-smoke-key" >> "$GITHUB_ENV"
       - name: Prepare disposable bind mounts and external proxy network
         run: |
           mkdir -p "$MOVIEHUB_DATA_PATH" "$MOVIEHUB_BACKUP_PATH"
-          sudo chown -R 10001:10001 "${RUNNER_TEMP}/moviehub-compose-smoke"
+          sudo chown -R 10001:10001 "$RUNNER_TEMP/moviehub-compose-smoke"
           docker network create chatgpt-browser_default
       - name: Validate isolated Compose configuration
         run: docker compose -p moviehub-ci-smoke config --quiet

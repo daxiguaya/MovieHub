@@ -1,4 +1,5 @@
 name: Real-data Compose upgrade rehearsal
+# [run-real-upgrade] normalized snapshot payloads store chart rows under movies
 
 on:
   push:

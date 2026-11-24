@@ -46,9 +46,9 @@ Cross-chart duplicate Douban IDs: **0**. All 38 records have a non-empty title a
 - **Do not fill missing ranks or metadata with guesses.** Any enrichment should be a separate, source-attributed, rate-limited stage with its own validation and provenance.
 - The 8-entry Chinese-movie chart is a real observed result, not an automatic failure. Before treating it as the intended full chart, compare it with the official page and collector parsing behavior.
 
-## Next real-data gate
+## Follow-up data work
 
-The next meaningful dataset is a **consistent, read-only staged copy of the actual Scout SQLite source**, including its WAL state or produced through SQLite's online backup mechanism. The source database's concrete path was not established in the earlier NAS scan, and this run did not connect to the NAS. Once a staged copy is supplied, run the whole-catalog identity/numeric audit, annual-chart coverage audit and preview/reconciliation against that copy. Keep the destination MovieHub database isolated and disposable for any import rehearsal.
+The 38-record annual artifact has been imported and verified in an isolated MovieHub database, but it is not a complete searchable catalogue and its metadata is sparse. The next product-facing data work is to select the intended first-release chart set and enrich records from verified, permitted sources, retaining provenance and allowing unknown fields to remain empty. A Scout SQLite snapshot and its read-only coverage audit are **optional** and should only be pursued if Scout is deliberately selected as an external metadata source. MovieHub does not have a production source database because it has not been deployed; no Scout source or NAS production environment is required to continue development.
 
 No Scout source file, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed.
 

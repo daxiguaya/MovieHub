@@ -2,9 +2,9 @@
 
 > **更新基线：2026-11-24**  
 > 仓库：`daxiguaya/MovieHub`  
-> 工作分支：`phase4/database-foundation`  
+> 工作分支：`main`  
 > 当前阶段：部署前收尾（Pre-deployment hardening）  
-> 整体进度估算：**约 83%**。这是交付范围估算，不是测试通过率。
+> 整体进度估算：**约 84%**。这是交付范围估算，不是测试通过率。
 
 ## 一句话结论
 
@@ -68,6 +68,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - [x] 显式一次性数据库初始化；容器启动不自动建库或迁移。
 - [x] SQLite 在线备份、SHA-256 manifest、保留策略、校验恢复、恢复前回滚副本。
 - [x] 健康检查/readiness、配置模板、部署/备份恢复/导入 runbook。
+- [x] GitHub 隔离 runner 上真实启动双容器，验证未初始化 503、显式初始化、真实 API 读写、在线备份、停止 API 后恢复、重新启动 API、恢复值与回滚副本，再检查双容器健康状态。
 
 ## 当前首发数据质量缺口
 
@@ -92,7 +93,8 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - [ ] 完成前端真实数据视觉 QA 和异常状态检查。
 
 ### P1 — 隔离环境部署演练（不触碰 NAS）
-- [ ] 在临时目录/隔离主机演练 Compose 启动、显式初始化、数据导入、readiness、备份、恢复、升级和回滚。
+- [x] 在 GitHub 隔离 runner 完成 Compose 启动、显式初始化、readiness、API 读写、备份、恢复、恢复后 API 验证和回滚副本验收。
+- [ ] 继续补齐隔离环境下的真实规范化数据导入、镜像升级、版本回滚演练。
 - [ ] 检查密钥注入、反向代理信任边界、容器权限、数据卷和日志策略。
 - [ ] 制定目标 NAS 资源预算、目录权限、备份落点和性能测量方案。
 - [ ] 将 NPM 与 Xiaoya 集成验收步骤整理为可执行清单。
@@ -122,10 +124,10 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | 榜单采集、规范化和真实导入 | 已完成首发数据演练 |
 | 首发详情元数据丰富度 | 进行中 |
 | 前端核心功能与桌面/移动端真实数据 E2E | 榜单、详情、搜索、收藏链路自动化验收通过；视觉 QA 待做 |
-| 容器、备份恢复和运维文档 | 已实现；隔离部署演练待做 |
+| 容器、备份恢复和运维文档 | 已实现；隔离 Compose 启动及备份恢复闭环通过，数据导入/升级演练待做 |
 | NAS/NPM 实际联调与生产部署 | 未开始 |
 
-**整体进度仍约 83%。** 本轮完成了剧情简介来源的许可、稳定性和匹配路径专项研究，新增 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。TMDB 是首选试验候选，但尚未批准批量导入：免费开发 API 仅适用于非商业用途、要求署名且无 SLA，中文覆盖率及实际缓存/展示条款仍须实测/核验；Wikipedia 是带 CC BY-SA 义务的逐条备用；OMDb 因索引/归档/分发限制排除。简介仍为 0/250，不虚报进度。下一步先运行 TMDB 只读 dry-run（需 API read token），核验 288 条匹配与中文简介覆盖，再决定是否做 schema v4 与导入。随后继续真实数据分页、多日期历史/排名比较、筛选和异常状态验收。最新真实数据浏览器 CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的核心 job 通过，真实浏览器 4/4 通过；被 skip 的 job 不计通过。
+**整体进度调整为约 84%。** 本轮完成了剧情简介来源的许可、稳定性和匹配路径专项研究，新增 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。TMDB 是首选试验候选，但尚未批准批量导入：免费开发 API 仅适用于非商业用途、要求署名且无 SLA，中文覆盖率及实际缓存/展示条款仍须实测/核验；Wikipedia 是带 CC BY-SA 义务的逐条备用；OMDb 因索引/归档/分发限制排除。简介仍为 0/250，不虚报进度。下一步先运行 TMDB 只读 dry-run（需 API read token），核验 288 条匹配与中文简介覆盖，再决定是否做 schema v4 与导入。随后继续真实数据分页、多日期历史/排名比较、筛选和异常状态验收。最新真实数据浏览器 CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的核心 job 通过，真实浏览器 4/4 通过；被 skip 的 job 不计通过。
 
 ## 2026-11-24 — Pagination, history, search-filter acceptance expansion
 
@@ -214,3 +216,12 @@ This remains isolated CI verification. No NAS, NPM, Scout source database, or pr
 
 
 The documentation/main-head CI [#45344314269](https://github.com/daxiguaya/MovieHub/actions/runs/45344314269) also passed all required jobs: backend 267 passed / 4 skipped, browser E2E 10 passed / 4 skipped, frontend tests/type-check/build, both image builds, and full isolated Compose backup/restore rehearsal. Optional external-source collection and performance jobs remained skipped by design.
+
+
+## 2026-11-24 — Compose lifecycle rehearsal completed
+
+- [x] Complete the live two-container Compose backup/restore rehearsal in CI [#45343969389](https://github.com/daxiguaya/MovieHub/actions/runs/45343969389): baseline API value → backup → changed API value → stop API → one-shot restore → restart API → restored value → rollback-copy verification.
+- [x] Verify both container health checks and isolated project cleanup.
+- [x] Switch headless browser CI to Playwright Chromium headless shell; [#45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) and documentation/main-head CI [#45344314269](https://github.com/daxiguaya/MovieHub/actions/runs/45344314269) passed, with 10 browser E2E passed / 4 skipped and backend 267 passed / 4 skipped.
+
+The remaining 16% is concentrated in licensed/accurate synopsis coverage, genuine same-chart multi-date source history, final import/upgrade rehearsal, and separately approved production integration/deployment. No NAS or production database was touched.

@@ -745,3 +745,14 @@ The initial strict-cursor CI attempt reported 264 passed / 1 failed / 4 skipped 
 Added integrated regression coverage for the complete database lifecycle using only temporary paths: initialize a fresh MovieHub database, verify readiness, create a checksum-verified backup, introduce a post-backup change, restore, verify that the rollback copy preserves the newer state, and re-check readiness/schema/integrity/foreign keys. A separate test proves the initializer refuses an existing external SQLite database without changing its source records or adding MovieHub tables.
 
 This is a database lifecycle rehearsal, not a live Docker/NPM/NAS deployment. CI verification is pending. No production data or running services were accessed.
+
+
+## 2026-11-24 — Database lifecycle CI verified; Compose runtime smoke added
+
+- [x] Database initialize → readiness → write → backup → later write → restore → rollback-copy and integrity checks passed in temporary SQLite.
+- [x] Existing external SQLite database refusal/no-mutation regression passed.
+- [x] Branch-head CI [#45339047025](https://github.com/daxiguaya/MovieHub/actions/runs/45339047025): backend 267 passed / 4 skipped; frontend tests/build, browser E2E, backend/frontend image builds, and both Compose config variants succeeded.
+- [x] Add a dedicated compose-smoke CI job to build and start the actual two-container Compose stack on an isolated GitHub runner, check liveness and pre-init readiness, explicitly initialize a disposable DB, then test readiness, chart API and frontend HTTP.
+- [ ] Await the first execution of compose-smoke; no live Compose runtime result is claimed yet.
+
+No NAS, NPM, Scout source database, or production data was accessed. Overall progress remains approximately 83%.

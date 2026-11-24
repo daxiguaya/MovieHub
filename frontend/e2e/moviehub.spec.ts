@@ -13,6 +13,20 @@ const chart = {
   last_updated: null
 };
 
+const discoveryItem = {
+  provider: "tmdb",
+  provider_id: 999,
+  media_type: "movie",
+  title: "星际穿越",
+  original_title: "Interstellar",
+  year: 2014,
+  rating: 8.7,
+  rating_count: 1000,
+  poster_path: null,
+  backdrop_path: null,
+  genre_ids: [878]
+};
+
 const movie = {
   id: 42,
   douban_id: "1292052",
@@ -52,6 +66,24 @@ async function installApiFixtures(page) {
     const path = url.pathname;
     const method = request.method();
 
+    if (path === "/api/discovery/regions" && method === "GET") {
+      return route.fulfill({ json: { provider: "tmdb", regions: [{ code: "US", name: "美国" }] } });
+    }
+    if (path === "/api/discovery/genres" && method === "GET") {
+      return route.fulfill({ json: { provider: "tmdb", media_type: "movie", genres: [{ id: 878, name: "科幻" }] } });
+    }
+    if (path === "/api/discovery/search" && method === "GET") {
+      return route.fulfill({
+        json: { provider: "tmdb", query: url.searchParams.get("q"), page: 1, total_pages: 1,
+          total_results: 1, items: [discoveryItem], attribution: "TMDB" }
+      });
+    }
+    if (path === "/api/discovery/discover" && method === "GET") {
+      return route.fulfill({
+        json: { provider: "tmdb", media_type: "movie", page: 1, total_pages: 1,
+          total_results: 0, items: [], attribution: "TMDB" }
+      });
+    }
     if (path === "/api/charts" && method === "GET") {
       return route.fulfill({ json: [chart] });
     }
@@ -133,11 +165,11 @@ test("opens a chart and navigates from its ranked item to movie details", async 
 
 test("searches by Chinese title and displays matching movie results", async ({ page }) => {
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际穿越");
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill("星际穿越");
+  await page.getByRole("button", { name: /搜索/ }).click();
 
   await expect(page.getByRole("link", { name: "星际穿越" }).first()).toBeVisible();
-  await expect(page.getByText("1 部作品")).toBeVisible();
+  await expect(page.getByText(/1 部 · 本地匹配 1 部/)).toBeVisible();
   expect(new URL(page.url()).searchParams.get("search")).toBe("星际穿越");
 });
 

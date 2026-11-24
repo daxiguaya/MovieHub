@@ -74,8 +74,7 @@ test("submits online Discover with dynamic multi-select filters and preserves se
 
   await expect(page.getByRole("link", { name: "在线匹配影片" })).toBeVisible();
   await expect.poll(() => localQueries.length).toBeGreaterThan(0);
-  const local = localQueries.find((query) => query.has("min_rating") && query.has("genres"));
-  expect(local).toBeDefined();
+  const local = localQueries.find((query) => query.has("min_rating") && query.has("genres"))!;
   expect(local.get("min_rating")).toBe("8");
   expect(local.get("min_rating_count")).toBe("1000");
   expect(local.get("min_year")).toBe("2020");

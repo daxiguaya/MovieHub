@@ -60,24 +60,50 @@ jobs:
             exit 1
           fi
 
-      - name: Run read-only Chinese overview coverage audit
+      - name: Run read-only audit for Top 250 and all four annual charts
         working-directory: backend
         env:
           TMDB_API_READ_TOKEN: ${{ secrets.TMDB_API_READ_TOKEN }}
         run: |
+          set -euo pipefail
+          input_dir="${RUNNER_TEMP}/moviehub-first-launch-bundle"
           python -m scripts.audit_tmdb_overview \
-            --input-dir "${RUNNER_TEMP}/moviehub-first-launch-bundle" \
+            --input-dir "$input_dir" \
             --date 2026-11-24 \
             --language zh-CN \
             --language zh-TW \
             --min-interval 0.3 \
-            > "${RUNNER_TEMP}/tmdb-overview-audit.json"
-          cat "${RUNNER_TEMP}/tmdb-overview-audit.json"
+            > "${RUNNER_TEMP}/tmdb-overview-audit-top250.json"
+          python -m scripts.audit_tmdb_overview \
+            --input-dir "$input_dir" \
+            --date 2026-11-23 \
+            --language zh-CN \
+            --language zh-TW \
+            --min-interval 0.3 \
+            > "${RUNNER_TEMP}/tmdb-overview-audit-annual-2025.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          for name in ("tmdb-overview-audit-top250.json", "tmdb-overview-audit-annual-2025.json"):
+              report = json.loads((root / name).read_text(encoding="utf-8"))
+              print(json.dumps({
+                  "report": name,
+                  "movie_count": report["movie_count"],
+                  "language_count": report["language_count"],
+                  "record_count": report["record_count"],
+                  "summary": report["summary"],
+                  "by_language": report["by_language"],
+              }, ensure_ascii=False))
+          PY
 
-      - name: Upload coverage report (no synopsis text)
+      - name: Upload coverage reports (no synopsis text)
         uses: actions/upload-artifact@v4
         with:
           name: moviehub-tmdb-overview-audit
-          path: ${{ runner.temp }}/tmdb-overview-audit.json
+          path: |
+            ${{ runner.temp }}/tmdb-overview-audit-top250.json
+            ${{ runner.temp }}/tmdb-overview-audit-annual-2025.json
           if-no-files-found: error
           retention-days: 14

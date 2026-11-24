@@ -43,7 +43,7 @@ class ChartService:
 
     @staticmethod
     def _decode_cursor(cursor: str | None) -> int | None:
-        if not cursor:
+        if cursor is None:
             return None
 
         try:

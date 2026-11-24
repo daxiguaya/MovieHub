@@ -15,13 +15,13 @@ The backup directory is mounted at `/backups`, separately from MovieHub's writab
 
 ## Prepare the backup destination
 
-Set `MOVIEHUB_BACKUP_PATH` in the project `.env` file. The Compose default is `/volume1/backup/moviehub`.
+Set `MOVIEHUB_BACKUP_PATH` in the project `.env` file. The Compose default is `/volume1/docker/moviehub/backup`.
 
 Create it and grant the container UID/GID write access (defaults to 10001:10001):
 
 ```sh
-mkdir -p /volume1/backup/moviehub
-chown -R 10001:10001 /volume1/backup/moviehub
+mkdir -p /volume1/docker/moviehub/backup
+chown -R 10001:10001 /volume1/docker/moviehub/backup
 ```
 
 Prefer a different physical volume or a separate/off-site destination for disaster recovery. A backup on the same disk does not protect against disk failure.
@@ -86,7 +86,7 @@ The restore command requires both `--confirm` and `--service-stopped`. These fla
 - Never use a Scout database path as the restore destination.
 - Never run restore while the MovieHub API is running.
 - Do not delete the pre-restore rollback copy until recovery has been verified.
-- Keep backups outside Git and outside the application source tree.
+- Keep backups outside Git; the configured backup directory is a separate bind mount and must remain excluded from version control.
 - This runbook does not authorize production initialization, Scout import, or deployment.
 
 

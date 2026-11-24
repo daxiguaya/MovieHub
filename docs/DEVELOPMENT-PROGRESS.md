@@ -726,3 +726,15 @@ This verifies the current application against a freshly collected real dataset i
 - [ ] Branch-head CI verification pending.
 
 This closes an API edge case: a typo or tampered cursor previously restarted pagination at page one without telling the caller. It does not change the current 83% overall estimate. No NAS, production database, Scout source, NPM, or running service was accessed.
+
+
+## Optional Scout mount correction (2026-11-24)
+
+- [x] Made the Scout bind mount optional: Compose defaults to the tracked empty read-only directory `deploy/empty-imports`.
+- [x] Kept an explicitly configured Scout path read-only.
+- [x] Updated the environment example and deployment runbook; normal MovieHub initialization no longer requires Scout.
+- [x] CI now validates both Compose modes.
+- [x] Updated the pre-existing malformed-cursor unit test after the first strict-cursor CI run exposed its old "ignore invalid cursor" expectation.
+- [ ] Latest branch-head CI pending.
+
+The initial strict-cursor CI attempt reported 264 passed / 1 failed / 4 skipped because a legacy unit test still encoded the old behavior. The test now expects a cursor validation error; re-run is underway. Overall progress remains **83%** and nothing was deployed.

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import (
-    Base, Chart, ChartSnapshot, ChartItem, Movie,
+    Base, Chart, ChartSnapshot, ChartItem, Movie, MovieMetadataProvenance,
     Genre, Region, MovieGenre, MovieRegion,
 )
 from app.schemas_chart_import import ChartMovieImport, ChartSnapshotImport
@@ -485,6 +485,64 @@ def test_new_movie_metadata_associations_receive_generated_movie_id():
         ).all())
         assert genre_names == {"Drama", "Thriller"}
         assert region_names == {"China"}
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_chart_import_records_field_level_source_provenance_idempotently():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        snapshot = _snapshot(
+            date(2026, 11, 24),
+            [
+                ChartMovieImport(
+                    douban_id="120101",
+                    rank=1,
+                    title="Provenance fixture",
+                    original_title="Source title",
+                    year=2020,
+                    rating=8.2,
+                    rating_count=12345,
+                    directors=["Director A"],
+                    actors=["Actor A"],
+                    overview="Source synopsis",
+                    douban_url="https://movie.douban.com/subject/120101/",
+                )
+            ],
+        )
+        service.import_snapshot(db, snapshot)
+        db.commit()
+
+        movie = db.scalar(
+            select(Movie).where(Movie.douban_id == "120101")
+        )
+        records = db.scalars(
+            select(MovieMetadataProvenance).where(
+                MovieMetadataProvenance.movie_id == movie.id
+            )
+        ).all()
+        by_field = {record.field_name: record for record in records}
+
+        assert set(by_field) == {
+            "original_title", "year", "rating", "rating_count",
+            "directors", "actors", "overview",
+        }
+        assert all(record.source == "test" for record in records)
+        assert all(
+            record.source_url == "https://movie.douban.com/subject/120101/"
+            for record in records
+        )
+        assert all(record.observed_at is not None for record in records)
+        assert all(len(record.value_sha256) == 64 for record in records)
+
+        db.commit()
+        service.import_snapshot(db, snapshot)
+        db.commit()
+        assert db.scalar(
+            select(func.count()).select_from(MovieMetadataProvenance)
+        ) == 7
     finally:
         db.close()
         engine.dispose()

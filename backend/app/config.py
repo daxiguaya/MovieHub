@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     data_dir: Path = Path("/data")
+    backup_dir: Path = Path("/backups")
     import_dir: Path = Path("/imports")
     api_key: str = ""
     cors_origins: list[str] = Field(default_factory=list)

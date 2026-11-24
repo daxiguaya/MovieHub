@@ -666,3 +666,10 @@ The same run collected all four official 2025 annual charts and all four normali
 
 - [x] Full branch-head CI run [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353) completed: backend **247 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; Playwright E2E **4/4 passed**; real annual-data import rehearsal **passed**.
 - [ ] Annual-chart-collection and performance-benchmarks jobs were skipped in this push-triggered run; the imported artifact was the previously retained real collector output, not a new collection.
+
+## 2026-11-24 — 真实年度数据浏览器验收接线
+
+- 新增 Playwright 场景：使用 live API 遍历四个真实 2025 年度榜单（8/10/10/10），打开其中一部真实影片详情，并以真实标题完成搜索。
+- 新增独立 CI job：从已留存的官方采集 artifact 建立临时 SQLite，执行正式年度批量导入命令，启动 FastAPI 并运行该浏览器场景。
+- 当前状态：代码与 workflow 已提交，等待带标记的 push 触发 CI。CI 未通过前不计为完成，不上调整体进度。
+- 安全边界：所有数据与服务均在 GitHub runner 临时环境；不访问 NAS/Scout，不部署、不初始化生产库、不改 NPM、不重启任何服务。

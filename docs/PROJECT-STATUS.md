@@ -165,3 +165,15 @@ All work remained in disposable GitHub Actions storage. No NAS path, production 
 - [ ] Await the branch-head CI run for this change; no test result is claimed before the workflow completes.
 
 This is API input hardening only. It does not claim real multi-date source snapshots, synopsis coverage, or deployment completion. Overall delivery estimate remains **83%**. All tests continue to use disposable SQLite; no NAS, production database, NPM configuration, or service was touched.
+
+
+## 2026-11-24 — Optional Scout mount and cursor regression follow-up
+
+- [x] Remove the hard requirement for `MOVIEHUB_IMPORT_PATH`; Compose now mounts a tracked empty directory read-only when Scout is not configured.
+- [x] Keep explicit Scout configuration supported as a read-only `/imports` mount.
+- [x] Update `deploy/.env.example` and deployment instructions so Scout is clearly optional.
+- [x] Expand CI Compose validation to check both no-Scout and explicit-Scout configurations.
+- [x] Strict cursor validation surfaced one older unit test that still expected malformed cursors to be silently ignored; update that test to assert the new HTTP/service contract.
+- [ ] Await the latest branch-head CI run after the regression-test correction.
+
+The first cursor-hardening CI attempt found the stale expectation (264 passed, 1 failed, 4 skipped); this was a test-contract mismatch, not a runtime failure in the new API test. The legacy test has now been updated and a fresh CI run is in progress. Overall estimate remains **83%**; no deployment or production data operation was performed.

@@ -663,6 +663,89 @@ function MoviePage({ config }: { config: PublicConfig }) {
   );
 }
 
+function ExternalMoviePage({ config }: { config: PublicConfig }) {
+  const { mediaType = "movie", providerId = "" } = useParams();
+  const id = Number(providerId);
+  const validType = mediaType === "tv" ? "tv" : "movie";
+  const [movie, setMovie] = useState<DiscoveryDetail | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [favoriteError, setFavoriteError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    if (!Number.isInteger(id) || id <= 0 || (mediaType !== "movie" && mediaType !== "tv")) {
+      setError("作品编号无效");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    api.discoveryDetail(validType, id)
+      .then((data) => { if (active) setMovie(data); })
+      .catch((err: Error) => { if (active) setError(err.message); })
+      .finally(() => { if (active) setLoading(false); });
+    api.externalFavorites()
+      .then((items) => { if (active) setIsFavorite(items.some((item) => item.media_type === validType && item.provider_id === id)); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [id, mediaType, validType]);
+
+  async function toggleFavorite() {
+    if (!movie) return;
+    setFavoriteError("");
+    try {
+      if (isFavorite) await api.removeExternalFavorite(validType, id);
+      else await api.saveExternalFavorite(movie);
+      setIsFavorite(!isFavorite);
+    } catch (err) {
+      setFavoriteError((err as Error).message);
+    }
+  }
+
+  if (loading) return <Loading label="正在获取在线作品详情…" />;
+  if (error || !movie) return <ErrorState message={error || "作品不存在"} />;
+
+  const poster = movie.poster_path ? "https://image.tmdb.org/t/p/w500" + movie.poster_path : "";
+  const directors = movie.credits.crew?.filter((person) => person.job === "Director").map((person) => person.name) ?? [];
+  const actors = movie.credits.cast?.slice(0, 12).map((person) => person.name) ?? [];
+  const countries = movie.production_countries.map((country) =>
+    typeof country === "string" ? country : (country.name || country.iso_3166_1 || "")
+  ).filter(Boolean);
+
+  return (
+    <>
+      <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><Link to="/search">全网搜索</Link><span>/</span><span>{movie.title}</span></div>
+      <section className="detail-layout">
+        <div className="detail-poster-wrap">
+          <div className="movie-poster">
+            {poster ? <img src={poster} alt={movie.title} loading="lazy" /> : <div className="poster-placeholder"><span>TMDB</span><small>{movie.year ?? "TITLE"}</small></div>}
+          </div>
+          <div className="detail-poster-caption">TMDB DISCOVERY</div>
+        </div>
+        <div className="detail-copy">
+          <div className="eyebrow">{movie.media_type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? "YEAR UNKNOWN"}</div>
+          <h1>{movie.title}</h1>
+          {movie.original_title && <div className="original-title">{movie.original_title}</div>}
+          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB · {movie.rating_count.toLocaleString()} 票</span></div>
+          <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
+          <div className="detail-actions">
+            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchBaseUrl, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
+            <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
+            {movie.external_ids.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.external_ids.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
+          </div>
+          {favoriteError && <div className="inline-error">{favoriteError}</div>}
+          {directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{directors.join(" / ")}</p></section>}
+          {actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{actors.join(" / ")}</p></section>}
+          {movie.runtime && <section className="detail-section"><h3>片长</h3><p>{movie.runtime} 分钟</p></section>}
+          {movie.number_of_seasons && <section className="detail-section"><h3>剧集信息</h3><p>{movie.number_of_seasons} 季 · {movie.number_of_episodes ?? "—"} 集</p></section>}
+          <p className="tmdb-attribution">{movie.attribution}</p>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function FavoritesPage() {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);

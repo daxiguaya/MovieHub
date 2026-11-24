@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter } from "react-router-dom";
 import App from "./App";
 
 function jsonResponse(payload: unknown): Response {
@@ -225,6 +225,34 @@ describe("MovieHub frontend workflows", () => {
     )).toBe(true);
   });
 
+
+
+  it("clears a previous chart error when navigating to another chart", async () => {
+    installFetchMock((url) => {
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/charts/broken/snapshots") return [];
+      if (url === "/api/charts/broken") throw new Error("榜单读取失败");
+      if (url === "/api/charts/top250/snapshots") return [];
+      if (url === "/api/charts/top250") {
+        return { chart, items: [], next_cursor: null, total: 0 };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/charts/broken"]}>
+        <Link to="/charts/top250">切换榜单</Link>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("榜单读取失败")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "切换榜单" }));
+
+    expect(await screen.findByRole("heading", { name: "豆瓣电影 Top 250" })).toBeInTheDocument();
+    expect(screen.queryByText("榜单读取失败")).not.toBeInTheDocument();
+    expect(screen.getByText("这份榜单还没有快照")).toBeInTheDocument();
+  });
 
   it("adds and removes a favorite through the protected favorites API", async () => {
     const requests: { url: string; method: string }[] = [];

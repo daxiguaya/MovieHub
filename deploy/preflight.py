@@ -105,7 +105,7 @@ def main() -> int:
             continue
         writable = target_write_bit(path, uid, gid)
         if writable is False:
-            errors.append(f"{key} mode bits do not grant write access to UID/GID {uid}:{gid}: {path}")
+            warnings.append(f"{key} mode bits do not show write access for UID/GID {uid}:{gid}; inspect DSM ACLs or adjust ownership before deployment: {path}")
         elif writable is None:
             errors.append(f"Cannot inspect {key}: {path}")
         else:
@@ -151,8 +151,11 @@ def main() -> int:
         errors.append(f"Cannot inspect required Docker network {EXPECTED_NETWORK}: {exc}")
 
     try:
-        existing = docker_json(["ps", "-a", "--format", "{{.Names}}"])
-        conflicts = sorted(EXPECTED_CONTAINERS.intersection(existing if isinstance(existing, list) else []))
+        result = run(["docker", "ps", "-a", "--format", "{{.Names}}"])
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip() or "docker ps failed")
+        existing = [name.strip() for name in result.stdout.splitlines() if name.strip()]
+        conflicts = sorted(EXPECTED_CONTAINERS.intersection(existing))
         if conflicts:
             errors.append("Container-name conflicts exist: " + ", ".join(conflicts))
         else:

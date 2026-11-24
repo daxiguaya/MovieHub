@@ -163,3 +163,29 @@ def test_backup_retention_does_not_delete_unrecognized_directories(tmp_path):
     assert newer.is_dir()
     assert foreign.is_dir()
     assert malformed.is_dir()
+
+
+
+@pytest.mark.parametrize("manifest_payload", ["[]", "null", '"foreign-export"', "true", "17"])
+def test_backup_retention_ignores_valid_json_non_object_manifests(
+    tmp_path, manifest_payload
+):
+    database = tmp_path / "data" / "movies.db"
+    backup_root = tmp_path / "backups"
+    _initialize_database(database)
+
+    owned = create_backup(database, backup_root, keep_last=1)
+    foreign = backup_root / "moviehub-foreign-json"
+    foreign.mkdir()
+    (foreign / "movies.db").write_bytes(b"foreign data")
+    (foreign / "manifest.json").write_text(
+        manifest_payload, encoding="utf-8"
+    )
+
+    # A valid backup must still be created even when a neighboring directory
+    # contains syntactically valid JSON that is not a manifest object.
+    newer = create_backup(database, backup_root, keep_last=1)
+
+    assert owned != newer
+    assert newer.is_dir()
+    assert foreign.is_dir()

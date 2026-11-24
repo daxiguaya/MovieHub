@@ -28,6 +28,10 @@ logger = logging.getLogger("moviehub.charts")
 MAX_PAGE_SIZE = 50
 
 
+class ChartCursorError(ValueError):
+    """Raised when a chart pagination cursor is malformed."""
+
+
 class ChartService:
     """Read chart definitions and their dated movie snapshots."""
 
@@ -43,13 +47,18 @@ class ChartService:
             return None
 
         try:
-            decoded = base64.urlsafe_b64decode(
-                cursor.encode("ascii")
-            ).decode("ascii")
+            decoded_bytes = base64.b64decode(
+                cursor.encode("ascii"),
+                altchars=b"-_",
+                validate=True,
+            )
+            decoded = decoded_bytes.decode("ascii")
             rank = int(decoded)
-            return rank if rank > 0 else None
-        except (ValueError, UnicodeDecodeError):
-            return None
+            if rank <= 0 or str(rank) != decoded:
+                raise ValueError("cursor rank is not canonical")
+            return rank
+        except (ValueError, UnicodeEncodeError, UnicodeDecodeError) as exc:
+            raise ChartCursorError("Invalid chart pagination cursor") from exc
 
     @staticmethod
     def _chart_response(chart: Chart) -> ChartResponse:

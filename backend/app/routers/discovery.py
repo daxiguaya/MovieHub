@@ -217,8 +217,8 @@ async def get_online_detail(
 
 @router.get("/cache-stats")
 @limiter.limit("10/minute")
-async def get_cache_stats(request: Request) -> dict[str, int]:
-    return provider_response_cache.stats()
+async def get_cache_stats(request: Request) -> dict[str, int | float]:
+    return {**provider_response_cache.stats(), **tmdb_client.stats()}
 
 
 @router.get("/favorites", dependencies=[Depends(verify_api_key)])

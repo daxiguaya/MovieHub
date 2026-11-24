@@ -24,6 +24,8 @@ def _migrated_database(path: Path) -> None:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript(MIGRATION.read_text(encoding="utf-8"))
         conn.executescript(followup.read_text(encoding="utf-8"))
+        provenance = MIGRATION.with_name("003_movie_metadata_provenance.sql")
+        conn.executescript(provenance.read_text(encoding="utf-8"))
     finally:
         conn.close()
 

@@ -1,5 +1,6 @@
 """Safety tests for verified MovieHub SQLite backup and restore."""
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -215,3 +216,54 @@ def test_backup_retention_never_follows_symlinked_backup_directories(tmp_path):
     assert link.is_symlink()
     assert external.is_dir()
     assert (external / "movies.db").read_bytes() == b"external data"
+
+
+
+@pytest.mark.parametrize(
+    ("manifest_kind", "expected_error"),
+    [
+        ("array", "JSON object"),
+        ("null", "JSON object"),
+        ("boolean-format-version", "manifest format"),
+        ("boolean-schema-version", "schema version"),
+        ("wrong-size", "database size"),
+        ("invalid-digest", "SHA-256 digest"),
+        ("malformed-json", "read backup manifest"),
+    ],
+)
+def test_restore_rejects_invalid_manifest_without_touching_current_database(
+    tmp_path, manifest_kind, expected_error
+):
+    database = tmp_path / "data" / "movies.db"
+    _initialize_database(database)
+    _insert_movie(database, "Current database must survive")
+    backup_dir = create_backup(database, tmp_path / "backups")
+    manifest_path = backup_dir / "manifest.json"
+
+    if manifest_kind == "array":
+        manifest_path.write_text("[]", encoding="utf-8")
+    elif manifest_kind == "null":
+        manifest_path.write_text("null", encoding="utf-8")
+    elif manifest_kind == "malformed-json":
+        manifest_path.write_text("{broken", encoding="utf-8")
+    else:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest_kind == "boolean-format-version":
+            manifest["format_version"] = True
+        elif manifest_kind == "boolean-schema-version":
+            manifest["schema_version"] = True
+        elif manifest_kind == "wrong-size":
+            manifest["database_size_bytes"] += 1
+        elif manifest_kind == "invalid-digest":
+            manifest["database_sha256"] = "not-a-sha256"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match=expected_error):
+        restore_backup(
+            backup_dir,
+            database,
+            confirm=True,
+            service_stopped=True,
+        )
+
+    assert _movie_titles(database) == ["Current database must survive"]

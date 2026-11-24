@@ -76,7 +76,10 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 当前明确待补：
 - [x] 对新采集的 Top 250 JSON artifact 复核评价人数实际覆盖率；已修复当前页面文本解析并在真实数据中验证 250/250。
-- [x] 完成剧情简介来源专项研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [x] 新增只读 TMDB adapter 与覆盖率审计 CLI：优先已有 TMDB ID，其次 IMDb ID，最后严格标题+年份匹配；拒绝歧义/年份冲突；zh-CN/zh-TW 请求；报告只输出匹配元数据、简介长度和 SHA-256，不输出简介正文、不写数据库。Mocked API/backend tests passed。\n- [x] 新增手动 GitHub Actions workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml)，从已验证首发 artifact 读取 2026-11-24 Top 250 快照（250 部影片），分别测量 zh-CN/zh-TW；运行需要仓库 Actions secret `TMDB_API_READ_TOKEN`。\n- [x] 已配置 `TMDB_API_READ_TOKEN` 并完成真实只读 API 审计：Top 250 的 250 部影片分别检查 zh-CN/zh-TW，共 500 条语言记录；470 条确认有对应语言剧情简介（94%），其余 3 条歧义、4 条身份信息不足、21 条无严格匹配、2 条无简介均未接受。审计只输出匹配元数据/长度/SHA-256，不输出简介正文、不写数据库。
+- [x] 完成剧情简介来源专项研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。
+- [x] 新增只读 TMDB adapter 与覆盖率审计 CLI：优先已有 TMDB ID，其次 IMDb ID，最后严格标题+年份匹配；拒绝歧义/年份冲突；zh-CN/zh-TW 请求；报告只输出匹配元数据、简介长度和 SHA-256，不输出简介正文、不写数据库。Mocked API/backend tests passed。
+- [x] 新增手动 GitHub Actions workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml)，从已验证首发 artifact 读取 2026-11-24 Top 250 快照（250 部影片），分别测量 zh-CN/zh-TW；运行需要仓库 Actions secret `TMDB_API_READ_TOKEN`。
+- [x] 已配置 `TMDB_API_READ_TOKEN` 并完成真实只读 API 审计：Top 250 的 250 部影片分别检查 zh-CN/zh-TW，共 500 条语言记录；470 条确认有对应语言剧情简介（94%），其余 3 条歧义、4 条身份信息不足、21 条无严格匹配、2 条无简介均未接受。审计只输出匹配元数据/长度/SHA-256，不输出简介正文、不写数据库。
 - [x] 导入时仅填补空字段，不覆盖已有来源数据；字段级来源、来源 URL、采集时间和内容指纹已落库并通过真实数据验证。
 - [ ] 对多来源冲突制定优先级与审计规则；缺失值仍允许为空。
 - [x] 收藏/取消收藏的真实 API 与 SQLite 写入、读取、删除流程已通过 Playwright。
@@ -86,7 +89,8 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 ### P0 — 首发内容与体验收尾
 - [x] 复核 Top 250 评价人数真实覆盖率并修复解析器与真实页面结构的差异。
-- [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [x] 已配置只读 token 并完成 Top 250 的 500 条 zh-CN/zh-TW 真实 API 审计，简介可用覆盖率 470/500（94%）。
+- [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。
+- [x] 已配置只读 token 并完成 Top 250 的 500 条 zh-CN/zh-TW 真实 API 审计，简介可用覆盖率 470/500（94%）。
 - [ ] 继续核验 TMDB 当前条款中缓存、持久化、再分发和展示限制；未核验/批准前不把简介写入 MovieHub 数据库。
 - [x] schema v3 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与真实数据持久化检查。
 - [x] 真实数据收藏/取消收藏：通过 Playwright 经可信代理注入密钥，验证 live API 与临时 SQLite 的写入、列表读取、删除。
@@ -243,3 +247,15 @@ The remaining 16% is concentrated in licensed/accurate synopsis coverage, genuin
 - [x] Real-data rehearsal [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) passed every step. Main CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) passed backend **267 passed / 4 skipped**, frontend regression/type-check/build, browser E2E **10 passed / 4 skipped**, and the standard isolated Compose smoke test. Optional benchmark/collection jobs were skipped and are not counted as passed.
 
 The TMDB audit is a coverage/matching dry-run only. It does not authorize bulk synopsis persistence or redistribution. The real-data rehearsal used only disposable GitHub Actions storage and was fully cleaned up. **No NAS, NPM, production database, Scout source database, or NAS service was accessed or changed.** Production deployment remains a separate, not-yet-started approval stage.
+
+## 2026-11-24 — Expanded synopsis audit scope and legal hold
+
+- [x] Rechecked the current official TMDB FAQ and rate-limit documentation: non-commercial developer use only, attribution/approved logo and exact disclaimer required, no SLA, and respect changing request limits/HTTP 429.
+- [x] Followed TMDB's official Getting Started link to its Terms of Use. The primary terms page blocks automated retrieval; a third-party transcription dated 2026-11-10 quotes a six-month maximum cache, non-commercial restriction, non-transferable/non-sublicensable license, derivative and AI-related restrictions. This is documented as a risk signal, not treated as the controlling official text.
+- [x] Set a hard compliance hold: no synopsis schema v4, no persistent importer and no synopsis database writes until the owner has reviewed the current official terms and approved the retention/display model.
+- [x] Extended the read-only audit workflow to separately measure Top 250 (snapshot 2026-11-24) and the four annual charts (snapshot 2026-11-23, 38 unique movie/TV records), both in zh-CN and zh-TW. The second real API audit is running from the retained artifact; it will produce two reports with no synopsis text.
+- [ ] Review the annual-chart zh-CN/zh-TW coverage report after the workflow completes.
+- [ ] Complete a second genuine Top 250 capture on a different date before claiming real Top 250 historical movement. Do not clone today's data and label it historical.
+- [ ] Complete Scout read-only integration rehearsal and remaining frontend edge-state QA in isolated CI.
+
+The official terms page was not machine-readable in this research session, so the project deliberately does not infer permission for indefinite synopsis retention. No production resources were touched.

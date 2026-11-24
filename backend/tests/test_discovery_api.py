@@ -11,6 +11,7 @@ from app.services.provider_cache import provider_response_cache
 def _client(monkeypatch):
     monkeypatch.setattr(poster_cache_service, "clear_expired_cache", lambda: 0)
     monkeypatch.setattr(provider_response_cache, "clear_expired", lambda: 0)
+    monkeypatch.setattr(provider_response_cache, "backup_daily", lambda *args, **kwargs: None)
     return TestClient(app)
 
 

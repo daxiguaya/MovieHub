@@ -690,3 +690,16 @@ The same run collected all four official 2025 annual charts and all four normali
 - 当前简介覆盖率仍为 **0/250**。不使用短评、宣传标语、自动生成内容或受 robots 限制的豆瓣接口填充。
 - 安全边界：只审查公开官方文档和 GitHub 代码；未访问 NAS、Scout 数据库或生产服务，未创建生产库、未部署、未修改 NPM、未重启服务。
 
+## Pagination, history and combined-filter acceptance expansion (2026-11-24)
+
+- [x] Browser test: traverse chart cursor pagination through the final page without losing earlier items.
+- [x] Browser test: switch from a paginated latest snapshot to an older date and verify the previous page's items are cleared.
+- [x] Browser test: compare two snapshot dates and assert moved/new rank states in their own result rows.
+- [x] Browser tests: combined search filters, zero-result state, and API failure state.
+- [x] Backend HTTP integration: verify chart pagination cursor traversal and historical-date reads against a temporary SQLite database.
+- [x] Backend HTTP integration: verify combined keyword/type/rating/rating-count/year/genre/excluded-genre/region filters return only the matching movie.
+- [x] Fix strict accessible-name selectors in the new browser tests.
+
+CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741): 265 backend tests passed, 4 skipped; 10 browser E2E passed, 4 opt-in real-data journeys skipped; frontend tests/build and both container builds passed. The skipped live-data journeys and performance/collection jobs are not counted as passed.
+
+This is a test-coverage improvement, not a claim that the real-source dataset now contains multiple dated snapshots. Overall delivery estimate remains **83%**. Real TMDB overview coverage, real-source multi-date snapshot verification, isolated Compose operations rehearsal, and separately authorized NAS deployment remain outstanding.

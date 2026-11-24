@@ -10,7 +10,7 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "003_movie_metadata_provenance.sql"
+    / "004_external_api_cache.sql"
 )
 
 
@@ -19,7 +19,7 @@ def _create_empty_database(path: Path) -> None:
     sqlite3.connect(str(path)).close()
 
 def _create_v2_database(path: Path) -> None:
-    """Create an isolated, valid schema-v2 fixture for the v2 -> v3 runner."""
+    """Create an isolated, valid schema-v2 fixture for the v2 -> v4 runner."""
     path.parent.mkdir(parents=True, exist_ok=True)
     initial = (
         Path(__file__).resolve().parents[1]
@@ -53,11 +53,11 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_version_three_migration_upgrades_v2_and_is_idempotent(tmp_path):
+def test_version_four_migration_upgrades_v2_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
     _create_v2_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 3
+    assert execute_migration(db_path, MIGRATION) == 4
     assert execute_migration(db_path, MIGRATION) == 3
 
     conn = sqlite3.connect(str(db_path))
@@ -80,6 +80,7 @@ def test_version_three_migration_upgrades_v2_and_is_idempotent(tmp_path):
             "schema_migrations",
             "import_batch_receipts",
             "movie_metadata_provenance",
+            "external_api_cache",
         } <= tables
     finally:
         conn.close()
@@ -255,7 +256,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
 
 
 def test_v2_migration_preserves_existing_catalogue_and_user_data(tmp_path):
-    """A populated v2 database must retain every user-facing relation on v3."""
+    """A populated v2 database must retain every user-facing relation on v4."""
     db_path = tmp_path / "populated-v1.db"
     _create_v2_database(db_path)
 

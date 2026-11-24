@@ -61,5 +61,4 @@ def test_dry_run_report_deduplicates_movies_and_never_contains_synopsis_text():
     assert report["by_language"]["zh-CN"]["overview_available"] == 1
     assert report["by_language"]["zh-TW"]["no_overview"] == 1
     serialized = str(report)
-    assert "overview text" not in serialized
-    assert "synopsis text" not in serialized
+    assert "一段真实的剧情简介文本" not in serialized

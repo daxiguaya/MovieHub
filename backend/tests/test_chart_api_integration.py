@@ -100,10 +100,13 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
                 "/api/charts/api-fixture-chart",
                 params={"snapshot_date": "2026-11-23", "limit": 1},
             )
-            invalid_cursor = client.get(
-                "/api/charts/api-fixture-chart",
-                params={"cursor": "not-a-valid-cursor"},
-            )
+            invalid_cursors = [
+                client.get(
+                    "/api/charts/api-fixture-chart",
+                    params={"cursor": cursor},
+                )
+                for cursor in ("", "not-a-valid-cursor", "MA==", "LTA=", "MDAx")
+            ]
 
         assert first.status_code == 200
         assert first.json()["imported_count"] == 2
@@ -132,7 +135,10 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
         assert historical_page.status_code == 200
         assert historical_page.json()["total"] == 1
         assert historical_page.json()["items"][0]["douban_id"] == "10003"
-        assert invalid_cursor.status_code == 400
-        assert invalid_cursor.json()["detail"] == "Invalid chart pagination cursor"
+        assert all(response.status_code == 400 for response in invalid_cursors)
+        assert all(
+            response.json()["detail"] == "Invalid chart pagination cursor"
+            for response in invalid_cursors
+        )
     finally:
         engine.dispose()

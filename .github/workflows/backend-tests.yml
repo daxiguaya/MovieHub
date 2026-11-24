@@ -1,0 +1,677 @@
+name: Backend tests
+
+on:
+  push:
+    branches:
+      - main
+      - "phase4/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+        working-directory: backend
+      - name: Compile backend
+        run: python -m compileall -q app scripts tests
+        working-directory: backend
+      - name: Run tests
+        run: python -m pytest -q
+        working-directory: backend
+
+      - name: Validate Compose without the optional Scout source
+        run: docker compose config --quiet
+        env:
+          MOVIEHUB_API_KEY: ci-placeholder-only
+          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
+      - name: Validate Compose with an explicitly configured read-only Scout source
+        run: docker compose config --quiet
+        env:
+          MOVIEHUB_IMPORT_PATH: /tmp/scout-import
+          MOVIEHUB_API_KEY: ci-placeholder-only
+          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
+      - name: Build backend container image
+        run: docker build --tag moviehub-backend:ci ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Run frontend regression tests
+        run: npm test -- --reporter=dot
+        working-directory: frontend
+      - name: Type-check and build frontend
+        run: npm run build
+        working-directory: frontend
+      - name: Build frontend container image
+        run: docker build --tag moviehub-frontend:ci ./frontend
+
+
+  frontend-e2e:
+    runs-on: ubuntu-24.04
+    env:
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies for live API test
+        run: pip install -r requirements.txt
+        working-directory: backend
+      - name: Initialize isolated MovieHub test database
+        run: python -m scripts.init_db
+        working-directory: backend
+      - name: Seed isolated chart and movie fixtures
+        run: |
+          python - <<'PY'
+          from sqlalchemy import select
+          from app.database import (
+              Chart, ChartItem, ChartSnapshot, Genre, Movie,
+              MovieGenre, MovieRegion, Region, SessionLocal,
+          )
+
+          with SessionLocal() as db:
+              chart = db.scalar(select(Chart).where(Chart.slug == "top250"))
+              movie = Movie(
+                  douban_id="1292052",
+                  imdb_id="tt0816692",
+                  title="星际穿越",
+                  original_title="Interstellar",
+                  year=2014,
+                  rating=9.4,
+                  rating_count=100000,
+                  type="movie",
+                  directors='["Christopher Nolan"]',
+                  actors='["Matthew McConaughey"]',
+                  overview="A journey through space and time.",
+                  douban_url="https://movie.douban.com/subject/1292052/",
+              )
+              db.add(movie)
+              db.flush()
+
+              genre = Genre(name="科幻")
+              region = Region(name="美国")
+              db.add_all([genre, region])
+              db.flush()
+              db.add_all([
+                  MovieGenre(movie_id=movie.id, genre_id=genre.id),
+                  MovieRegion(movie_id=movie.id, region_id=region.id),
+              ])
+
+              snapshot = ChartSnapshot(
+                  list_id=chart.list_id,
+                  snapshot_date="2026-11-23",
+                  item_count=1,
+              )
+              db.add(snapshot)
+              db.flush()
+              db.add(ChartItem(
+                  snapshot_id=snapshot.id,
+                  movie_id=movie.id,
+                  rank=1,
+                  source_rating=9.4,
+              ))
+              db.commit()
+          PY
+        working-directory: backend
+      - name: Start FastAPI against the temporary database
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > "${RUNNER_TEMP}/moviehub-e2e-api.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/moviehub-e2e-api.pid"
+        working-directory: backend
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/moviehub-e2e-api.log"
+          exit 1
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      # Playwright's browser download is large and can vary with runner network speed.
+      # The package.json hash invalidates this cache when the pinned Playwright version changes.
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('frontend/package.json') }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run browser end-to-end tests
+        run: npm run test:e2e
+        working-directory: frontend
+
+  annual-chart-collection:
+    # Opt-in only: collect from the official public source, validate locally, and retain JSON as a CI artifact.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-annual-collection]'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: backend
+      - name: Collect and dry-run all four official 2025 annual charts
+        run: |
+          set -euo pipefail
+          output_dir="${RUNNER_TEMP}/moviehub-annual-2025"
+          capture_date="$(date -u +%F)"
+          python -m scripts.collect_douban_annual \
+            --date "$capture_date" \
+            --output-dir "$output_dir"
+          count=0
+          for file in "$output_dir"/*.json; do
+            test -f "$file"
+            python -m scripts.import_chart --input "$file" --dry-run
+            count=$((count + 1))
+          done
+          test "$count" -eq 4
+        working-directory: backend
+      - name: Upload normalized annual snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: moviehub-douban-annual-2025
+          path: ${{ runner.temp }}/moviehub-annual-2025/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+
+  real-annual-data-import-rehearsal:
+    # One-off real-source-data rehearsal in a disposable CI database; never targets NAS/production.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[run-real-annual-import]')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-real-annual-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Download the previously collected real annual-chart artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: moviehub-douban-annual-2025
+          repository: ${{ github.repository }}
+          run-id: 45213246118
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/moviehub-real-annual-2025
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: backend
+      - name: Initialize a disposable MovieHub database
+        run: python -m scripts.init_db
+        working-directory: backend
+      - name: Import all four real annual snapshots atomically
+        run: |
+          python -m scripts.import_annual_charts \
+            --input-dir "${RUNNER_TEMP}/moviehub-real-annual-2025" \
+            --date 2026-11-23 \
+            --apply
+        working-directory: backend
+      - name: Verify persisted counts, ranks, integrity and foreign keys
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          from app.database import get_db_path
+
+          path = Path(get_db_path())
+          conn = sqlite3.connect(path)
+          try:
+              integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+              assert integrity == "ok", integrity
+              fk_errors = conn.execute("PRAGMA foreign_key_check").fetchall()
+              assert not fk_errors, fk_errors
+
+              charts = conn.execute("""
+                  SELECT l.slug, s.item_count, s.id
+                  FROM lists AS l
+                  JOIN chart_snapshots AS s ON s.list_id = l.list_id
+                  WHERE l.category = 'annual'
+                    AND l.period = '2025'
+                    AND s.snapshot_date = '2026-11-23'
+                  ORDER BY l.slug
+              """).fetchall()
+              assert len(charts) == 4, charts
+
+              total = 0
+              all_ids = set()
+              for slug, item_count, snapshot_id in charts:
+                  ranks = [
+                      row[0] for row in conn.execute(
+                          "SELECT rank FROM list_items WHERE snapshot_id = ? ORDER BY rank",
+                          (snapshot_id,),
+                      )
+                  ]
+                  assert len(ranks) == item_count, (slug, item_count, ranks)
+                  assert ranks == list(range(1, item_count + 1)), (slug, ranks)
+                  ids = {
+                      row[0] for row in conn.execute("""
+                          SELECT m.douban_id
+                          FROM list_items AS i
+                          JOIN movies AS m ON m.id = i.movie_id
+                          WHERE i.snapshot_id = ?
+                      """, (snapshot_id,))
+                  }
+                  assert len(ids) == item_count, (slug, ids)
+                  assert not (all_ids & ids), (slug, all_ids & ids)
+                  all_ids.update(ids)
+                  total += item_count
+
+              movie_count = conn.execute("SELECT COUNT(*) FROM movies").fetchone()[0]
+              item_count = conn.execute("SELECT COUNT(*) FROM list_items").fetchone()[0]
+              assert total == 38, total
+              assert movie_count == 38, movie_count
+              assert item_count == 38, item_count
+              print({
+                  "database": str(path),
+                  "charts": len(charts),
+                  "movies": movie_count,
+                  "chart_items": item_count,
+                  "foreign_key_errors": len(fk_errors),
+                  "integrity_check": integrity,
+                  "ranks": "continuous per chart",
+                  "cross_chart_duplicate_ids": 0,
+              })
+          finally:
+              conn.close()
+          PY
+        working-directory: backend
+
+  performance-benchmarks:
+    # Opt-in on demand: manual dispatch or an explicitly marked commit on phase4.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-benchmarks]'))
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+        working-directory: backend
+      - name: Run synthetic SQLite search and Scout import benchmarks
+        run: |
+          MOVIEHUB_RUN_SEARCH_BENCHMARKS=1 MOVIEHUB_RUN_IMPORT_BENCHMARKS=1 \
+            python -m pytest -q -s \
+              tests/test_search_performance.py \
+              tests/test_import_performance.py
+        working-directory: backend
+
+  real-annual-data-browser-e2e:
+    # Combined first-launch Top 250 + official annual charts in isolated SQLite and live browser journey.
+    needs: first-launch-data-collection
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[run-first-launch-data]')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-first-launch-browser
+      MOVIEHUB_REAL_ANNUAL_E2E: "1"
+      MOVIEHUB_API_KEY: "ci-only-real-data-e2e-key"
+      MOVIEHUB_E2E_PROXY_API_KEY: "ci-only-real-data-e2e-key"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Download the verified combined first-launch dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: moviehub-first-launch-douban
+          path: ${{ runner.temp }}/moviehub-first-launch-bundle
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+        working-directory: backend
+      - name: Initialize isolated MovieHub database
+        run: python -m scripts.init_db
+        working-directory: backend
+      - name: Import Top 250 and all four official annual snapshots
+        run: |
+          set -euo pipefail
+          for file in "${RUNNER_TEMP}/moviehub-first-launch-bundle/moviehub-first-launch"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+          for file in "${RUNNER_TEMP}/moviehub-first-launch-bundle/moviehub-annual-2025"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+        working-directory: backend
+      - name: Start FastAPI against the real-data database
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > "${RUNNER_TEMP}/moviehub-first-launch-api.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/moviehub-first-launch-api.pid"
+        working-directory: backend
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/api/ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${RUNNER_TEMP}/moviehub-first-launch-api.log"
+          exit 1
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: frontend
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('frontend/package.json') }}
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run the combined real first-launch browser journeys
+        run: npm run test:e2e -- --grep "real (Top 250 first-launch snapshot|2025 annual snapshots|first-launch dataset remains usable|imported Top 250 movie can be favorited and removed through the live API)"
+        working-directory: frontend
+
+  first-launch-data-collection:
+    # Explicitly opt-in: expand the first-launch dataset from public Douban charts in a disposable CI database.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-first-launch-data]'))
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-first-launch-data
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the retained official 2025 annual-chart artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: moviehub-douban-annual-2025
+          repository: ${{ github.repository }}
+          run-id: 45213246118
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/moviehub-annual-2025
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: backend
+      - name: Collect the robots-permitted Top 250 snapshot
+        run: |
+          set -euo pipefail
+          output_dir="${RUNNER_TEMP}/moviehub-first-launch"
+          capture_date="$(date -u +%F)"
+          mkdir -p "$output_dir"
+          python -m scripts.collect_douban_top250 \
+            --date "$capture_date" \
+            --output "$output_dir/top250-$capture_date.json"
+          python -m scripts.import_chart --input "$output_dir/top250-$capture_date.json" --dry-run
+          echo "MOVIEHUB_CAPTURE_DATE=$capture_date" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_FIRST_LAUNCH_DIR=$output_dir" >> "$GITHUB_ENV"
+        working-directory: backend
+      - name: Audit source coverage and cross-chart overlap
+        run: |
+          python -m scripts.audit_first_launch_data \
+            --input-dir "$MOVIEHUB_FIRST_LAUNCH_DIR" \
+            --date "$MOVIEHUB_CAPTURE_DATE"
+        working-directory: backend
+      - name: Initialize a disposable MovieHub database
+        run: python -m scripts.init_db
+        working-directory: backend
+      - name: Import all first-launch charts
+        run: |
+          set -euo pipefail
+          for file in "$MOVIEHUB_FIRST_LAUNCH_DIR"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+          for file in "${RUNNER_TEMP}/moviehub-annual-2025"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+        working-directory: backend
+      - name: Verify persisted chart and movie counts
+        run: |
+          python - <<'PY'
+          import os
+          from sqlalchemy import func, select
+          from app.database import (
+              Chart, ChartItem, ChartSnapshot, Movie,
+              MovieMetadataProvenance, SessionLocal,
+          )
+
+          capture_date = os.environ["MOVIEHUB_CAPTURE_DATE"]
+          with SessionLocal() as db:
+              expected = {"top250": 250}
+              for slug, minimum in expected.items():
+                  chart = db.scalar(select(Chart).where(Chart.slug == slug))
+                  assert chart is not None, f"missing chart {slug}"
+                  snapshot = db.scalar(
+                      select(ChartSnapshot).where(
+                          ChartSnapshot.list_id == chart.list_id,
+                          ChartSnapshot.snapshot_date == capture_date,
+                      )
+                  )
+                  assert snapshot is not None, f"missing snapshot {slug}"
+                  assert snapshot.item_count == minimum, (slug, snapshot.item_count)
+              annual_slugs = (
+                  "annual-2025-chinese-movies",
+                  "annual-2025-international-movies",
+                  "annual-2025-hidden-gems",
+                  "annual-2025-chinese-tv",
+              )
+              annual_items = 0
+              for slug in annual_slugs:
+                  chart = db.scalar(select(Chart).where(Chart.slug == slug))
+                  assert chart is not None, f"missing chart {slug}"
+                  snapshot = db.scalar(
+                      select(ChartSnapshot).where(
+                          ChartSnapshot.list_id == chart.list_id,
+                          ChartSnapshot.snapshot_date == "2026-11-23",
+                      )
+                  )
+                  assert snapshot is not None and snapshot.item_count > 0, slug
+                  annual_items += snapshot.item_count
+
+              movies = db.scalar(select(func.count()).select_from(Movie))
+              items = db.scalar(select(func.count()).select_from(ChartItem))
+              snapshots = db.scalar(select(func.count()).select_from(ChartSnapshot))
+              provenance_by_field = dict(
+                  db.execute(
+                      select(
+                          MovieMetadataProvenance.field_name,
+                          func.count(),
+                      ).group_by(MovieMetadataProvenance.field_name)
+                  ).all()
+              )
+              assert provenance_by_field.get("year", 0) >= 248, provenance_by_field
+              assert provenance_by_field.get("rating", 0) >= 250, provenance_by_field
+              assert provenance_by_field.get("rating_count") == 250, provenance_by_field
+              assert provenance_by_field.get("original_title", 0) >= 223, provenance_by_field
+              assert provenance_by_field.get("directors", 0) >= 238, provenance_by_field
+              assert provenance_by_field.get("actors", 0) >= 233, provenance_by_field
+              assert annual_items == 38, annual_items
+              assert 250 <= movies <= 288, movies
+              assert items == 288, items
+              assert snapshots == 5, snapshots
+              import sqlite3
+              from app.database import get_db_path
+              connection = sqlite3.connect(get_db_path())
+              try:
+                  integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+                  fk_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
+                  assert integrity == "ok", integrity
+                  assert not fk_errors, fk_errors
+              finally:
+                  connection.close()
+              print({
+                  "persisted_unique_movies": movies,
+                  "persisted_chart_items": items,
+                  "persisted_snapshots": snapshots,
+                  "cross_chart_deduplication": items - movies,
+                  "integrity_check": integrity,
+                  "foreign_key_errors": len(fk_errors),
+                  "metadata_provenance_by_field": provenance_by_field,
+              })
+          PY
+        working-directory: backend
+      - name: Upload normalized first-launch snapshots and audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: moviehub-first-launch-douban
+          path: |
+            ${{ runner.temp }}/moviehub-first-launch/*.json
+            ${{ runner.temp }}/moviehub-annual-2025/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  compose-smoke:
+    # Start the real two-container Compose stack on an isolated GitHub runner.
+    # This never uses NAS paths, external NPM networks, or production data.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure disposable Compose environment
+        run: |
+          echo "MOVIEHUB_DATA_PATH=$RUNNER_TEMP/moviehub-compose-smoke/data" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_BACKUP_PATH=$RUNNER_TEMP/moviehub-compose-smoke/backups" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_IMPORT_PATH=$GITHUB_WORKSPACE/deploy/empty-imports" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_FRONTEND_CONFIG_PATH=$GITHUB_WORKSPACE/deploy/frontend-config.json" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_API_KEY=ci-only-compose-smoke-key" >> "$GITHUB_ENV"
+      - name: Prepare disposable bind mounts and external proxy network
+        run: |
+          mkdir -p "$MOVIEHUB_DATA_PATH" "$MOVIEHUB_BACKUP_PATH"
+          sudo chown -R 10001:10001 "$RUNNER_TEMP/moviehub-compose-smoke"
+          docker network create chatgpt-browser_default
+      - name: Validate isolated Compose configuration
+        run: docker compose -p moviehub-ci-smoke config --quiet
+      - name: Start both containers before database initialization
+        run: docker compose -p moviehub-ci-smoke up --build -d
+      - name: Verify liveness and that readiness correctly blocks an uninitialized database
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import urlopen
+
+          for attempt in range(60):
+              try:
+                  with urlopen("http://127.0.0.1:8000/api/health", timeout=3) as response:
+                      assert response.status == 200
+                      assert json.load(response)["status"] == "healthy"
+                  break
+              except (HTTPError, URLError, TimeoutError):
+                  if attempt == 59:
+                      raise
+                  time.sleep(1)
+          else:
+              raise AssertionError("API liveness endpoint did not become available")
+
+          try:
+              urlopen("http://127.0.0.1:8000/api/ready", timeout=5)
+          except HTTPError as error:
+              assert error.code == 503, error.code
+          else:
+              raise AssertionError("Readiness must reject an uninitialized database")
+          PY
+      - name: Explicitly initialize the disposable MovieHub database
+        run: docker compose -p moviehub-ci-smoke run --rm --no-deps moviehub python -m scripts.init_db
+      - name: Verify API readiness, seeded chart API, and frontend container
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          from urllib.request import urlopen
+
+          with urlopen("http://127.0.0.1:8000/api/ready", timeout=10) as response:
+              assert response.status == 200
+              ready = json.load(response)
+              assert ready["status"] == "ready", ready
+
+          with urlopen("http://127.0.0.1:8000/api/charts", timeout=10) as response:
+              assert response.status == 200
+              charts = json.load(response)
+              assert isinstance(charts, list) and charts, charts
+              assert any(chart.get("slug") == "top250" for chart in charts), charts
+          PY
+      - name: Wait for frontend HTTP and capture startup diagnostics on failure
+        run: |
+          for attempt in $(seq 1 30); do
+            frontend_state="$(docker inspect --format '{{.State.Status}}' moviehub-web 2>/dev/null || true)"
+            if [ "$frontend_state" = running ] && timeout 5s docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
+              'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -p moviehub-ci-smoke logs --no-color moviehub-web
+          docker inspect moviehub-web
+          exit 1
+      - name: Verify both container health checks report healthy
+        run: |
+          for attempt in $(seq 1 45); do
+            backend_health="$(docker inspect --format '{{.State.Health.Status}}' moviehub-backend)"
+            frontend_health="$(docker inspect --format '{{.State.Health.Status}}' moviehub-web)"
+            if [ "$backend_health" = healthy ] && [ "$frontend_health" = healthy ]; then
+              echo "backend=$backend_health frontend=$frontend_health"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -p moviehub-ci-smoke ps
+          docker compose -p moviehub-ci-smoke logs --no-color
+          exit 1
+      - name: Stop and remove only the isolated Compose project
+        if: always()
+        run: docker compose -p moviehub-ci-smoke down --volumes --remove-orphans

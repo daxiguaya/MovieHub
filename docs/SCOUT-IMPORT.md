@@ -1,0 +1,195 @@
+# Douban Scout import runbook
+
+MovieHub imports Scout data into its own database. The source is opened read-only and must be inside the configured `MOVIEHUB_IMPORT_PATH` host directory, mounted as `/imports:ro`.
+
+## Before importing
+
+1. Initialize the independent MovieHub database explicitly with `python -m scripts.init_db`. New databases are built at schema version 2. For an existing version-1 MovieHub database, stop the application, run `python -m scripts.migrate`, verify the retained pre-migration backup and `GET /api/ready`, then resume normal operation.
+2. Set `MOVIEHUB_IMPORT_PATH` to a dedicated directory containing the Scout database or a consistent read-only copy.
+3. Do not point `MOVIEHUB_DATA_PATH` at Scout. Do not run MovieHub migrations or initialization against Scout.
+4. Ensure any SQLite WAL sidecar files required for a consistent source read are present and readable in the mounted directory. Prefer a SQLite online-backup copy when staging a snapshot; do not copy only the main database file while Scout is actively writing in WAL mode.
+5. Keep the API key private. The favorites-only NPM header injection described in [DEPLOYMENT.md](DEPLOYMENT.md) must not be applied to the entire `/api/` path.
+
+## Start an incremental import
+
+Send a protected request from an authorized operator workstation:
+
+```sh
+curl -X POST "https://<moviehub-host>/api/import" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <MOVIEHUB_API_KEY>" \
+  -d '{"source_path":"scout.sqlite","force_full":false}'
+```
+
+The `source_path` is relative to `/imports` in this example. The endpoint rejects paths that resolve outside the configured import directory.
+
+Check progress:
+
+```sh
+curl "https://<moviehub-host>/api/import/status" \
+  -H "X-API-Key: <MOVIEHUB_API_KEY>"
+```
+
+Before any target write, source validation rejects movie/TV rows with a missing, non-numeric or duplicate Douban ID, or a blank title. This prevents malformed identity rows from being silently counted as ordinary skips. Only one import can run at a time. The service opens one read-only SQLite transaction for the full import so validation, total counting and row iteration use the same source snapshot, including when the source is WAL-backed and still receiving writes. It processes 500 records per target transaction and isolates individual bad records with SAVEPOINTs. The status response includes an `errors` count for records that raised processing exceptions; a run can finish with status `completed` while reporting nonzero record errors, so check both `status` and `errors` before treating the import as clean.
+
+## Incremental vs. forced full
+
+- `force_full: false`: for an existing MovieHub movie, skip the source row when Scout `update_time` is not newer than MovieHub's last imported source timestamp. New rows are imported normally.
+- `force_full: true`: reprocess all valid source rows even when timestamps are unchanged. Use this after changing field-mapping or merge logic.
+- A non-empty Scout field can refresh its corresponding MovieHub field. Missing/empty source fields do not erase populated MovieHub metadata.
+- Scout rows that disappear are not deletion instructions. MovieHub retains previously imported movies.
+- If a later batch fails, earlier committed batches remain. Fix the cause and retry; the import is designed to be idempotent.
+
+## After importing
+
+- Confirm status is `completed` and inspect backend logs for skipped/error records.
+- Check MovieHub movie counts and a few known records using the read APIs.
+- Do not edit the Scout database or remove source rows to make MovieHub match a desired catalogue.
+- Do not treat a successful metadata import as chart acquisition. Chart snapshots use the separate normalized JSON workflow in [CHART-IMPORT.md](CHART-IMPORT.md).
+
+## Production boundary
+
+This runbook documents the operator procedure only. It does not authorize importing the user's live Scout database, creating a production MovieHub database, changing NPM, or restarting any NAS service. Perform those actions only after a separate review and explicit approval.
+
+
+## Optional synthetic import benchmark
+
+The repository includes opt-in 10,000-row and 100,000-row synthetic import benchmarks. They generate temporary Scout-shaped SQLite source files and import into temporary MovieHub SQLite databases through the production `ImportService`; no real Scout or MovieHub database is opened.
+
+Run from the `backend/` directory:
+
+```sh
+MOVIEHUB_RUN_IMPORT_BENCHMARKS=1 pytest -q -s tests/test_import_performance.py
+```
+
+The output reports elapsed time, rows per second and the configured transaction batch size. These cases are skipped by default in CI because throughput and memory behavior depend on the runner and storage hardware. Run them first on a controlled test machine; repeat on the NAS only as part of a separately authorized pre-deployment test. The benchmark does not deploy the application or touch production data.
+
+
+## Whole-catalogue Scout import preflight
+
+Before importing a staged Scout copy, run the read-only whole-catalogue audit:
+
+```sh
+cd backend
+python -m scripts.audit_scout_import --scout-db /path/to/staged-scout.sqlite
+python -m scripts.audit_scout_import --scout-db /path/to/staged-scout.sqlite --strict
+```
+
+The report uses one read-only SQLite transaction snapshot and streams movie/TV rows. It reports media-type totals, invalid/duplicate identities, invalid ratings and years, malformed `raw_data`, and coverage for every metadata field consumed by the importer. Strict mode exits with code 2 when invalid identities or duplicate Douban IDs exist; numeric and raw-data anomalies remain visible warnings for review. It never opens the MovieHub target database and never modifies Scout.
+
+
+## Combined Scout import preflight (recommended)
+
+Run the whole-catalogue quality audit and annual-chart coverage audit together to get one import decision:
+
+```sh
+cd backend
+python -m scripts.audit_scout_preflight \
+  --scout-db /path/to/staged-scout.sqlite \
+  --input /path/to/annual-movies.json \
+  --input /path/to/annual-tv.json
+```
+
+Repeat `--input` for every normalized chart snapshot. Exit code 0 means the combined identity and chart-coverage gates passed and the data is ready for operator review. Exit code 2 means one or more blocking issues were found; exit code 1 means the audit could not be completed. The JSON report contains both detailed audits, one consolidated blocking-issues object, and non-blocking numeric/raw-data warnings. Use a consistent staged SQLite backup and keep it unchanged for the duration of the command. A passing report does not itself authorize or perform an import.
+
+
+## Read-only import preview
+
+After the combined Scout/chart quality gate passes, preview the expected target changes before starting the background import:
+
+```sh
+cd backend
+python -m scripts.preview_scout_import --scout-db /path/to/staged-scout.sqlite
+python -m scripts.preview_scout_import --scout-db /path/to/staged-scout.sqlite --force-full
+```
+
+The preview requires an already initialized independent MovieHub database. It opens Scout read-only in a consistent transaction and queries existing MovieHub Douban IDs/source timestamps. It reports new records, update candidates, unchanged incremental skips, expected writes and numeric warnings. It does not call the upsert path or modify either database. A preview is advisory: target data may change before a later import, and record-level errors/constraints can only be confirmed during the actual import.
+
+
+## Durable import batch journal
+
+Every import run now appends a JSONL journal beside the MovieHub database:
+
+`movies.db.import-journal.jsonl`
+
+The journal records run start, each committed 500-row batch (including the last processed Douban ID and cumulative counts), and terminal success/failure. Each event is appended with a single write and `fsync`; the file is created with owner-only permissions (0600). An unterminated final line after an abrupt process exit is ignored when reading; the next append takes an exclusive file lock, preserves a complete JSON event missing only its newline, and truncates only a malformed partial tail before writing. Resume checkpoints are backed by `import_batch_receipts` in the MovieHub database. Each receipt is inserted in the same SQLite transaction as its batch's movie, genre, region and poster writes, and contains cumulative counters, the last source ID, the source fingerprint and the bounded per-record error manifest. A unique `(run_id, batch_number)` constraint prevents duplicate receipts. The JSONL journal remains the operator-facing append-only history, but it is no longer the authority for committed work: when a process stops after the target transaction commits but before its journal append, resume validates the database receipts against the unchanged Scout snapshot and repairs the missing journal/error-manifest events before continuing. A journal checkpoint without a matching receipt, a receipt with a different fingerprint, or conflicting counters/cursors fails closed. Completed runs cannot be resumed. Source changes, mode changes, or a different source path are rejected. Fingerprinting is streaming and read-only but adds one full source pass before a resumed import starts.
+
+
+### Resume an interrupted run
+
+Use the original run ID returned by `POST /api/import` or `GET /api/import/status`:
+
+```json
+{
+  "source_path": "scout.sqlite",
+  "force_full": false,
+  "resume_run_id": "the-original-run-id"
+}
+```
+
+The source must remain inside the configured import directory. A resume request will not silently start a new run if the ID is missing, completed, belongs to another source path/mode, or has a different source-data fingerprint.
+
+## Read-only import run history
+
+The durable journal can now be inspected without opening either SQLite database:
+
+```sh
+cd backend
+python -m scripts.import_history
+python -m scripts.import_history --run-id <run-id>
+```
+
+The command reports each run's source path and mode, source fingerprint, latest committed checkpoint, cumulative processed/imported/skipped/error counts, batch count, resume count and lifecycle timestamps. A run with no terminal event is shown as `incomplete` (the journal alone cannot prove whether its process is still running or crashed); a failed attempt that has subsequently been resumed is shown as `running`. A torn final JSONL line is ignored. The command is read-only and does not resume, modify or delete journal entries, open Scout, or write to MovieHub.
+
+
+## Durable per-record failure manifest
+
+Each failed source row is now written to a separate owner-only JSONL manifest beside the import journal:
+
+`movies.db.import-errors.jsonl`
+
+Entries include the run ID, committed batch number, Douban ID, source title, exception class, a bounded error message and timestamp. Raw Scout `raw_data` is never copied into the manifest. Failure entries are appended only after their containing MovieHub batch commits. If a crash occurs after the manifest append but before the batch checkpoint, a resumed batch can report the same failure again; the read-only report de-duplicates identical run/batch/record/error entries.
+
+Inspect all failures or filter by one run:
+
+```sh
+cd backend
+python -m scripts.import_errors
+python -m scripts.import_errors --run-id <run-id>
+```
+
+The report is read-only. A completed import can still contain record-level failures; use this manifest to identify exact rows and causes before considering the run clean.
+
+
+## Persisted preview and post-import reconciliation
+
+Save the read-only preview before importing so its source fingerprint and expected counters can be compared later:
+
+```sh
+cd backend
+python -m scripts.preview_scout_import --scout-db /imports/staged-scout.sqlite --output /imports/scout-preview.json
+python -m scripts.reconcile_scout_import --preview /imports/scout-preview.json --run-id <completed-run-id>
+```
+
+Add `--force-full` to the preview when the actual import uses forced-full mode. Preview JSON is versioned and written atomically with owner-only permissions (0600). Preview and importer fingerprint the same ordered Scout row projection inside a read-only SQLite snapshot. Reconciliation refuses a missing/incomplete run, different source path, different mode or different fingerprint. It checks source totals, processed rows, imported rows plus record failures, unchanged skips after excluding failures, and the durable per-record error manifest. Exit code 0 means counters reconcile; exit code 2 means blocked or mismatched. The command is read-only and opens neither SQLite database. A match validates accounting and source identity, not metadata correctness or target stability between preview and import.
+
+
+### Automated end-to-end acceptance coverage
+
+The backend integration suite now exercises the complete preview → real SQLite import → journal reconciliation path against an isolated target database. It verifies that preview and importer source fingerprints agree, both new records are imported, the completed journal is discoverable, and reconciliation reports zero counter drift. The fixture is temporary and does not touch a production database.
+
+
+## One-command readiness package
+
+For a single operator-facing report that combines the strict catalogue/chart gate and the target-aware preview, run:
+
+```sh
+cd backend
+python -m scripts.prepare_scout_import \
+  --scout-db /imports/staged-scout.sqlite \
+  --input /imports/annual-movies.json \
+  --input /imports/annual-tv.json \
+  --output /imports/scout-readiness.json
+```
+
+Repeat `--input` for every normalized annual chart snapshot. Add `--force-full` only when the intended import will also use forced-full mode. The command audits Scout identity and chart coverage first; if a strict blocker exists, it writes a blocked report and does not query the target database. Only a passing gate proceeds to the read-only target-aware preview. The JSON report is written atomically with mode 0600. Exit codes: 0 ready/no changes, 2 strict gate blocked, 1 execution failure. This command does not import or mutate either database.

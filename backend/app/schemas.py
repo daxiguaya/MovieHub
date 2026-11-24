@@ -71,8 +71,10 @@ class ImportStatus(BaseModel):
     """Import process status schema."""
 
     status: Literal["idle", "running", "completed", "failed"]
+    run_id: str | None = None
     processed: int = 0
     total: int = 0
+    errors: int = 0
     percentage: float = 0.0
     message: str | None = None
     started_at: datetime | None = None
@@ -104,6 +106,14 @@ class ChartResponse(BaseModel):
     last_updated: datetime | None = None
 
 
+class ChartSnapshotResponse(BaseModel):
+    """Available dated snapshot for a chart."""
+
+    snapshot_date: str
+    imported_at: datetime
+    item_count: int
+
+
 class ChartMovieResponse(MovieResponse):
     """Movie card as it appears inside a chart."""
 
@@ -120,3 +130,40 @@ class ChartMoviesListResponse(BaseModel):
     next_cursor: str | None = None
     total: int
 
+
+class FavoriteUpsert(BaseModel):
+    """Favorite write payload for the single-user installation."""
+
+    note: str = Field(default="", max_length=1000)
+
+
+class FavoriteResponse(BaseModel):
+    """A saved movie and its user-owned favorite metadata."""
+
+    movie: MovieResponse
+    created_at: datetime
+    note: str = ""
+
+class ChartRankChange(BaseModel):
+    """One movie's rank movement between two chart snapshots."""
+
+    movie_id: int
+    douban_id: str | None = None
+    title: str
+    year: int | None = None
+    type: MovieType
+    before_rank: int | None = None
+    after_rank: int | None = None
+    rank_change: int | None = None
+    status: Literal["new", "removed", "moved", "unchanged"]
+
+
+class ChartCompareResponse(BaseModel):
+    """Rank comparison for two dated snapshots of the same chart."""
+
+    chart: ChartResponse
+    from_date: str
+    to_date: str
+    total_before: int
+    total_after: int
+    items: list[ChartRankChange]

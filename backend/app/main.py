@@ -1,4 +1,3 @@
-
 """FastAPI application entry point for MovieHub."""
 
 import asyncio
@@ -8,17 +7,24 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.database import get_db_path
+from app.config import settings
+from app.database import (
+    DatabaseNotInitializedError,
+    database_is_ready,
+    get_db_path,
+)
 from app.limiter import limiter
 from app.logging_config import setup_logging
 from app.routers.chart_import import router as chart_import_router
 from app.routers.charts import router as charts_router
 from app.routers.data_import import router as import_router
+from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
 
@@ -52,7 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if not db_path.exists():
         logger.warning(
             "Database file not found at %s. "
-            "The API will return database errors until data is imported.",
+            "Run the explicit database initializer before using data APIs.",
             db_path,
         )
     else:
@@ -90,6 +96,18 @@ app = FastAPI(
 app.state.limiter = limiter
 
 
+@app.exception_handler(DatabaseNotInitializedError)
+async def database_not_initialized_handler(
+    request: Request,
+    exc: DatabaseNotInitializedError,
+) -> JSONResponse:
+    """Return a clear service-unavailable response without opening SQLite."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": str(exc)},
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(
     request: Request,
@@ -118,18 +136,23 @@ async def rate_limit_exceeded_handler(
     return _rate_limit_exceeded_handler(request, exc)
 
 
+# Cross-origin requests are disabled by default. Configure
+# MOVIEHUB_CORS_ORIGINS as a JSON string array to allow specific frontends.
+# Same-origin requests (for example, through one Nginx Proxy Manager host)
+# do not require CORS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 
 # Read APIs
 app.include_router(movies_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
+app.include_router(favorites_router, prefix="/api")
 
 # Protected write/import APIs
 app.include_router(chart_import_router, prefix="/api")
@@ -138,8 +161,22 @@ app.include_router(import_router, prefix="/api")
 
 @app.get("/api/health")
 def health_check() -> dict[str, str]:
-    """Basic application health check."""
+    """Basic application liveness check."""
     return {"status": "healthy"}
+
+
+@app.get("/api/ready")
+def readiness_check() -> dict[str, str | int]:
+    """Check that the MovieHub-owned schema is initialized and readable."""
+    if not database_is_ready():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "MovieHub database is not ready. Initialize it with "
+                "'python -m scripts.init_db' and apply pending migrations."
+            ),
+        )
+    return {"status": "ready", "schema_version": 2}
 
 
 if __name__ == "__main__":
@@ -150,4 +187,3 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
     )
-

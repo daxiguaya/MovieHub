@@ -19,6 +19,12 @@ router = APIRouter(prefix="/import", tags=["import"])
 class ImportRequest(BaseModel):
     source_path: str = Field(min_length=1, max_length=1024)
     force_full: bool = False
+    resume_run_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
 
 
 @router.post("", response_model=ImportStatus, dependencies=[Depends(verify_api_key)])
@@ -45,7 +51,11 @@ def start_import(request: Request, payload: ImportRequest) -> ImportStatus:
     if not source.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source database not found")
     try:
-        return import_service.start_import(str(source), force_full=payload.force_full)
+        return import_service.start_import(
+            str(source),
+            force_full=payload.force_full,
+            resume_run_id=payload.resume_run_id,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except FileNotFoundError as exc:

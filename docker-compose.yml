@@ -1,0 +1,92 @@
+services:
+  moviehub:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: moviehub-backend:local
+    container_name: moviehub-backend
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "${MOVIEHUB_UID:-10001}:${MOVIEHUB_GID:-10001}"
+    environment:
+      MOVIEHUB_DATA_DIR: /data
+      MOVIEHUB_BACKUP_DIR: /backups
+      MOVIEHUB_IMPORT_DIR: /imports
+      MOVIEHUB_API_KEY: ${MOVIEHUB_API_KEY:-}
+      MOVIEHUB_CORS_ORIGINS: ${MOVIEHUB_CORS_ORIGINS:-[]}
+      MOVIEHUB_LOG_LEVEL: ${MOVIEHUB_LOG_LEVEL:-INFO}
+      FORWARDED_ALLOW_IPS: ${MOVIEHUB_TRUSTED_PROXY_IPS:-127.0.0.1}
+    volumes:
+      - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
+      - ${MOVIEHUB_BACKUP_PATH:-/volume1/backup/moviehub}:/backups
+      - ${MOVIEHUB_IMPORT_PATH:-./deploy/empty-imports}:/imports:ro
+    expose:
+      - "8000"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - default
+      - npm_proxy
+
+  moviehub-web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: moviehub-frontend:local
+    container_name: moviehub-web
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "10001:10001"
+    volumes:
+      - ${MOVIEHUB_FRONTEND_CONFIG_PATH:-./deploy/frontend-config.json}:/usr/share/nginx/html/config.json:ro
+    expose:
+      - "8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - npm_proxy
+
+networks:
+  default:
+    driver: bridge
+  npm_proxy:
+    external: true
+    name: chatgpt-browser_default

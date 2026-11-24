@@ -1,9 +1,13 @@
 
 """Movie API endpoints for MovieHub."""
 
+import asyncio
+import ipaddress
 import json
 import logging
 import re
+import socket
+from urllib.parse import urljoin, urlsplit
 from typing import Literal
 
 import httpx
@@ -11,7 +15,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session, selectinload
 
-from app.cache import cached
 from app.config import settings
 from app.database import (
     Genre,
@@ -188,6 +191,29 @@ def get_stats(
     return movie_service.get_stats(db)
 
 
+@router.get("/id/{movie_id:int}", response_model=MovieDetailResponse)
+@limiter.limit(settings.rate_limit_search)
+def get_movie_detail_by_internal_id(
+    request: Request,
+    movie_id: int,
+    db: Session = Depends(get_db),
+) -> MovieDetailResponse:
+    """Get a movie detail by MovieHub's stable internal ID."""
+    movie = (
+        db.query(Movie)
+        .options(
+            selectinload(Movie.genres).selectinload(MovieGenre.genre_obj),
+            selectinload(Movie.regions).selectinload(MovieRegion.region_obj),
+            selectinload(Movie.posters),
+        )
+        .filter(Movie.id == movie_id)
+        .first()
+    )
+    if movie is None:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return _get_movie_detail(movie)
+
+
 @router.get("/{douban_id}", response_model=MovieDetailResponse)
 @limiter.limit(settings.rate_limit_search)
 def get_movie_detail(
@@ -241,11 +267,87 @@ def _get_poster_candidates(base_urls: list[str]) -> list[str]:
     return candidates
 
 
-@cached(prefix="working_poster")
-async def _find_working_poster_url(
-    poster_urls: list[str],
-) -> tuple[str, str] | None:
-    """Find the first working poster URL."""
+POSTER_MAX_BYTES = 8 * 1024 * 1024
+POSTER_MAX_REDIRECTS = 3
+_ALLOWED_POSTER_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/avif",
+}
+
+
+def _poster_bytes_match_content_type(content: bytes, content_type: str) -> bool:
+    """Require a matching raster-image file signature, not just a server header."""
+    if not content:
+        return False
+    if content_type == "image/jpeg":
+        return content.startswith(bytes.fromhex("ffd8ff"))
+    if content_type == "image/png":
+        return content.startswith(bytes.fromhex("89504e470d0a1a0a"))
+    if content_type == "image/gif":
+        return content.startswith((b"GIF87a", b"GIF89a"))
+    if content_type == "image/webp":
+        return (
+            len(content) >= 12
+            and content.startswith(b"RIFF")
+            and content[8:12] == b"WEBP"
+        )
+    if content_type == "image/avif":
+        return (
+            len(content) >= 12
+            and content[4:8] == b"ftyp"
+            and content[8:12] in (b"avif", b"avis")
+        )
+    return False
+
+def _is_allowed_poster_url(url: str) -> bool:
+    """Allow only HTTPS Douban image CDN hosts, never arbitrary URLs."""
+    try:
+        parsed = urlsplit(url)
+        host = (parsed.hostname or "").lower()
+        return (
+            parsed.scheme == "https"
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port in (None, 443)
+            and re.fullmatch(r"img[0-9]+\.doubanio\.com", host) is not None
+        )
+    except ValueError:
+        return False
+
+
+def _all_resolved_addresses_are_public(addresses: list[str]) -> bool:
+    """Reject DNS answers containing loopback, private, link-local or reserved IPs."""
+    if not addresses:
+        return False
+    try:
+        return all(ipaddress.ip_address(address).is_global for address in addresses)
+    except ValueError:
+        return False
+
+
+async def _poster_host_resolves_publicly(url: str) -> bool:
+    """Resolve each allowlisted CDN host and reject any non-public address."""
+    try:
+        parsed = urlsplit(url)
+        loop = asyncio.get_running_loop()
+        records = await loop.getaddrinfo(
+            parsed.hostname,
+            parsed.port or 443,
+            type=socket.SOCK_STREAM,
+        )
+        addresses = list({record[4][0] for record in records})
+        return _all_resolved_addresses_are_public(addresses)
+    except (OSError, ValueError):
+        return False
+
+
+async def _download_poster_image(
+    url: str,
+) -> tuple[bytes, str] | None:
+    """Download a bounded raster image while validating every redirect hop."""
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -256,22 +358,65 @@ async def _find_working_poster_url(
         "Referer": "https://movie.douban.com/",
     }
 
+    current_url = url
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(5.0),
-        follow_redirects=True,
+        timeout=httpx.Timeout(10.0),
+        follow_redirects=False,
     ) as client:
-        for url in _get_poster_candidates(poster_urls):
-            try:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
+        for redirect_count in range(POSTER_MAX_REDIRECTS + 1):
+            if not _is_allowed_poster_url(current_url):
+                logger.warning("Rejected poster URL outside the Douban image CDN allowlist")
+                return None
+            if not await _poster_host_resolves_publicly(current_url):
+                logger.warning("Rejected poster CDN host resolving to a non-public address")
+                return None
 
-                content_type = response.headers.get("content-type", "")
-                if content_type.startswith("image/") and response.content:
-                    return url, content_type.split(";", maxsplit=1)[0].strip()
+            try:
+                async with client.stream("GET", current_url, headers=headers) as response:
+                    if response.status_code in (301, 302, 303, 307, 308):
+                        location = response.headers.get("location")
+                        if not location or redirect_count >= POSTER_MAX_REDIRECTS:
+                            return None
+                        current_url = urljoin(current_url, location)
+                        continue
+
+                    response.raise_for_status()
+                    content_type = (
+                        response.headers.get("content-type", "")
+                        .split(";", maxsplit=1)[0]
+                        .strip()
+                        .lower()
+                    )
+                    if content_type not in _ALLOWED_POSTER_CONTENT_TYPES:
+                        return None
+
+                    content_length = response.headers.get("content-length")
+                    if content_length:
+                        try:
+                            if int(content_length) > POSTER_MAX_BYTES:
+                                logger.warning("Rejected oversized poster response")
+                                return None
+                        except ValueError:
+                            return None
+
+                    chunks: list[bytes] = []
+                    total_bytes = 0
+                    async for chunk in response.aiter_bytes():
+                        total_bytes += len(chunk)
+                        if total_bytes > POSTER_MAX_BYTES:
+                            logger.warning("Aborted oversized poster response")
+                            return None
+                        chunks.append(chunk)
+
+                    body = b"".join(chunks)
+                    if not _poster_bytes_match_content_type(body, content_type):
+                        logger.warning("Rejected poster whose file signature does not match its content type")
+                        return None
+                    return body, content_type
 
             except httpx.HTTPError:
-                logger.debug("Poster candidate unavailable: %s", url)
-                continue
+                logger.debug("Poster candidate unavailable")
+                return None
 
     return None
 
@@ -294,6 +439,7 @@ async def get_poster(
             headers={
                 "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
                 "X-Cache": "HIT",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 
@@ -311,57 +457,19 @@ async def get_poster(
     if not poster_urls:
         raise HTTPException(status_code=404, detail="No poster available for this movie")
 
-    result = await _find_working_poster_url(poster_urls)
+    downloaded: tuple[bytes, str] | None = None
+    for candidate_url in _get_poster_candidates(poster_urls):
+        downloaded = await _download_poster_image(candidate_url)
+        if downloaded is not None:
+            break
 
-    if result is None:
+    if downloaded is None:
         raise HTTPException(
             status_code=502,
             detail="Failed to fetch a valid poster image",
         )
 
-    working_url, content_type = result
-
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-        "Referer": "https://movie.douban.com/",
-    }
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0),
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(working_url, headers=headers)
-            response.raise_for_status()
-
-            content = response.content
-            actual_content_type = (
-                response.headers.get("content-type", content_type)
-                .split(";", maxsplit=1)[0]
-                .strip()
-            )
-
-    except httpx.HTTPError as exc:
-        logger.warning(
-            "Failed to download poster for movie %s: %s",
-            movie_id,
-            exc,
-        )
-        raise HTTPException(
-            status_code=502,
-            detail="Failed to download poster image",
-        ) from exc
-
-    if not actual_content_type.startswith("image/") or not content:
-        raise HTTPException(
-            status_code=502,
-            detail="Invalid poster image response",
-        )
+    content, actual_content_type = downloaded
 
     poster_cache_service.save_poster(
         movie_id,
@@ -379,6 +487,7 @@ async def get_poster(
             headers={
                 "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
                 "X-Cache": "MISS",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 
@@ -388,6 +497,7 @@ async def get_poster(
         headers={
             "Cache-Control": f"public, max-age={POSTER_CACHE_MAX_AGE}",
             "X-Cache": "MISS",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

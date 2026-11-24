@@ -32,3 +32,13 @@
 *.pfx
 
 .DS_Store
+
+# Local repair and migration safety artifacts (keep out of source control).
+**/*-repair-backup-*/
+**/repair-backup-*/
+*.bak
+*.backup
+*.pre-migration-*
+*.restore.tmp
+*.initializing
+repair_phase*.py

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import (
     Chart,
     ChartItem,
+    ChartSnapshot,
     Movie,
     MovieGenre,
     MovieRegion,
@@ -18,12 +19,17 @@ from app.schemas import (
     ChartMovieResponse,
     ChartMoviesListResponse,
     ChartResponse,
+    ChartSnapshotResponse,
     MovieResponse,
 )
 
 logger = logging.getLogger("moviehub.charts")
 
 MAX_PAGE_SIZE = 50
+
+
+class ChartCursorError(ValueError):
+    """Raised when a chart pagination cursor is malformed."""
 
 
 class ChartService:
@@ -37,17 +43,22 @@ class ChartService:
 
     @staticmethod
     def _decode_cursor(cursor: str | None) -> int | None:
-        if not cursor:
+        if cursor is None:
             return None
 
         try:
-            decoded = base64.urlsafe_b64decode(
-                cursor.encode("ascii")
-            ).decode("ascii")
+            decoded_bytes = base64.b64decode(
+                cursor.encode("ascii"),
+                altchars=b"-_",
+                validate=True,
+            )
+            decoded = decoded_bytes.decode("ascii")
             rank = int(decoded)
-            return rank if rank > 0 else None
-        except (ValueError, UnicodeDecodeError):
-            return None
+            if rank <= 0 or str(rank) != decoded:
+                raise ValueError("cursor rank is not canonical")
+            return rank
+        except (ValueError, UnicodeEncodeError, UnicodeDecodeError) as exc:
+            raise ChartCursorError("Invalid chart pagination cursor") from exc
 
     @staticmethod
     def _chart_response(chart: Chart) -> ChartResponse:
@@ -134,6 +145,31 @@ class ChartService:
             .one_or_none()
         )
 
+    def get_chart_snapshots(
+        self,
+        db: Session,
+        slug: str,
+    ) -> list[ChartSnapshotResponse] | None:
+        """List available historical snapshots for an enabled chart."""
+        chart = self.get_chart(db, slug)
+        if chart is None:
+            return None
+
+        snapshots = (
+            db.query(ChartSnapshot)
+            .filter(ChartSnapshot.list_id == chart.list_id)
+            .order_by(ChartSnapshot.snapshot_date.desc())
+            .all()
+        )
+        return [
+            ChartSnapshotResponse(
+                snapshot_date=item.snapshot_date,
+                imported_at=item.imported_at,
+                item_count=item.item_count,
+            )
+            for item in snapshots
+        ]
+
     def get_chart_movies(
         self,
         db: Session,
@@ -142,19 +178,26 @@ class ChartService:
         cursor: str | None = None,
         limit: int = 20,
     ) -> ChartMoviesListResponse | None:
-        """Return a ranked chart snapshot with cursor pagination."""
+        """Return one dated chart snapshot with cursor pagination."""
         chart = self.get_chart(db, slug)
         if chart is None:
             return None
 
+        snapshot_query = db.query(ChartSnapshot).filter(
+            ChartSnapshot.list_id == chart.list_id
+        )
         if snapshot_date is None:
-            snapshot_date = (
-                db.query(func.max(ChartItem.snapshot_date))
-                .filter(ChartItem.list_id == chart.list_id)
-                .scalar()
+            snapshot = (
+                snapshot_query
+                .order_by(ChartSnapshot.snapshot_date.desc())
+                .first()
             )
+        else:
+            snapshot = snapshot_query.filter(
+                ChartSnapshot.snapshot_date == snapshot_date
+            ).one_or_none()
 
-        if snapshot_date is None:
+        if snapshot is None:
             return ChartMoviesListResponse(
                 chart=self._chart_response(chart),
                 items=[],
@@ -164,36 +207,24 @@ class ChartService:
 
         query = (
             db.query(ChartItem)
-            .join(
-                Movie,
-                Movie.douban_id == ChartItem.douban_id,
-            )
-            .filter(
-                ChartItem.list_id == chart.list_id,
-                ChartItem.snapshot_date == snapshot_date,
-            )
+            .join(Movie, Movie.id == ChartItem.movie_id)
+            .filter(ChartItem.snapshot_id == snapshot.id)
             .options(
                 selectinload(ChartItem.movie).selectinload(
                     Movie.genres
-                ).selectinload(
-                    MovieGenre.genre_obj
-                ),
+                ).selectinload(MovieGenre.genre_obj),
                 selectinload(ChartItem.movie).selectinload(
                     Movie.regions
-                ).selectinload(
-                    MovieRegion.region_obj
-                ),
+                ).selectinload(MovieRegion.region_obj),
             )
         )
 
-        total = query.count()
-
+        total = snapshot.item_count
         cursor_rank = self._decode_cursor(cursor)
         if cursor_rank is not None:
             query = query.filter(ChartItem.rank > cursor_rank)
 
         limit = max(1, min(int(limit), MAX_PAGE_SIZE))
-
         rows = (
             query.order_by(ChartItem.rank.asc())
             .limit(limit + 1)
@@ -202,24 +233,19 @@ class ChartService:
 
         has_more = len(rows) > limit
         rows = rows[:limit]
-
         items: list[ChartMovieResponse] = []
 
         for chart_item in rows:
             movie = chart_item.movie
             if movie is None:
-                # The join normally excludes this case. Keep the guard
-                # in case a database has inconsistent relationship data.
                 continue
-
             movie_data = self._movie_response(movie)
-
             items.append(
                 ChartMovieResponse(
                     **movie_data.model_dump(),
                     rank=chart_item.rank,
                     source_rating=chart_item.source_rating,
-                    snapshot_date=chart_item.snapshot_date,
+                    snapshot_date=snapshot.snapshot_date,
                 )
             )
 
@@ -233,6 +259,101 @@ class ChartService:
             next_cursor=next_cursor,
             total=total,
         )
+
+
+    def compare_snapshots(
+        self,
+        db: Session,
+        slug: str,
+        from_date: str,
+        to_date: str,
+    ):
+        """Compare two dated snapshots using MovieHub's internal movie IDs."""
+        from app.schemas import ChartCompareResponse, ChartRankChange
+
+        chart = self.get_chart(db, slug)
+        if chart is None:
+            return None
+
+        snapshots = (
+            db.query(ChartSnapshot)
+            .filter(
+                ChartSnapshot.list_id == chart.list_id,
+                ChartSnapshot.snapshot_date.in_([from_date, to_date]),
+            )
+            .all()
+        )
+        by_date = {snapshot.snapshot_date: snapshot for snapshot in snapshots}
+        before_snapshot = by_date.get(from_date)
+        after_snapshot = by_date.get(to_date)
+        if before_snapshot is None or after_snapshot is None:
+            return None
+
+        def ranked_items(snapshot_id: int) -> dict[int, tuple[int, Movie]]:
+            rows = (
+                db.query(ChartItem, Movie)
+                .join(Movie, Movie.id == ChartItem.movie_id)
+                .filter(ChartItem.snapshot_id == snapshot_id)
+                .all()
+            )
+            return {
+                movie.id: (chart_item.rank, movie)
+                for chart_item, movie in rows
+            }
+
+        before = ranked_items(before_snapshot.id)
+        after = ranked_items(after_snapshot.id)
+        changes = []
+        for movie_id in before.keys() | after.keys():
+            before_entry = before.get(movie_id)
+            after_entry = after.get(movie_id)
+            movie = (after_entry or before_entry)[1]
+            before_rank = before_entry[0] if before_entry else None
+            after_rank = after_entry[0] if after_entry else None
+
+            if before_rank is None:
+                state = "new"
+            elif after_rank is None:
+                state = "removed"
+            elif before_rank == after_rank:
+                state = "unchanged"
+            else:
+                state = "moved"
+
+            changes.append(
+                ChartRankChange(
+                    movie_id=movie.id,
+                    douban_id=movie.douban_id,
+                    title=movie.title,
+                    year=movie.year,
+                    type=movie.type,
+                    before_rank=before_rank,
+                    after_rank=after_rank,
+                    rank_change=(
+                        before_rank - after_rank
+                        if before_rank is not None and after_rank is not None
+                        else None
+                    ),
+                    status=state,
+                )
+            )
+
+        changes.sort(
+            key=lambda item: (
+                item.after_rank is None,
+                item.after_rank if item.after_rank is not None else item.before_rank or 0,
+                item.title.casefold(),
+            )
+        )
+        return ChartCompareResponse(
+            chart=self._chart_response(chart),
+            from_date=from_date,
+            to_date=to_date,
+            total_before=len(before),
+            total_after=len(after),
+            items=changes,
+        )
+
 
 
 chart_service = ChartService()

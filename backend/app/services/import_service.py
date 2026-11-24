@@ -1,11 +1,15 @@
 
 """Non-destructive MovieHub importer for Douban Scout SQLite databases."""
 
+import hashlib
 import json
 import logging
+import math
+from itertools import islice
 import re
 import sqlite3
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar
@@ -16,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.cache import cache_manager
 from app.database import (
     Genre,
+    ImportBatchReceipt,
     Movie,
     MovieGenre,
     MoviePoster,
@@ -25,6 +30,11 @@ from app.database import (
 )
 from app.metadata_constants import VALID_GENRES, VALID_REGIONS
 from app.schemas import ImportStatus
+from app.services.import_journal import (
+    append_import_event,
+    get_import_journal_path,
+    read_import_events,
+)
 
 logger = logging.getLogger("moviehub.import")
 
@@ -87,6 +97,7 @@ class ImportService:
         self,
         source_path: str,
         force_full: bool = False,
+        resume_run_id: str | None = None,
     ) -> ImportStatus:
         """Start a background import.
 
@@ -102,8 +113,10 @@ class ImportService:
             raise RuntimeError("Import already in progress")
 
         try:
+            run_id = resume_run_id or uuid.uuid4().hex
             with self._status_lock:
                 self._status = ImportStatus(
+                    run_id=run_id,
                     status="running",
                     processed=0,
                     total=0,
@@ -114,7 +127,7 @@ class ImportService:
 
             thread = threading.Thread(
                 target=self._run_import,
-                args=(path, force_full),
+                args=(path, force_full, run_id, resume_run_id),
                 name="moviehub-import",
                 daemon=True,
             )
@@ -158,18 +171,31 @@ class ImportService:
         self,
         source_path: Path,
         force_full: bool,
+        run_id: str | None = None,
+        resume_run_id: str | None = None,
     ) -> None:
+        run_id = resume_run_id or run_id or uuid.uuid4().hex
+        with self._status_lock:
+            self._status.run_id = run_id
+            self._status.status = "running"
+            self._status.processed = 0
+            self._status.total = 0
+            self._status.errors = 0
+            self._status.percentage = 0.0
+            self._status.message = "Import started or resuming"
         source_conn: sqlite3.Connection | None = None
+        committed_batches = 0
 
         try:
             logger.info(
-                "Starting MovieHub import: source=%s force_full=%s",
+                "Starting MovieHub import: source=%s force_full=%s batch_size=%s",
                 source_path,
                 force_full,
+                self._BATCH_SIZE,
             )
 
-            # Read-only, but deliberately not immutable:
-            # SQLite may need to read a source database's WAL file.
+            # Read-only, but deliberately not immutable: SQLite may need the
+            # source database's WAL file to present a consistent snapshot.
             source_uri = source_path.as_uri() + "?mode=ro"
             source_conn = sqlite3.connect(
                 source_uri,
@@ -177,116 +203,408 @@ class ImportService:
                 timeout=30,
             )
             source_conn.row_factory = sqlite3.Row
-
-            self._validate_source(source_conn)
+            # Pin one SQLite read snapshot before validation/counting/iteration.
+            # This keeps the reported total and imported rows consistent even
+            # if Scout continues writing to its WAL-backed database.
+            source_conn.execute("BEGIN")
+            self._validate_source(
+                source_conn,
+                reject_duplicate_ids=True,
+                reject_invalid_identity=True,
+            )
 
             total = source_conn.execute(
                 "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
             ).fetchone()[0]
-
             if total <= 0:
                 raise ValueError("Source database contains no movie or TV records")
 
-            self._set_progress(0, total, "Reading source database")
+            # Hash exactly the ordered Scout projection consumed by import.
+            source_fingerprint = self._fingerprint_source(source_conn)
+            journal_path = get_import_journal_path(SessionLocal)
+            processed = skipped = imported = record_errors = committed_batches = 0
+            last_douban_id: str | None = None
 
-            processed = 0
-            skipped = 0
-            error_logs = 0
-
-            with SessionLocal() as db:
-                # A single transaction ensures a failed import does not leave
-                # half-updated movie metadata or a stale FTS index.
-                with db.begin():
-                    genre_map = self._ensure_genres(db)
-                    region_map = self._ensure_regions(db)
-
-                    cursor = source_conn.execute(SOURCE_ROW_SQL)
-
-                    for row in cursor:
-                        try:
-                            # A SAVEPOINT isolates a malformed record. Without it,
-                            # one failed flush poisons the outer transaction and
-                            # every subsequent row fails with PendingRollbackError.
-                            with db.begin_nested():
-                                changed = self._upsert_source_row(
-                                    db=db,
-                                    row=row,
-                                    genre_map=genre_map,
-                                    region_map=region_map,
-                                )
-                            if not changed:
-                                skipped += 1
-
-                        except Exception:
-                            # A failed SAVEPOINT may have rolled back newly
-                            # inserted lookup rows; refresh in-memory ID maps.
-                            genre_map.clear()
-                            genre_map.update({
-                                item.name: item.id
-                                for item in db.scalars(select(Genre)).all()
-                            })
-                            region_map.clear()
-                            region_map.update({
-                                item.name: item.id
-                                for item in db.scalars(select(Region)).all()
-                            })
-                            skipped += 1
-                            if error_logs < self._MAX_ERROR_LOGS:
-                                logger.exception(
-                                    "Failed to process source record douban_id=%s",
-                                    row["douban_id"],
-                                )
-                                error_logs += 1
-
-                        processed += 1
-
-                        if processed % self._BATCH_SIZE == 0:
-                            db.flush()
-                            self._set_progress(
-                                processed,
-                                total,
-                                f"Processed {processed} of {total}",
-                            )
-
-                    db.flush()
-
-
-                # Transaction has committed successfully here.
-                logger.info(
-                    "Import committed: processed=%s skipped=%s",
-                    processed,
-                    skipped,
+            if resume_run_id:
+                run_events = [
+                    event for event in read_import_events(journal_path)
+                    if event.get("run_id") == resume_run_id
+                ]
+                start_event = next(
+                    (event for event in run_events if event.get("event") == "run_started"),
+                    None,
                 )
+                if start_event is None:
+                    raise ValueError(f"Import run not found or not resumable: {resume_run_id}")
+                if any(event.get("event") == "run_completed" for event in run_events):
+                    raise ValueError(f"Import run is already completed: {resume_run_id}")
+                if start_event.get("source_path") != str(source_path):
+                    raise ValueError("Resume source path does not match the original import")
+                if start_event.get("force_full") is not force_full:
+                    raise ValueError("Resume import mode does not match the original run")
+                if start_event.get("source_fingerprint") != source_fingerprint:
+                    raise ValueError(
+                        "Source data changed since the interrupted run; refusing checkpoint resume"
+                    )
+                from app.services.import_receipts import restore_from_batch_receipts
 
-            # Invalidate query caches only after the database commit.
-            cache_manager.clear()
+                # The target database receipt is authoritative because it was
+                # committed atomically with this run's movie rows. The JSONL
+                # journal is repaired from receipts if the process died after
+                # the SQLite commit but before the journal append.
+                with SessionLocal() as receipt_db:
+                    restored = restore_from_batch_receipts(
+                        receipt_db,
+                        source_conn,
+                        journal_path,
+                        run_id,
+                        source_fingerprint,
+                        total,
+                    )
+                processed = restored["processed"]
+                imported = restored["imported"]
+                skipped = restored["skipped"]
+                record_errors = restored["errors"]
+                committed_batches = restored["batch"]
+                last_douban_id = restored["last_douban_id"]
+                append_import_event(journal_path, {
+                    "event": "run_resumed",
+                    "run_id": run_id,
+                    "source_fingerprint": source_fingerprint,
+                    "processed_before_resume": processed,
+                    "resumed_at": datetime.now().isoformat(),
+                })
+            else:
+                append_import_event(journal_path, {
+                    "event": "run_started",
+                    "run_id": run_id,
+                    "source_path": str(source_path),
+                    "force_full": force_full,
+                    "source_fingerprint": source_fingerprint,
+                    "total": total,
+                    "started_at": datetime.now().isoformat(),
+                })
 
             self._set_progress(
                 processed,
                 total,
-                f"Import completed; skipped {skipped} records",
+                "Resuming from last committed batch" if resume_run_id else "Reading source database",
             )
-            self._finish(
-                "completed",
-                f"Import completed; skipped {skipped} records",
+            error_logs = 0
+            if last_douban_id is None:
+                cursor = source_conn.execute(SOURCE_ROW_SQL)
+            else:
+                resume_sql = SOURCE_ROW_SQL.replace(
+                    "ORDER BY douban_id",
+                    "AND douban_id > ? ORDER BY douban_id",
+                )
+                cursor = source_conn.execute(resume_sql, (last_douban_id,))
+
+            with SessionLocal() as db:
+                while True:
+                    rows = list(islice(cursor, self._BATCH_SIZE))
+                    if not rows:
+                        break
+
+                    # Commit bounded batches instead of holding one SQLite
+                    # writer transaction for the entire Scout catalogue.
+                    # Movie rows and the durable batch receipt commit together;
+                    # a failed transaction leaves neither behind.
+                    batch_errors: list[dict[str, Any]] = []
+                    batch_imported = batch_skipped = batch_errors_count = 0
+                    batch_processed = len(rows)
+                    batch_number = committed_batches + 1
+                    committed_at = datetime.now().isoformat()
+                    receipt_event: dict[str, Any] = {}
+                    with db.begin():
+                        genre_map = self._ensure_genres(db)
+                        region_map = self._ensure_regions(db)
+
+                        for row in rows:
+                            try:
+                                with db.begin_nested():
+                                    changed = self._upsert_source_row(
+                                        db=db,
+                                        row=row,
+                                        genre_map=genre_map,
+                                        region_map=region_map,
+                                        force_full=force_full,
+                                    )
+                                if changed:
+                                    batch_imported += 1
+                                else:
+                                    batch_skipped += 1
+                            except Exception as exc:
+                                batch_errors_count += 1
+                                batch_errors.append({
+                                    "run_id": run_id,
+                                    "batch": batch_number,
+                                    "douban_id": str(row["douban_id"]),
+                                    "title": str(row["douban_title"] or "")[:300],
+                                    "error_type": type(exc).__name__[:120],
+                                    "error_message": str(exc)[:500],
+                                    "occurred_at": datetime.now().isoformat(),
+                                })
+                                genre_map = {
+                                    item.name: item.id
+                                    for item in db.scalars(select(Genre)).all()
+                                }
+                                region_map = {
+                                    item.name: item.id
+                                    for item in db.scalars(select(Region)).all()
+                                }
+                                batch_skipped += 1
+                                if error_logs < self._MAX_ERROR_LOGS:
+                                    logger.exception(
+                                        "Failed to process source record douban_id=%s",
+                                        row["douban_id"],
+                                    )
+                                    error_logs += 1
+
+                        # The receipt and all movie/metadata writes share this
+                        # exact transaction. A crash can commit both or neither.
+                        receipt = ImportBatchReceipt(
+                            run_id=run_id,
+                            batch_number=batch_number,
+                            source_fingerprint=source_fingerprint,
+                            processed=processed + batch_processed,
+                            total=total,
+                            imported=imported + batch_imported,
+                            skipped=skipped + batch_skipped,
+                            errors=record_errors + batch_errors_count,
+                            last_douban_id=str(rows[-1]["douban_id"]),
+                            error_records=json.dumps(
+                                batch_errors,
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                            ),
+                            committed_at=committed_at,
+                        )
+                        db.add(receipt)
+                        receipt_event = {
+                            "event": "batch_committed",
+                            "run_id": run_id,
+                            "batch": batch_number,
+                            "processed": receipt.processed,
+                            "total": total,
+                            "last_douban_id": receipt.last_douban_id,
+                            "imported": receipt.imported,
+                            "skipped": receipt.skipped,
+                            "errors": receipt.errors,
+                            "committed_at": committed_at,
+                        }
+
+                    # Counters advance only after the transaction containing
+                    # both target rows and their receipt has committed.
+                    processed += batch_processed
+                    imported += batch_imported
+                    skipped += batch_skipped
+                    record_errors += batch_errors_count
+                    committed_batches = batch_number
+
+                    if batch_errors:
+                        from app.services.import_errors import append_import_errors
+                        append_import_errors(journal_path, batch_errors)
+
+                    append_import_event(journal_path, receipt_event)
+                    self._set_progress(
+                        processed,
+                        total,
+                        f"Processed {processed} of {total} records",
+                    )
+
+            logger.info(
+                "Import committed: processed=%s imported=%s skipped=%s batches=%s force_full=%s",
+                processed,
+                imported,
+                skipped,
+                committed_batches,
+                force_full,
             )
 
+            if imported:
+                cache_manager.clear()
+
+            completion_message = (
+                f"Import completed; imported {imported}, skipped {skipped}, "
+                f"record errors {record_errors}"
+            )
+            with self._status_lock:
+                self._status.errors = record_errors
+            self._set_progress(processed, total, completion_message)
+            append_import_event(journal_path, {
+                "event": "run_completed",
+                "run_id": run_id,
+                "processed": processed,
+                "total": total,
+                "imported": imported,
+                "skipped": skipped,
+                "errors": record_errors,
+                "batches": committed_batches,
+                "completed_at": datetime.now().isoformat(),
+            })
+            self._finish("completed", completion_message)
+
         except Exception:
-            logger.exception("MovieHub import failed")
-            # Avoid exposing filesystem paths or database internals in API status.
+            logger.exception(
+                "MovieHub import failed after %s committed batches",
+                committed_batches,
+            )
+            # Earlier committed batches have transactional receipts; resume
+            # restores their exact counters and source cursor from those rows.
+            if committed_batches:
+                try:
+                    cache_manager.clear()
+                except Exception:
+                    logger.exception("Failed to clear caches after partial import")
+            try:
+                append_import_event(
+                    get_import_journal_path(SessionLocal),
+                    {
+                        "event": "run_failed",
+                        "run_id": run_id,
+                        "committed_batches": committed_batches,
+                        "failed_at": datetime.now().isoformat(),
+                    },
+                )
+            except Exception:
+                logger.exception("Failed to persist import failure event")
             self._finish(
                 "failed",
-                "Import failed. Check the backend log for details.",
+                "Import failed. Earlier batches, if any, were committed; retry is safe. "
+                "Check the backend log for details.",
             )
 
         finally:
             if source_conn is not None:
                 source_conn.close()
-
             self._run_lock.release()
 
+    def preview_import(
+        self,
+        source_path: str | Path,
+        force_full: bool = False,
+    ) -> dict[str, Any]:
+        """Classify a Scout import without writing to Scout or MovieHub."""
+        path = Path(source_path).expanduser().resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"Source database not found: {path}")
+
+        source_conn = sqlite3.connect(
+            path.as_uri() + "?mode=ro",
+            uri=True,
+            timeout=30,
+        )
+        source_conn.row_factory = sqlite3.Row
+        try:
+            # Match the importer's validation and stable source snapshot.
+            source_conn.execute("BEGIN")
+            self._validate_source(
+                source_conn,
+                reject_duplicate_ids=True,
+                reject_invalid_identity=True,
+            )
+            total = source_conn.execute(
+                "SELECT COUNT(*) FROM item WHERE type IN ('movie', 'tv')"
+            ).fetchone()[0]
+            if total <= 0:
+                raise ValueError("Source database contains no movie or TV records")
+
+            source_fingerprint = self._fingerprint_source(source_conn)
+
+            with SessionLocal() as db:
+                # This path deliberately performs SELECTs only. It never calls
+                # the upsert routine or flushes/commits target changes.
+                target_rows = db.execute(
+                    select(Movie.douban_id, Movie.updated_at).where(
+                        Movie.douban_id.is_not(None)
+                    )
+                ).all()
+                target_by_id = {
+                    str(douban_id): updated_at
+                    for douban_id, updated_at in target_rows
+                }
+
+            new_records = 0
+            update_candidates = 0
+            unchanged_skips = 0
+            invalid_years = 0
+            invalid_ratings = 0
+            for row in source_conn.execute(SOURCE_ROW_SQL):
+                douban_id = str(row["douban_id"])
+                if douban_id not in target_by_id:
+                    new_records += 1
+                elif not force_full:
+                    source_updated_at = self._safe_int(row["update_time"])
+                    target_updated_at = target_by_id[douban_id]
+                    if (
+                        source_updated_at is not None
+                        and target_updated_at is not None
+                        and source_updated_at <= target_updated_at
+                    ):
+                        unchanged_skips += 1
+                    else:
+                        update_candidates += 1
+                else:
+                    update_candidates += 1
+
+                year = self._safe_int(row["year"])
+                if row["year"] is not None and (
+                    year is None or not 1870 <= year <= 2200
+                ):
+                    invalid_years += 1
+                if row["rating"] is not None and self._safe_rating(row["rating"]) is None:
+                    invalid_ratings += 1
+
+            return {
+                "report_version": 1,
+                "generated_at": datetime.now().isoformat(),
+                "read_only": True,
+                "source_database": str(path),
+                "source_fingerprint": source_fingerprint,
+                "force_full": force_full,
+                "source_snapshot_consistent": True,
+                "summary": {
+                    "source_records": total,
+                    "target_records_checked": len(target_by_id),
+                    "new_records": new_records,
+                    "update_candidates": update_candidates,
+                    "unchanged_skips": unchanged_skips,
+                    "would_write": new_records + update_candidates,
+                    "invalid_years": invalid_years,
+                    "invalid_ratings": invalid_ratings,
+                },
+                "decision": "ready_for_import" if new_records + update_candidates else "no_changes",
+                "limitations": [
+                    "Preview is advisory; target data may change before a later import starts.",
+                    "Record-level processing errors and database constraints can only be confirmed during import.",
+                    "No source or target rows were inserted, updated, or deleted.",
+                ],
+            }
+        finally:
+            source_conn.close()
+
     @staticmethod
-    def _validate_source(conn: sqlite3.Connection) -> None:
+    def _fingerprint_source(conn: sqlite3.Connection) -> str:
+        """Hash every ordered source row consumed by the importer."""
+        digest = hashlib.sha256()
+        for row in conn.execute(SOURCE_ROW_SQL):
+            encoded = json.dumps(
+                [row[key] for key in row.keys()],
+                ensure_ascii=False,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _validate_source(
+        conn: sqlite3.Connection,
+        reject_duplicate_ids: bool = False,
+        reject_invalid_identity: bool = False,
+    ) -> None:
         """Check that the source database has the expected item table."""
         result = conn.execute(
             """
@@ -320,6 +638,55 @@ class ImportService:
             raise ValueError(
                 "Source item table is missing required columns: "
                 + ", ".join(sorted(missing))
+            )
+
+        # Invalid identity rows can be reported by the read-only audit tool;
+        # the importer opts into rejecting them before any target writes.
+        if reject_invalid_identity:
+            invalid_identity = conn.execute(
+                """
+                SELECT rowid, douban_id, douban_title
+                FROM item
+                WHERE type IN ('movie', 'tv')
+                  AND (
+                        douban_id IS NULL
+                        OR trim(CAST(douban_id AS TEXT)) = ''
+                        OR trim(CAST(douban_id AS TEXT)) GLOB '*[^0-9]*'
+                        OR douban_title IS NULL
+                        OR trim(douban_title) = ''
+                  )
+                LIMIT 1
+                """
+            ).fetchone()
+            if invalid_identity is not None:
+                raise ValueError(
+                    "Source database contains a movie/TV row with an invalid "
+                    "Douban ID or empty title: "
+                    f"rowid={invalid_identity['rowid']}, "
+                    f"douban_id={invalid_identity['douban_id']!r}"
+                )
+
+        # A Scout export must identify each imported subject exactly once.
+        # Duplicate IDs make the eventual upsert depend on SQLite row order
+        # and can silently replace one record with another.
+        if not reject_duplicate_ids:
+            return
+
+        duplicate = conn.execute(
+            """
+            SELECT douban_id, COUNT(*) AS row_count
+            FROM item
+            WHERE type IN ('movie', 'tv')
+              AND douban_id IS NOT NULL
+            GROUP BY douban_id
+            HAVING COUNT(*) > 1
+            LIMIT 1
+            """
+        ).fetchone()
+        if duplicate is not None:
+            raise ValueError(
+                "Source database contains duplicate Douban IDs: "
+                f"{duplicate['douban_id']} ({duplicate['row_count']} rows)"
             )
 
     @staticmethod
@@ -528,12 +895,27 @@ class ImportService:
 
     @staticmethod
     def _safe_int(value: Any, default: int | None = None) -> int | None:
+        # bool subclasses int; fractional floats must not be truncated.
+        if value is None or value == "" or isinstance(value, bool):
+            return default
+        if isinstance(value, float) and not value.is_integer():
+            return default
         try:
-            if value is None or value == "":
-                return default
             return int(value)
         except (TypeError, ValueError, OverflowError):
             return default
+
+    @staticmethod
+    def _safe_rating(value: Any) -> float | None:
+        if value is None or value == "" or isinstance(value, bool):
+            return None
+        try:
+            rating = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(rating) or not 0 <= rating <= 10:
+            return None
+        return rating
 
     @staticmethod
     def _safe_string(value: Any) -> str | None:
@@ -580,8 +962,14 @@ class ImportService:
         row: sqlite3.Row,
         genre_map: dict[str, int],
         region_map: dict[str, int],
+        force_full: bool = False,
     ) -> bool:
-        """Upsert one movie while preserving data absent from this source."""
+        """Upsert one movie while preserving data absent from this source.
+
+        Incremental imports skip records whose Scout update_time is not newer
+        than MovieHub's last imported source timestamp. force_full bypasses
+        this check and reprocesses every valid source record.
+        """
         douban_id = self._safe_string(row["douban_id"])
         title = self._safe_string(row["douban_title"])
 
@@ -593,6 +981,15 @@ class ImportService:
         movie = db.scalar(
             select(Movie).where(Movie.douban_id == douban_id)
         )
+
+        if movie is not None and not force_full:
+            source_updated_at = self._safe_int(row["update_time"])
+            if (
+                source_updated_at is not None
+                and movie.updated_at is not None
+                and source_updated_at <= movie.updated_at
+            ):
+                return False
 
         if movie is None:
             movie = Movie(
@@ -608,16 +1005,13 @@ class ImportService:
         movie.type = row["type"]
 
         year = self._safe_int(row["year"])
-        rating = row["rating"]
+        rating = self._safe_rating(row["rating"])
 
-        if year is not None:
+        if year is not None and 1870 <= year <= 2200:
             movie.year = year
 
         if rating is not None:
-            try:
-                movie.rating = float(rating)
-            except (TypeError, ValueError):
-                pass
+            movie.rating = rating
 
         imdb_id = self._safe_string(row["imdb_id"])
         if imdb_id:

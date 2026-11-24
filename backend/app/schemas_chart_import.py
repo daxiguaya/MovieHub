@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.chart_definitions import get_chart_definition
+
 
 class ChartMovieImport(BaseModel):
     """One movie entry in a normalized chart snapshot."""
@@ -78,11 +80,11 @@ class ChartSnapshotImport(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    slug: str = Field(min_length=1, max_length=128)
-    name: str = Field(min_length=1, max_length=128)
+    slug: str = Field(min_length=1, max_length=96)
+    name: str = Field(min_length=1, max_length=160)
 
-    source: str = Field(min_length=1, max_length=64)
-    category: str = Field(min_length=1, max_length=64)
+    source: str = Field(min_length=1, max_length=32)
+    category: str = Field(min_length=1, max_length=32)
 
     period: str | None = Field(default=None, max_length=32)
     description: str | None = None
@@ -95,7 +97,7 @@ class ChartSnapshotImport(BaseModel):
     @classmethod
     def validate_slug(cls, value: str) -> str:
         value = value.strip().lower()
-        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", value):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,95}", value):
             raise ValueError(
                 "slug may contain lowercase letters, digits and hyphens"
             )
@@ -111,6 +113,23 @@ class ChartSnapshotImport(BaseModel):
 
         if len(ranks) != len(set(ranks)):
             raise ValueError("duplicate rank in chart snapshot")
+
+        # Built-in chart slugs have a stable taxonomy. Reject cross-period,
+        # cross-category and movie/TV mismatches before database access.
+        definition = get_chart_definition(self.slug)
+        if definition is not None:
+            if self.category != definition.category:
+                raise ValueError(
+                    f"chart {self.slug} requires category={definition.category!r}"
+                )
+            if self.period != definition.period:
+                raise ValueError(
+                    f"chart {self.slug} requires period={definition.period!r}"
+                )
+            if any(movie.type != definition.media_type for movie in self.movies):
+                raise ValueError(
+                    f"chart {self.slug} accepts only {definition.media_type!r} entries"
+                )
 
         return self
 

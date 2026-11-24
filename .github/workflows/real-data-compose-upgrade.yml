@@ -90,7 +90,7 @@ jobs:
           total = 0
           for path in files:
               payload = json.loads(path.read_text(encoding="utf-8"))
-              count = len(payload.get("items", []))
+              count = len(payload.get("movies", []))
               total += count
               print(f"{path.relative_to(root)}: {count} items")
           assert total == 288, total

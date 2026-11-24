@@ -30,6 +30,10 @@ class ProviderResponseCache:
         self.path = path or (Path(settings.data_dir) / "cache" / "discovery.sqlite3")
         self._lock = threading.RLock()
         self._initialized = False
+        self._hits = 0
+        self._misses = 0
+        self._stale_hits = 0
+        self._writes = 0
 
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,6 +106,7 @@ class ProviderResponseCache:
                 (key,),
             ).fetchone()
             if row is None or (row[1] <= now and (not allow_stale or row[2] <= now)):
+                self._misses += 1
                 return None
             connection.execute(
                 "UPDATE provider_response_cache SET accessed_at=? WHERE cache_key=?",
@@ -113,7 +118,12 @@ class ProviderResponseCache:
                 connection.execute("DELETE FROM provider_response_cache WHERE cache_key=?", (key,))
                 return None
             if not isinstance(payload, dict):
+                self._misses += 1
                 return None
+            if row[1] <= now:
+                self._stale_hits += 1
+            else:
+                self._hits += 1
             return payload, row[1] <= now
 
     def set(
@@ -148,6 +158,7 @@ class ProviderResponseCache:
                  now + ttl + STALE_GRACE_SECONDS, now),
             )
             self._evict(connection)
+            self._writes += 1
         return True
 
     @staticmethod
@@ -178,7 +189,9 @@ class ProviderResponseCache:
                    FROM provider_response_cache""",
                 (int(time.time()),),
             ).fetchone()
-        return {"entries": int(row[0]), "bytes": int(row[1]), "fresh_entries": int(row[2])}
+        return {"entries": int(row[0]), "bytes": int(row[1]), "fresh_entries": int(row[2]),
+                "hits": self._hits, "misses": self._misses,
+                "stale_hits": self._stale_hits, "writes": self._writes}
 
     def save_favorite(self, media_type: str, provider_id: int, snapshot: dict[str, Any], note: str = "") -> dict[str, Any]:
         self._init()

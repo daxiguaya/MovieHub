@@ -326,7 +326,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · ★ {item.rating?.toFixed(1) ?? "—"} · {item.rating_count.toLocaleString()} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · TMDB ★ {item.rating?.toFixed(1) ?? "—"} · {item.rating_count.toLocaleString()} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -771,7 +771,7 @@ function SearchPage() {
       <PageHeading eyebrow="ONLINE DISCOVERY" title="搜索全网电影与剧集" description="在线搜索 TMDB 的电影和剧集目录；搜索结果按页加载，不会把全站资料一次性下载到 NAS。" />
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
-        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">电影和剧集</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
+        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
@@ -784,7 +784,7 @@ function SearchPage() {
         </select></label>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">关键词模式搜索全网目录；清空关键词后，类型、地区、年份和评分筛选会使用 TMDB Discover。每次只加载当前页。</p>
+      <p className="search-hint">关键词模式可同时搜索电影和剧集；清空关键词后，请选择电影或剧集再组合类型、地区、年份和评分筛选。每次只加载当前页。</p>
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}

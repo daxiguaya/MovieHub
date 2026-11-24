@@ -28,6 +28,7 @@ from app.routers.data_import import router as import_router
 from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
+from app.services.tmdb_client import tmdb_client
 
 setup_logging()
 
@@ -84,6 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         with contextlib.suppress(asyncio.CancelledError):
             await cleanup_task
 
+        await tmdb_client.aclose()
         logger.info("MovieHub application shutting down...")
 
 

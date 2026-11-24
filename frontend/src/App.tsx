@@ -151,6 +151,8 @@ function HomePage() {
         <Link className="text-link" to="/search">浏览全部电影 <span>→</span></Link>
       </div>
 
+      <DiscoverySpotlight />
+
       {loading ? <Loading label="正在读取榜单…" /> : error ? <ErrorState message={error} /> : (
         groups.map((group) => group.items.length > 0 && (
           <section className="chart-group" key={group.title}>
@@ -171,6 +173,64 @@ function HomePage() {
         <div><strong>发现电影，然后交给小雅</strong><p>MovieHub 专注发现与整理。搜索资源、下载和播放仍由你现有的小雅与 Jellyfin 负责。</p></div>
       </section>
     </>
+  );
+}
+
+function DiscoverySpotlight() {
+  const [lists, setLists] = useState<{ key: string; title: string; items: DiscoveryItem[] }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const definitions = [
+      { key: "horror-high", title: "恐怖片高分榜", genre: "27", votes: "500", sort: "vote_average.desc" },
+      { key: "horror-gems", title: "恐怖片冷门佳作", genre: "27", votes: "50", sort: "vote_average.desc" },
+      { key: "thriller-high", title: "惊悚片高分榜", genre: "53", votes: "500", sort: "vote_average.desc" },
+      { key: "thriller-gems", title: "惊悚片冷门佳作", genre: "53", votes: "50", sort: "vote_average.desc" }
+    ];
+    Promise.all(definitions.map(async (definition) => {
+      const params = new URLSearchParams({
+        media_type: "movie",
+        page: "1",
+        with_genres: definition.genre,
+        min_votes: definition.votes,
+        min_rating: definition.votes === "50" ? "6.5" : "7",
+        sort_by: definition.sort
+      });
+      const data = await api.discoveryDiscover(params);
+      return { key: definition.key, title: definition.title, items: data.items.slice(0, 5) };
+    })).then((data) => { if (active) setLists(data); })
+      .catch(() => { if (active) setLists([]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  return (
+    <section className="genre-spotlight">
+      <div className="section-heading">
+        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>专门为类型片爱好者精选，按口碑和投票量动态发现作品。</p></div>
+        <Link className="text-link" to="/search">更多类型筛选 <span>→</span></Link>
+      </div>
+      {loading ? <Loading label="正在加载恐怖与惊悚精选…" /> : lists.length === 0 ? (
+        <div className="spotlight-fallback">专题数据暂时不可用，可进入全网搜索继续查找。</div>
+      ) : (
+        <div className="spotlight-grid">
+          {lists.map((list) => (
+            <section className="spotlight-panel" key={list.key}>
+              <h3>{list.title}</h3>
+              {list.items.map((item) => (
+                <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
+                  {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · ★ {item.rating?.toFixed(1) ?? "—"} · {item.rating_count.toLocaleString()} 票</small></span>
+                </Link>
+              ))}
+              {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
+            </section>
+          ))}
+        </div>
+      )}
+      <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+    </section>
   );
 }
 

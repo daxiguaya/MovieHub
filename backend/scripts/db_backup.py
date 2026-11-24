@@ -117,18 +117,33 @@ def _prune_backups(root: Path, keep_last: int, current: Path) -> None:
     if keep_last < 1:
         raise ValueError("keep_last must be at least 1")
 
-    candidates = sorted(
-        (
-            path
-            for path in root.iterdir()
-            if path.is_dir()
-            and not path.is_symlink()
-            and path.name.startswith(BACKUP_PREFIX)
-            and (path / "manifest.json").is_file()
-        ),
-        key=lambda path: path.name,
-        reverse=True,
-    )
+    # Retention is destructive: only prune directories that positively
+    # identify themselves as backups created by this utility. A matching
+    # filename or a manifest alone is not sufficient ownership evidence.
+    candidates = []
+    for path in root.iterdir():
+        if (
+            not path.is_dir()
+            or path.is_symlink()
+            or not path.name.startswith(BACKUP_PREFIX)
+        ):
+            continue
+        manifest_path = path / "manifest.json"
+        database_path = path / DATABASE_FILENAME
+        if not manifest_path.is_file() or not database_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if (
+            manifest.get("format_version") != 1
+            or manifest.get("database_file") != DATABASE_FILENAME
+            or manifest.get("schema_version") != CURRENT_SCHEMA_VERSION
+        ):
+            continue
+        candidates.append(path)
+    candidates.sort(key=lambda path: path.name, reverse=True)
     retained = 0
     for path in candidates:
         if path == current:

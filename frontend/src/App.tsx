@@ -637,7 +637,7 @@ function SearchPage() {
       <PageHeading eyebrow="ONLINE DISCOVERY" title="搜索全网电影与剧集" description="在线搜索 TMDB 的电影和剧集目录；搜索结果按页加载，不会把全站资料一次性下载到 NAS。" />
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
-        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value)}><option value="all">电影和剧集</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
+        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">电影和剧集</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>

@@ -547,18 +547,32 @@ function SearchPage() {
         onlinePromise = api.discoveryDiscover(discoverParams);
       }
 
-      const [local, online] = await Promise.all([
+      const [localResult, onlineResult] = await Promise.allSettled([
         localPromise,
         onlinePromise ?? Promise.resolve(null)
       ]);
-      setResults((current) => appendLocal ? current.concat(local.items) : local.items);
-      setTotal(local.total);
-      setNextCursor(local.next_cursor);
-      if (online) {
+      if (localResult.status === "fulfilled") {
+        const local = localResult.value;
+        setResults((current) => appendLocal ? current.concat(local.items) : local.items);
+        setTotal(local.total);
+        setNextCursor(local.next_cursor);
+      } else {
+        setError((localResult.reason as Error).message);
+      }
+      if (onlineResult.status === "fulfilled" && onlineResult.value) {
+        const online = onlineResult.value;
         setOnlineResults((current) => appendOnline ? current.concat(online.items) : online.items);
         setOnlineTotal(online.total_results);
         setOnlinePage(online.page);
         setOnlinePages(online.total_pages);
+      } else if (onlineResult.status === "rejected") {
+        setOnlineError((onlineResult.reason as Error).message);
+        if (!appendOnline) {
+          setOnlineResults([]);
+          setOnlineTotal(0);
+          setOnlinePage(1);
+          setOnlinePages(0);
+        }
       } else if (!appendOnline) {
         setOnlineResults([]);
         setOnlineTotal(0);

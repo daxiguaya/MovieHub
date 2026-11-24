@@ -1,0 +1,287 @@
+name: Real-data Compose upgrade rehearsal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/real-data-compose-upgrade.yml
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Run ID containing the verified first-launch JSON artifact"
+        required: false
+        type: string
+        default: "45329522019"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: moviehub-real-data-upgrade-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  real-data-upgrade:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-real-upgrade]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout MovieHub
+        uses: actions/checkout@v4
+
+      - name: Download verified first-launch source data
+        uses: actions/download-artifact@v4
+        with:
+          name: moviehub-first-launch-douban
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id || '45329522019' }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/moviehub-first-launch-bundle
+
+      - name: Configure isolated rehearsal directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/moviehub-real-data-upgrade"
+          mkdir -p "$root/data/db" "$root/backups"
+          chmod -R 0777 "$root"
+          echo "MOVIEHUB_DATA_PATH=$root/data" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_BACKUP_PATH=$root/backups" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_IMPORT_PATH=$RUNNER_TEMP/moviehub-first-launch-bundle" >> "$GITHUB_ENV"
+          echo "MOVIEHUB_FRONTEND_CONFIG_PATH=$PWD/deploy/frontend-config.json" >> "$GITHUB_ENV"
+
+      - name: Build a populated schema-v2 database fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os, sqlite3
+          from pathlib import Path
+          db = Path(os.environ["MOVIEHUB_DATA_PATH"]) / "db" / "movies.db"
+          migrations = Path("backend/migrations")
+          connection = sqlite3.connect(db)
+          try:
+              connection.execute("PRAGMA foreign_keys=ON")
+              connection.executescript((migrations / "001_moviehub_core.sql").read_text(encoding="utf-8"))
+              connection.executescript((migrations / "002_durable_import_batch_receipts.sql").read_text(encoding="utf-8"))
+              connection.execute(
+                  "INSERT INTO movies (douban_id,title,type,directors,actors,rating_count) VALUES (? ,?,'movie','[]','[]',0)",
+                  ("9000000001", "Pre-upgrade sentinel"),
+              )
+              connection.commit()
+              assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 2
+              assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+          finally:
+              connection.close()
+          print("Created populated schema-v2 fixture with sentinel")
+          PY
+
+      - name: Validate source artifact snapshot count
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["MOVIEHUB_IMPORT_PATH"])
+          files = sorted(root.rglob("*.json"))
+          assert len(files) == 5, [str(path) for path in files]
+          total = 0
+          for path in files:
+              payload = json.loads(path.read_text(encoding="utf-8"))
+              count = len(payload.get("items", []))
+              total += count
+              print(f"{path.relative_to(root)}: {count} items")
+          assert total == 288, total
+          print(f"Validated {len(files)} snapshots / {total} chart items")
+          PY
+
+      - name: Validate isolated Compose configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create chatgpt-browser_default >/dev/null 2>&1 || true
+          docker compose -p moviehub-real-upgrade config --quiet
+
+      - name: Migrate v2 to v3 using the production migration runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p moviehub-real-upgrade run --rm --no-deps moviehub python -m scripts.migrate
+          python - <<'PY'
+          import os, sqlite3
+          from pathlib import Path
+          db = Path(os.environ["MOVIEHUB_DATA_PATH"]) / "db" / "movies.db"
+          connection = sqlite3.connect(db)
+          try:
+              assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 3
+              assert connection.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == ("Pre-upgrade sentinel",)
+              assert connection.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='movie_metadata_provenance'").fetchone()[0] == 1
+              assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+              assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+              backups = list(db.parent.glob("movies.db.pre-migration-*.bak"))
+              assert len(backups) == 1, backups
+              old = sqlite3.connect(backups[0])
+              try:
+                  assert old.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 2
+                  assert old.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == ("Pre-upgrade sentinel",)
+              finally:
+                  old.close()
+          finally:
+              connection.close()
+          print("Schema v2->v3 passed; sentinel and verified pre-migration backup retained")
+          PY
+
+      - name: Start isolated backend and frontend containers
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p moviehub-real-upgrade up --build -d
+          for attempt in $(seq 1 60); do
+            if docker compose -p moviehub-real-upgrade exec -T moviehub python -c "from app.database import database_is_ready; assert database_is_ready()"; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker compose -p moviehub-real-upgrade logs --no-color
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Preflight and import five real snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find "$MOVIEHUB_IMPORT_PATH" -type f -name '*.json' -print0 | sort -z)
+          test "${#files[@]}" -eq 5
+          for file in "${files[@]}"; do
+            relative="${file#"$MOVIEHUB_IMPORT_PATH"/}"
+            docker compose -p moviehub-real-upgrade exec -T moviehub python -m scripts.import_chart --input "/imports/$relative" --dry-run
+          done
+          for file in "${files[@]}"; do
+            relative="${file#"$MOVIEHUB_IMPORT_PATH"/}"
+            docker compose -p moviehub-real-upgrade exec -T moviehub python -m scripts.import_chart --input "/imports/$relative"
+          done
+
+      - name: Verify real data through database and live API
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p moviehub-real-upgrade exec -T moviehub python - <<'PY'
+          import json, sqlite3
+          from urllib.request import urlopen
+          from app.database import get_db_path
+          connection = sqlite3.connect(get_db_path())
+          try:
+              version = connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0]
+              movies = connection.execute("SELECT COUNT(*) FROM movies").fetchone()[0]
+              snapshots = connection.execute("SELECT COUNT(*) FROM chart_snapshots").fetchone()[0]
+              items = connection.execute("SELECT COUNT(*) FROM list_items").fetchone()[0]
+              provenance = connection.execute("SELECT field_name,COUNT(*) FROM movie_metadata_provenance GROUP BY field_name").fetchall()
+              assert version == 3, version
+              assert movies >= 289, movies
+              assert snapshots == 5, snapshots
+              assert items == 288, items
+              assert connection.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == "Pre-upgrade sentinel"
+              assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+              assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+              print({"schema":version,"movies_including_sentinel":movies,"snapshots":snapshots,"chart_items":items,"provenance":provenance})
+          finally:
+              connection.close()
+          with urlopen("http://127.0.0.1:8000/api/ready", timeout=10) as response:
+              assert response.status == 200
+          with urlopen("http://127.0.0.1:8000/api/charts", timeout=10) as response:
+              charts = json.load(response)
+          assert len(charts) == 5, charts
+          with urlopen("http://127.0.0.1:8000/api/charts/top250?limit=50", timeout=10) as response:
+              top = json.load(response)
+          assert len(top["items"]) == 50, top
+          assert top["total"] == 250, top
+          print({"api_ready":True,"charts":len(charts),"top250_total":top["total"],"page_size":len(top["items"])})
+          PY
+
+      - name: Create verified backup of imported database
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup_dir="$(docker compose -p moviehub-real-upgrade exec -T moviehub python -m scripts.db_backup backup | tail -n 1 | tr -d '\r')"
+          test -n "$backup_dir"
+          echo "MOVIEHUB_REAL_BACKUP_DIR=$backup_dir" >> "$GITHUB_ENV"
+          echo "Created backup: $backup_dir"
+
+      - name: Restore backup and prove rollback copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p moviehub-real-upgrade exec -T moviehub python - <<'PY'
+          import sqlite3
+          from app.database import get_db_path
+          connection = sqlite3.connect(get_db_path())
+          try:
+              assert connection.execute("UPDATE movies SET title='Post-backup mutation' WHERE douban_id='9000000001'").rowcount == 1
+              connection.commit()
+          finally:
+              connection.close()
+          PY
+          docker compose -p moviehub-real-upgrade stop moviehub
+          docker compose -p moviehub-real-upgrade run --rm --no-deps moviehub python -m scripts.db_backup restore --backup-dir "$MOVIEHUB_REAL_BACKUP_DIR" --confirm --service-stopped
+          docker compose -p moviehub-real-upgrade up -d moviehub
+          docker compose -p moviehub-real-upgrade exec -T moviehub python - <<'PY'
+          import json, sqlite3, time
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.request import urlopen
+          from app.database import get_db_path
+          for attempt in range(60):
+              try:
+                  with urlopen("http://127.0.0.1:8000/api/ready", timeout=3) as response:
+                      assert response.status == 200
+                  break
+              except (HTTPError, URLError, TimeoutError):
+                  if attempt == 59:
+                      raise
+                  time.sleep(1)
+          with urlopen("http://127.0.0.1:8000/api/movies/9000000001", timeout=10) as response:
+              restored = json.load(response)
+          assert restored["title"] == "Pre-upgrade sentinel", restored
+          db = Path(get_db_path())
+          connection = sqlite3.connect(db)
+          try:
+              assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 3
+              assert connection.execute("SELECT COUNT(*) FROM chart_snapshots").fetchone()[0] == 5
+              assert connection.execute("SELECT COUNT(*) FROM list_items").fetchone()[0] == 288
+              assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+          finally:
+              connection.close()
+          copies = sorted(db.parent.glob("movies.db.pre-restore-*"))
+          assert copies, "pre-restore rollback copy missing"
+          old = sqlite3.connect(copies[-1])
+          try:
+              mutation = old.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0]
+          finally:
+              old.close()
+          assert mutation == "Post-backup mutation", mutation
+          print({"restored_title":restored["title"],"schema":3,"snapshots":5,"items":288,"rollback_copy":mutation})
+          PY
+
+      - name: Verify both container health checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 45); do
+            backend="$(docker inspect --format '{{.State.Health.Status}}' moviehub-backend)"
+            frontend="$(docker inspect --format '{{.State.Health.Status}}' moviehub-web)"
+            if [ "$backend" = healthy ] && [ "$frontend" = healthy ]; then
+              echo "backend=$backend frontend=$frontend"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -p moviehub-real-upgrade ps
+          docker compose -p moviehub-real-upgrade logs --no-color
+          exit 1
+
+      - name: Cleanup only the isolated Compose project
+        if: always()
+        run: docker compose -p moviehub-real-upgrade down --volumes --remove-orphans

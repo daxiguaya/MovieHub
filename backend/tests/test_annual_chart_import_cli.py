@@ -38,6 +38,7 @@ def _write_batch(directory, *, date_value="2026-11-23", filename_date=None, omit
                     "rank": 1,
                     "title": f"Fixture {name}",
                     "type": media_type,
+                    "posters": [f"https://example.test/{900000 + index}.jpg"],
                 }
             ],
         }

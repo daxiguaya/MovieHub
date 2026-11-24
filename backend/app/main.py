@@ -48,6 +48,8 @@ async def _poster_cache_cleanup_loop() -> None:
                 poster_cache_service.clear_expired_cache
             )
             await asyncio.to_thread(provider_response_cache.clear_expired)
+        await asyncio.to_thread(provider_response_cache.backup_daily, settings.backup_dir / "discovery")
+            await asyncio.to_thread(provider_response_cache.backup_daily, settings.backup_dir / "discovery")
         except Exception:
             logger.exception("Poster cache cleanup failed")
 

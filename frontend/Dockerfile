@@ -5,6 +5,8 @@ COPY package.json ./
 RUN npm install --no-audit --no-fund
 
 COPY . .
+ARG MOVIEHUB_BASE_PATH=/moviehub/
+ENV MOVIEHUB_BASE_PATH=${MOVIEHUB_BASE_PATH}
 RUN npm run build
 
 FROM nginx:alpine

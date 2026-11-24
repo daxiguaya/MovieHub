@@ -535,6 +535,9 @@ class ChartImportService:
                             rating_count=0,
                         )
                         db.add(movie)
+                        # Metadata associations use the generated movie primary key.
+                        # Flush the parent row before creating MovieGenre/MovieRegion.
+                        db.flush()
                         movie_map[douban_id] = movie
 
                     self._update_movie(

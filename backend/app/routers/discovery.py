@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.config import settings
@@ -162,7 +161,7 @@ async def get_online_detail(
     }
 
 
-@router.get("/cache/stats")
+@router.get("/cache-stats")
 @limiter.limit("10/minute")
 async def get_cache_stats(request: Request) -> dict[str, int]:
     return provider_response_cache.stats()

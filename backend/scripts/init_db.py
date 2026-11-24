@@ -20,7 +20,7 @@ from app.database import Base
 from app.services.chart_init_service import initialize_chart_definitions
 
 logger = logging.getLogger("moviehub.init_db")
-MIGRATION_VERSION = 3
+MIGRATION_VERSION = 4
 REQUIRED_TABLES = {
     "schema_migrations",
     "movies",
@@ -35,6 +35,7 @@ REQUIRED_TABLES = {
     "favorites",
     "import_batch_receipts",
     "movie_metadata_provenance",
+    "external_api_cache",
 }
 
 
@@ -196,6 +197,18 @@ def initialize(path: Path, migration_path: Path) -> None:
         provenance_sql = provenance_migration.read_text(encoding="utf-8").strip()
         if not provenance_sql:
             raise RuntimeError("Provenance migration SQL is empty")
+        cache_migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "004_external_api_cache.sql"
+        )
+        if not cache_migration.is_file():
+            raise FileNotFoundError(
+                f"Required external API cache migration not found: {cache_migration}"
+            )
+        cache_sql = cache_migration.read_text(encoding="utf-8").strip()
+        if not cache_sql:
+            raise RuntimeError("External API cache migration SQL is empty")
 
         conn = sqlite3.connect(str(temporary_path), timeout=30)
         try:
@@ -203,6 +216,7 @@ def initialize(path: Path, migration_path: Path) -> None:
             conn.executescript(sql)
             conn.executescript(followup_sql)
             conn.executescript(provenance_sql)
+            conn.executescript(cache_sql)
         finally:
             conn.close()
 

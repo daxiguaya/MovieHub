@@ -50,3 +50,42 @@ def test_cache_write_failure_does_not_discard_successful_upstream_payload(monkey
 
     monkeypatch.setattr(tmdb_module.provider_response_cache, "set", broken_cache_write)
     asyncio.run(client._cache_set("cache-key", "/search/movie", {"results": []}, 900))
+
+
+
+def test_cancelling_one_waiter_does_not_cancel_shared_upstream(monkeypatch):
+    import contextlib
+
+    client = tmdb_module.TMDBClient()
+
+    async def scenario():
+        started = asyncio.Event()
+        release = asyncio.Event()
+        calls = 0
+
+        async def no_cache(key, allow_stale=False):
+            return None
+
+        async def fake_fetch(key, endpoint, params, ttl):
+            nonlocal calls
+            calls += 1
+            started.set()
+            await release.wait()
+            return {"results": [{"id": 99}]}
+
+        monkeypatch.setattr(client, "_cache_get", no_cache)
+        monkeypatch.setattr(client, "_fetch_and_cache", fake_fetch)
+
+        first = asyncio.create_task(client.get_json("/search/movie", {"query": "cancel-safe"}))
+        await started.wait()
+        second = asyncio.create_task(client.get_json("/search/movie", {"query": "cancel-safe"}))
+        await asyncio.sleep(0)
+        first.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await first
+        release.set()
+        result = await second
+        assert result == {"results": [{"id": 99}]}
+        assert calls == 1
+
+    asyncio.run(scenario())

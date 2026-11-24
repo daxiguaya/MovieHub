@@ -197,3 +197,31 @@ def test_tmdb_client_requires_token_and_rejects_invalid_media_type():
         with TMDBOverviewClient("test-token", client=transport) as client:
             with pytest.raises(ValueError, match="media_type"):
                 client.lookup(_item(type="episode"))
+
+def test_tmdb_lookup_uses_requested_locale_for_search_and_details():
+    def handler(request):
+        assert request.url.params["language"] == "zh-TW"
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={
+                "results": [{
+                    "id": 278,
+                    "title": "刺激1995",
+                    "original_title": "The Shawshank Redemption",
+                    "release_date": "1994-09-23",
+                }]
+            })
+        if request.url.path == "/3/movie/278":
+            return httpx.Response(200, json={
+                "id": 278,
+                "title": "刺激1995",
+                "release_date": "1994-09-23",
+                "overview": "繁體中文劇情簡介。",
+            })
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(), language="zh-TW")
+
+    assert result.status == "overview_available"
+    assert result.language == "zh-TW"

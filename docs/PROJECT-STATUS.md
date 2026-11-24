@@ -285,3 +285,17 @@ The PR changes only read-only matching and parsing. No synopsis text is persiste
 - [ ] Perform first deployment only after explicit go-ahead; initialize a new MovieHub database (never Scout's database), import verified data, then test readiness, NPM routing, backups and rollback.
 
 **Current delivery estimate remains approximately 87%.** The matching fix and real-data audit are complete and merged; the estimate does not include NAS deployment. MovieHub still has no production database or NAS instance.
+
+
+## 2026-11-24 — Deployment preflight added and CI verified
+
+- [x] Added `deploy/preflight.py`, a read-only Synology/Linux preflight. It checks required Compose support/configuration, the API-key placeholder/length, `.env` file exposure, frontend runtime JSON, expected data/backup directories and likely UID/GID mode-bit access, external NPM network membership, likely NPM container identity, and fixed container-name conflicts.
+- [x] Preflight inspects rendered Compose JSON and blocks unexpected published host ports or writable container root filesystems. It does not create directories, change permissions, start/stop containers, initialize SQLite, change Docker networks, or edit NPM.
+- [x] Documented the preflight in [DEPLOYMENT.md](DEPLOYMENT.md); DSM ACLs and saved NPM proxy/TLS/access-control rules still require host-side verification.
+- [x] Added Python syntax compilation of the preflight to Backend CI. Final verification [#45369731877](https://github.com/daxiguaya/MovieHub/actions/runs/45369731877) passed: backend tests/build, frontend tests/build, frontend browser E2E, and full disposable Compose backup/restore smoke.
+- [x] Removed the obsolete `phase4/**` push trigger; `main` is the active development line.
+- [ ] NAS-specific host checks remain pending because no NAS execution channel is connected. Do not treat CI as NAS validation.
+- [ ] Before first deployment, verify actual NPM IP/trusted proxy range, DSM ACL write access, `.env` mode, import route denial, TLS/access policy, and backup destination on the NAS.
+- [ ] TMDB synopsis persistence remains on legal hold pending review of official terms, cache/retention, attribution, logo and display requirements.
+
+**Current delivery estimate: approximately 88%.** This is a development estimate, not a deployment percentage. The preflight script is implemented and CI-verified, but no NAS deployment or production database exists.

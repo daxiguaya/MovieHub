@@ -13,6 +13,7 @@ class ChartDefinition:
     description: str
     display_order: int
     media_type: str = "movie"
+    require_posters: bool = False
 
 
 INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
@@ -24,6 +25,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period=None,
         description="豆瓣电影 Top 250 经典电影榜单",
         display_order=10,
+        require_posters=True,
     ),
     ChartDefinition(
         slug="popular",
@@ -51,6 +53,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period="2025",
         description="豆瓣 2025 年度华语电影榜单",
         display_order=40,
+        require_posters=True,
     ),
     ChartDefinition(
         slug="annual-2025-international-movies",
@@ -60,6 +63,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period="2025",
         description="豆瓣 2025 年度外语电影榜单",
         display_order=50,
+        require_posters=True,
     ),
     ChartDefinition(
         slug="annual-2025-hidden-gems",
@@ -69,6 +73,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period="2025",
         description="豆瓣 2025 年度冷门佳片榜单",
         display_order=60,
+        require_posters=True,
     ),
     ChartDefinition(
         slug="annual-2025-chinese-tv",
@@ -78,6 +83,7 @@ INITIAL_CHARTS: tuple[ChartDefinition, ...] = (
         period="2025",
         description="豆瓣 2025 年度华语剧集榜单",
         display_order=70,
+        require_posters=True,
         media_type="tv",
     ),
 )

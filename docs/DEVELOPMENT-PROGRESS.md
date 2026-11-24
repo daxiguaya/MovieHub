@@ -685,7 +685,7 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] 排除 OMDb：其条款限制个人非商业用途，并禁止未经授权的复制、归档、分发和建立 Contributions 索引，不适合作为 MovieHub 持久目录来源。
 - [x] 确认当前 Top 250 采集器不提取 IMDb ID；schema 已有可选 imdb_id/tmdb_id 字段。后续 TMDB 匹配需先精确 ID，再严格 title+year+原名校验；歧义一律拒绝，不盲选首个搜索结果。
 - [x] 新增研究记录：[OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。
-- [ ] 获取 TMDB API read token，完成 250 条 Top 250 + 38 条年度数据的只读匹配/zh-CN 简介覆盖 dry-run；本轮没有访问 API 或声称已验证覆盖率。
+- [x] 新增只读 TMDB adapter `backend/app/adapters/tmdb_overview.py`：优先已有 TMDB ID、IMDb external ID，再 exact title+year；交叉校验媒体类型/年份/标题，歧义或不一致拒绝；请求语言参数贯穿 search/detail。\n- [x] 新增 `backend/scripts/audit_tmdb_overview.py`：递归读取组合 artifact、按 Douban ID 去重，报告 zh-CN/zh-TW 的匹配状态、简介长度/hash/来源 URL；不输出简介正文、不连接数据库。\n- [x] 新增 mock tests：覆盖精确匹配、歧义、年份冲突、IMDb ID、TMDB ID、空简介、语言、嵌套 artifact 和报告不含简介正文。Backend tests 在 CI #45331120315 的 Run tests step 通过；完整 job 仍在镜像构建/Playwright Chromium 阶段。\n- [x] 新增手动 workflow `.github/workflows/tmdb-overview-audit.yml`，下载已验证的首发 artifact #45329522019 并测量 zh-CN/zh-TW；报告不包含简介正文。\n- [ ] 添加仓库 Actions secret `TMDB_API_READ_TOKEN` 并执行真实只读覆盖试验；本轮未调用 TMDB API，未声称简介覆盖率有提升。
 - [ ] 在接受任何简介写入前，为 provenance 增加许可依据、语言、署名和修改标记，并确保详情页显示来源归属。
 - 当前简介覆盖率仍为 **0/250**。不使用短评、宣传标语、自动生成内容或受 robots 限制的豆瓣接口填充。
 - 安全边界：只审查公开官方文档和 GitHub 代码；未访问 NAS、Scout 数据库或生产服务，未创建生产库、未部署、未修改 NPM、未重启服务。

@@ -206,6 +206,46 @@ def create_backup(
         raise
 
 
+def _load_backup_manifest(manifest_path: Path, backup_file: Path) -> dict:
+    """Load and strictly validate a backup manifest before trusting its fields."""
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Could not read backup manifest: {exc}") from exc
+
+    if not isinstance(manifest, dict):
+        raise RuntimeError("Backup manifest must be a JSON object")
+    if (
+        type(manifest.get("format_version")) is not int
+        or manifest["format_version"] != 1
+    ):
+        raise RuntimeError("Unsupported backup manifest format")
+    if manifest.get("database_file") != DATABASE_FILENAME:
+        raise RuntimeError("Unexpected database filename in backup manifest")
+    if (
+        type(manifest.get("schema_version")) is not int
+        or manifest["schema_version"] != CURRENT_SCHEMA_VERSION
+    ):
+        raise RuntimeError("Backup schema version is not supported")
+
+    expected_size = manifest.get("database_size_bytes")
+    if type(expected_size) is not int or expected_size <= 0:
+        raise RuntimeError("Backup manifest has an invalid database size")
+    if expected_size != backup_file.stat().st_size:
+        raise RuntimeError("Backup database size does not match its manifest")
+
+    expected_digest = manifest.get("database_sha256")
+    if (
+        not isinstance(expected_digest, str)
+        or len(expected_digest) != 64
+        or any(character not in "0123456789abcdef" for character in expected_digest)
+    ):
+        raise RuntimeError("Backup manifest has an invalid SHA-256 digest")
+    if _sha256(backup_file) != expected_digest:
+        raise RuntimeError("Backup SHA-256 verification failed")
+    return manifest
+
+
 def restore_backup(
     backup_directory: Path | str,
     database_path: Path | str | None = None,
@@ -227,16 +267,7 @@ def restore_backup(
     if not manifest_path.is_file() or not backup_file.is_file():
         raise FileNotFoundError("Backup must contain manifest.json and movies.db")
 
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("format_version") != 1:
-        raise RuntimeError("Unsupported backup manifest format")
-    if manifest.get("database_file") != DATABASE_FILENAME:
-        raise RuntimeError("Unexpected database filename in backup manifest")
-    if manifest.get("schema_version") != CURRENT_SCHEMA_VERSION:
-        raise RuntimeError("Backup schema version is not supported")
-    if _sha256(backup_file) != manifest.get("database_sha256"):
-        raise RuntimeError("Backup SHA-256 verification failed")
-
+    _load_backup_manifest(manifest_path, backup_file)
     _validate_database(backup_file)
     if backup_file == target_path:
         raise RuntimeError("Backup source and restore destination must differ")

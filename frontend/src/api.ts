@@ -7,9 +7,10 @@ import type {
   MovieDetail,
   MoviesResponse
 } from "./types";
+import { appPath } from "./paths";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(appPath(`api${path}`), {
     ...init,
     headers: {
       Accept: "application/json",

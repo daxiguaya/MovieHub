@@ -176,4 +176,4 @@ This is API input hardening only. It does not claim real multi-date source snaps
 - [x] Strict cursor validation surfaced one older unit test that still expected malformed cursors to be silently ignored; update that test to assert the new HTTP/service contract.
 - [ ] Await the latest branch-head CI run after the regression-test correction.
 
-The first cursor-hardening CI attempt found the stale expectation (264 passed, 1 failed, 4 skipped); this was a test-contract mismatch, not a runtime failure in the new API test. The legacy test has now been updated and a fresh CI run is in progress. Overall estimate remains **83%**; no deployment or production data operation was performed.
+The first cursor-hardening CI attempt found the stale expectation (264 passed, 1 failed, 4 skipped); this was a test-contract mismatch, not a runtime failure in the new API test. The legacy test has now been updated, including its missing pytest/error imports; the latest test commit is awaiting a new branch-head CI run. Overall estimate remains **83%**; no deployment or production data operation was performed.

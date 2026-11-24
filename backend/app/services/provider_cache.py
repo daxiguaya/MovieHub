@@ -238,7 +238,7 @@ class ProviderResponseCache:
             )
             return cursor.rowcount > 0
 
-    def backup_daily(self, backup_dir: Path, keep_days: int = 7) -> Path:
+    def backup_daily(self, backup_dir: Path, keep_days: int = 7, force: bool = False) -> Path:
         """Create one verified SQLite backup per day, retaining a short history."""
         self._init()
         import os
@@ -246,7 +246,7 @@ class ProviderResponseCache:
         backup_dir.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d", time.localtime())
         destination = backup_dir / ("discovery-cache-" + stamp + ".sqlite3")
-        if destination.exists():
+        if destination.exists() and not force:
             probe = sqlite3.connect(destination, timeout=5)
             try:
                 integrity = probe.execute("PRAGMA integrity_check").fetchone()

@@ -39,8 +39,8 @@ from app.database import Base
 
 logger = logging.getLogger("moviehub.migrate")
 
-MIGRATION_VERSION = 3
-MIGRATION_FILENAME = "003_movie_metadata_provenance.sql"
+MIGRATION_VERSION = 4
+MIGRATION_FILENAME = "004_external_api_cache.sql"
 
 REQUIRED_MOVIE_COLUMNS = {
     "id",
@@ -74,6 +74,7 @@ REQUIRED_TABLES = {
     "schema_migrations",
     "import_batch_receipts",
     "movie_metadata_provenance",
+    "external_api_cache",
 }
 
 
@@ -493,7 +494,7 @@ def _execute_migration_locked(
         raise RuntimeError(
             "MovieHub database has not been initialized. Run "
             "'python -m scripts.init_db' first; this migration only upgrades "
-            "schema version 2 to version 3 and never initializes or modifies Scout."
+            "schema versions 1, 2, or 3 to version 4 and never initializes or modifies Scout."
         )
     logger.info("Target schema version: %s", MIGRATION_VERSION)
 
@@ -509,16 +510,20 @@ def _execute_migration_locked(
         logger.info("Existing MovieHub schema passed validation")
         return current_version
 
-    if current_version not in (1, 2):
+    if current_version not in (1, 2, 3):
         raise RuntimeError(
             f"Unsupported starting schema version: {current_version}. "
-            "This migration runner upgrades schema version 1 or 2 to version 3."
+            "This migration runner upgrades schema versions 1, 2, or 3 to version 4."
         )
 
     migration_paths = []
     if current_version == 1:
         migration_paths.append(
             migration_path.parent / "002_durable_import_batch_receipts.sql"
+        )
+    if current_version <= 2:
+        migration_paths.append(
+            migration_path.parent / "003_movie_metadata_provenance.sql"
         )
     migration_paths.append(migration_path)
     migration_sql = []
@@ -608,7 +613,7 @@ def parse_args() -> argparse.Namespace:
         "--migration",
         type=Path,
         default=None,
-        help="Migration SQL path; defaults to migrations/002_durable_import_batch_receipts.sql",
+        help="Migration SQL path; defaults to migrations/004_external_api_cache.sql",
     )
 
     parser.add_argument(

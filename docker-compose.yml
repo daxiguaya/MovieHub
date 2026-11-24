@@ -20,7 +20,7 @@ services:
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
       - ${MOVIEHUB_BACKUP_PATH:-/volume1/backup/moviehub}:/backups
-      - ${MOVIEHUB_IMPORT_PATH:?Set MOVIEHUB_IMPORT_PATH to the directory containing the Scout database}:/imports:ro
+      - ${MOVIEHUB_IMPORT_PATH:-./deploy/empty-imports}:/imports:ro
     expose:
       - "8000"
     tmpfs:

@@ -19,7 +19,7 @@ The source mount is read-only at the container boundary. Keep the MovieHub datab
 ## Prepare on the NAS
 
 1. Copy `deploy/.env.example` to the project root as `.env`.
-2. Set `MOVIEHUB_IMPORT_PATH` to the host directory containing the Scout SQLite source. Do not point it at the MovieHub data directory.
+2. Scout is optional. If you need to import from Scout, set `MOVIEHUB_IMPORT_PATH` to a dedicated host directory containing a readable Scout SQLite source/export. If not using Scout, leave it unset; Compose uses an empty read-only mount. Never point it at the MovieHub data directory.
 3. Generate a unique long `MOVIEHUB_API_KEY`.
 4. Confirm the external Docker network `chatgpt-browser_default` exists. It is the shared network currently used by NPM in this NAS setup.
 5. Create the data and backup directories and grant the configured container UID/GID write access. Defaults are UID/GID 10001:

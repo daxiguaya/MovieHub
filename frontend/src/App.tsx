@@ -463,7 +463,7 @@ function SearchPage() {
       const regionNames = selectedRegions.map((code) => regionOptions.find((item) => item.code === code)?.name).filter(Boolean);
       if (genreNames.length) localParams.set("genres", genreNames.join(","));
       if (regionNames.length) localParams.set("regions", regionNames.join(","));
-      const hasLocalCriteria = localParams.size > 0;
+      const hasLocalCriteria = localParams.toString().length > 0;
 
       const localPromise = hasLocalCriteria
         ? api.movies(localParams)
@@ -477,12 +477,13 @@ function SearchPage() {
           media_type: type === "tv" ? "tv" : "movie",
           page: String(requestedPage),
           min_votes: params.get("min_rating_count") || "100",
-          sort_by: "popularity.desc"
+          sort_by: minRating ? "vote_average.desc" : "popularity.desc"
         });
         if (selectedGenres.length) discoverParams.set("with_genres", selectedGenres.join("|"));
-        if (selectedRegions.length) discoverParams.set("region", selectedRegions[0]);
+        if (selectedRegions.length) discoverParams.set("region", selectedRegions.join("|"));
         if (minRating) discoverParams.set("min_rating", minRating);
-        if (minYear && minYear === maxYear) discoverParams.set("year", minYear);
+        if (minYear) discoverParams.set("min_year", minYear);
+        if (maxYear) discoverParams.set("max_year", maxYear);
         onlinePromise = api.discoveryDiscover(discoverParams);
       }
 
@@ -544,7 +545,27 @@ function SearchPage() {
 
   function loadMoreOnline() {
     if (onlinePage >= onlinePages || loading) return;
-    void runSearch(new URLSearchParams(searchParams), false, true);
+    const nextPage = onlinePage + 1;
+    const q = (searchParams.get("search") ?? "").trim();
+    const request = q.length >= 2
+      ? api.discoverySearch(q, type === "all" ? "all" : type, nextPage)
+      : api.discoveryDiscover(new URLSearchParams({
+          media_type: type === "tv" ? "tv" : "movie",
+          page: String(nextPage),
+          min_votes: searchParams.get("min_rating_count") || "100",
+          sort_by: minRating ? "vote_average.desc" : "popularity.desc",
+          ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")! } : {}),
+          ...(searchParams.get("region_codes") ? { region: searchParams.get("region_codes")! } : {}),
+          ...(searchParams.get("min_rating") ? { min_rating: searchParams.get("min_rating")! } : {}),
+          ...(searchParams.get("min_year") ? { min_year: searchParams.get("min_year")! } : {}),
+          ...(searchParams.get("max_year") ? { max_year: searchParams.get("max_year")! } : {})
+        }));
+    setLoading(true);
+    request.then((data) => {
+      setOnlineResults((current) => current.concat(data.items));
+      setOnlinePage(data.page);
+      setOnlinePages(data.total_pages);
+    }).catch((err: Error) => setOnlineError(err.message)).finally(() => setLoading(false));
   }
 
   const localOnly = results.filter((movie) => !onlineResults.some((item) =>
@@ -569,6 +590,7 @@ function SearchPage() {
         </select></label>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
+      <p className="search-hint">关键词模式搜索全网目录；清空关键词后，类型、地区、年份和评分筛选会使用 TMDB Discover。每次只加载当前页。</p>
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}

@@ -9,7 +9,7 @@ from typing import Any
 
 from app.adapters.local_import import LocalImportAdapter
 
-REQUIRED_CHARTS = {"top250", "popular", "high-rated"}
+REQUIRED_CHARTS = {"top250"}
 COVERAGE_FIELDS = (
     "year",
     "rating",

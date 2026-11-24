@@ -67,6 +67,15 @@ class TMDBClient:
         except Exception as exc:
             logger.warning("TMDB response-cache write failed: %s", type(exc).__name__)
 
+    def _inflight_done(
+        self, key: str, completed: asyncio.Task[dict[str, Any]]
+    ) -> None:
+        # Consume an exception if every HTTP waiter disconnected before the
+        # shared request finished, then remove only this exact task.
+        if not completed.cancelled():
+            completed.exception()
+        asyncio.create_task(self._remove_inflight(key, completed))
+
     async def _remove_inflight(
         self, key: str, completed: asyncio.Task[dict[str, Any]]
     ) -> None:
@@ -128,8 +137,8 @@ class TMDBClient:
                 )
                 _inflight[key] = task
                 task.add_done_callback(
-                    lambda completed, cache_key=key: asyncio.create_task(
-                        self._remove_inflight(cache_key, completed)
+                    lambda completed, cache_key=key: self._inflight_done(
+                        cache_key, completed
                     )
                 )
 

@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.limiter import limiter
 from app.schemas import ChartCompareResponse, ChartMoviesListResponse, ChartResponse, ChartSnapshotResponse
-from app.services.chart_service import chart_service
+from app.services.chart_service import ChartCursorError, chart_service
 
 router = APIRouter(
     prefix="/charts",
@@ -117,13 +117,16 @@ def get_chart_movies(
     db: Session = Depends(get_db),
 ) -> ChartMoviesListResponse:
     """Get the latest or a specified chart snapshot."""
-    result = chart_service.get_chart_movies(
-        db=db,
-        slug=slug,
-        snapshot_date=snapshot_date,
-        cursor=cursor,
-        limit=limit,
-    )
+    try:
+        result = chart_service.get_chart_movies(
+            db=db,
+            slug=slug,
+            snapshot_date=snapshot_date,
+            cursor=cursor,
+            limit=limit,
+        )
+    except ChartCursorError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if result is None:
         raise HTTPException(

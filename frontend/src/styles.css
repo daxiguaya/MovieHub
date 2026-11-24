@@ -265,3 +265,13 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 
 .spotlight-more { display: flex; justify-content: flex-end; align-items: center; gap: 5px; padding-top: 9px; margin-top: 5px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10px; font-weight: 600; }
 .spotlight-more:hover { color: #fff; }
+
+.credits-panel { display: flex; align-items: center; gap: 18px; padding: 20px; margin: 14px 0; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.tmdb-logo-link { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 64px; height: 64px; }
+.tmdb-logo-link img { display: block; width: 56px; height: 56px; object-fit: contain; }
+.credits-copy { display: flex; flex-direction: column; gap: 7px; }
+.credits-copy h2 { margin: 0; font-size: 14px; }
+.credits-copy p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.credits-copy a { color: var(--accent); font-size: 10px; width: fit-content; }
+.site-footer a { color: var(--accent); font-size: 10px; }
+@media (max-width: 560px) { .credits-panel { align-items: flex-start; padding: 15px; } }

@@ -52,3 +52,26 @@ def test_cache_stats_and_expiry_cleanup(tmp_path):
         )
     assert cache.clear_expired() == 1
     assert cache.stats()["entries"] == 0
+
+
+
+def test_external_favorites_survive_cache_eviction(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    saved = cache.save_favorite(
+        "movie", 550,
+        {"title": "Fight Club", "year": 1999, "poster_path": "/fight.jpg"},
+        "rewatch",
+    )
+    assert saved["provider_id"] == 550
+    assert saved["snapshot"]["title"] == "Fight Club"
+
+    cache.set("search-cache-key", "tmdb", "/search", {"results": []}, 1)
+    with cache._connect() as connection:
+        connection.execute("DELETE FROM provider_response_cache")
+
+    favorites = cache.list_favorites()
+    assert len(favorites) == 1
+    assert favorites[0]["provider_id"] == 550
+    assert favorites[0]["note"] == "rewatch"
+    assert cache.delete_favorite("movie", 550)
+    assert cache.list_favorites() == []

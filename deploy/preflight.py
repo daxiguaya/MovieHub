@@ -7,6 +7,7 @@ initializes a database, edits NPM, or changes Docker networks.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 import shutil
@@ -47,16 +48,40 @@ def docker_json(args: list[str]):
 
 
 def target_write_bit(path: Path, uid: int, gid: int) -> bool | None:
+    """Check write+search mode bits for the configured UID/GID.
+
+    This is deliberately advisory: DSM ACLs and supplementary group membership
+    can change the effective result and must be checked on the NAS.
+    """
     try:
         info = path.stat()
     except OSError:
         return None
     mode = info.st_mode
     if info.st_uid == uid:
-        return bool(mode & 0o200)
-    if info.st_gid == gid:
-        return bool(mode & 0o020)
-    return bool(mode & 0o002)
+        required = 0o300  # write + execute/search for owner
+    elif info.st_gid == gid:
+        required = 0o030  # write + execute/search for group
+    else:
+        required = 0o003  # write + execute/search for others
+    return (mode & required) == required
+
+
+def validate_trusted_proxy_ips(value: str) -> list[str]:
+    """Validate Uvicorn's comma-separated IP/CIDR trust list; never allow '*'. """
+    entries = [entry.strip() for entry in value.split(",") if entry.strip()]
+    if not entries:
+        raise ValueError("MOVIEHUB_TRUSTED_PROXY_IPS must contain at least one IP/CIDR.")
+    if "*" in entries:
+        raise ValueError("MOVIEHUB_TRUSTED_PROXY_IPS must never be '*'; use an exact proxy IP or subnet.")
+    for entry in entries:
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError as exc:
+            raise ValueError(
+                f"Invalid MOVIEHUB_TRUSTED_PROXY_IPS entry: {entry!r}; use an IP address or CIDR."
+            ) from exc
+    return entries
 
 
 def main() -> int:
@@ -89,6 +114,16 @@ def main() -> int:
         errors.append("MOVIEHUB_API_KEY is missing, a placeholder, or shorter than 32 characters.")
     else:
         print("[OK] API key is present (value deliberately not displayed).")
+
+    trusted_proxy_ips = env.get("MOVIEHUB_TRUSTED_PROXY_IPS", "127.0.0.1")
+    try:
+        validate_trusted_proxy_ips(trusted_proxy_ips)
+        if trusted_proxy_ips.strip() == "127.0.0.1":
+            warnings.append("MOVIEHUB_TRUSTED_PROXY_IPS still trusts loopback only; set the exact NPM IP or a dedicated subnet after confirming the NPM container.")
+        else:
+            print("[OK] Forwarded-header trust list contains valid explicit IP/CIDR entries.")
+    except ValueError as exc:
+        errors.append(str(exc))
 
     try:
         uid = int(env.get("MOVIEHUB_UID", "10001"))
@@ -158,9 +193,6 @@ def main() -> int:
         if npm_candidates:
             for name, ip in npm_candidates:
                 print(f"[INFO] Possible NPM network member: {name} ({ip or 'IP unavailable'})")
-            configured = env.get("MOVIEHUB_TRUSTED_PROXY_IPS", "127.0.0.1")
-            if configured == "127.0.0.1":
-                warnings.append("MOVIEHUB_TRUSTED_PROXY_IPS still trusts loopback only; set the exact NPM IP or a dedicated subnet after confirming the NPM container.")
         else:
             warnings.append("No container name containing 'proxy' or 'npm' was identified on the shared network; verify the NPM container and its IP manually.")
     except (RuntimeError, IndexError, json.JSONDecodeError) as exc:

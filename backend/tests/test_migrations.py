@@ -10,7 +10,7 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "002_durable_import_batch_receipts.sql"
+    / "003_movie_metadata_provenance.sql"
 )
 
 
@@ -19,7 +19,7 @@ def _create_empty_database(path: Path) -> None:
     sqlite3.connect(str(path)).close()
 
 def _create_v1_database(path: Path) -> None:
-    """Create an isolated, valid schema-v1 fixture for the v1 -> v2 runner."""
+    """Create an isolated, valid schema-v2 fixture for the v2 -> v3 runner."""
     path.parent.mkdir(parents=True, exist_ok=True)
     initial = (
         Path(__file__).resolve().parents[1]
@@ -30,6 +30,8 @@ def _create_v1_database(path: Path) -> None:
     try:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript(initial.read_text(encoding="utf-8"))
+        followup = initial.parent / "002_durable_import_batch_receipts.sql"
+        conn.executescript(followup.read_text(encoding="utf-8"))
     finally:
         conn.close()
 
@@ -51,18 +53,18 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_version_two_migration_upgrades_v1_and_is_idempotent(tmp_path):
+def test_version_three_migration_upgrades_v2_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
     _create_v1_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 2
-    assert execute_migration(db_path, MIGRATION) == 2
+    assert execute_migration(db_path, MIGRATION) == 3
+    assert execute_migration(db_path, MIGRATION) == 3
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 2
+        ).fetchone()[0] == 3
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         tables = {
@@ -77,6 +79,7 @@ def test_version_two_migration_upgrades_v1_and_is_idempotent(tmp_path):
             "chart_snapshots", "list_items", "favorites",
             "schema_migrations",
             "import_batch_receipts",
+            "movie_metadata_provenance",
         } <= tables
     finally:
         conn.close()
@@ -222,7 +225,7 @@ def test_validation_rejects_missing_foreign_key_contract(tmp_path):
         validate_orm_schema_contract(db_path)
 
 
-def test_concurrent_v1_migrations_are_serialized(tmp_path):
+def test_concurrent_v2_migrations_are_serialized(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
 
     db_path = tmp_path / "concurrent.db"
@@ -235,12 +238,12 @@ def test_concurrent_v1_migrations_are_serialized(tmp_path):
         ]
         results = [future.result(timeout=30) for future in futures]
 
-    assert results == [2, 2]
+    assert results == [3, 3]
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version=2"
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=3"
         ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
@@ -251,8 +254,8 @@ def test_concurrent_v1_migrations_are_serialized(tmp_path):
 
 
 
-def test_v1_migration_preserves_existing_catalogue_and_user_data(tmp_path):
-    """A populated v1 database must retain every user-facing relation on v2."""
+def test_v2_migration_preserves_existing_catalogue_and_user_data(tmp_path):
+    """A populated v2 database must retain every user-facing relation on v3."""
     db_path = tmp_path / "populated-v1.db"
     _create_v1_database(db_path)
 
@@ -319,7 +322,7 @@ def test_v1_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     finally:
         conn.close()
 
-    assert execute_migration(db_path, MIGRATION) == 2
+    assert execute_migration(db_path, MIGRATION) == 3
 
     backup_path = next(tmp_path.glob("populated-v1.db.pre-migration-*.bak"))
     for candidate in (db_path, backup_path):
@@ -368,7 +371,7 @@ def test_v1_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     try:
         assert migrated.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 2
+        ).fetchone()[0] == 3
         assert migrated.execute(
             "SELECT COUNT(*) FROM import_batch_receipts"
         ).fetchone()[0] == 0

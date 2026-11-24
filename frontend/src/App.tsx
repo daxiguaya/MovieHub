@@ -675,7 +675,9 @@ function SearchPage() {
           <div className="movie-grid">{onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}</div>
           {onlinePage < onlinePages && <button className="secondary-button load-more" onClick={loadMoreOnline} disabled={loading}>{loading ? "正在加载…" : "加载更多在线结果"}</button>}
         </>
-      ) : loading ? <Loading /> : (
+      ) : loading ? <Loading /> : hasSearched ? (
+        <EmptyState title="没有找到匹配的作品" detail="试试更短的片名，或放宽类型、地区、年份和评分条件。" />
+      ) : (
         <EmptyState title="输入片名或选择筛选条件" detail="关键词搜索覆盖在线电影和剧集；不输入关键词时，可以使用类型、地区、年份和评分发现作品。" />
       )}
       {localOnly.length > 0 && (

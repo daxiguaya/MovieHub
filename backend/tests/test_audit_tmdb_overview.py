@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from app.adapters.tmdb_overview import OverviewLookup
 from app.schemas_chart_import import ChartMovieImport, ChartSnapshotImport
-from scripts.audit_tmdb_overview import build_report
+from scripts.audit_tmdb_overview import build_report, load_snapshots
 
 
 class StubClient:
@@ -62,3 +62,30 @@ def test_dry_run_report_deduplicates_movies_and_never_contains_synopsis_text():
     assert report["by_language"]["zh-TW"]["no_overview"] == 1
     serialized = str(report)
     assert "一段真实的剧情简介文本" not in serialized
+
+def test_load_snapshots_reads_nested_first_launch_artifact_layout(tmp_path):
+    nested = tmp_path / "moviehub-first-launch"
+    nested.mkdir()
+    snapshot = ChartSnapshotImport(
+        slug="nested-chart",
+        name="Nested chart",
+        source="test",
+        category="general",
+        snapshot_date=date(2026, 11, 24),
+        movies=[
+            ChartMovieImport(
+                douban_id="54321",
+                rank=1,
+                title="Nested fixture",
+                year=2020,
+            )
+        ],
+    )
+    (nested / "snapshot.json").write_text(
+        snapshot.model_dump_json(),
+        encoding="utf-8",
+    )
+
+    loaded = load_snapshots(tmp_path, "2026-11-24")
+    assert len(loaded) == 1
+    assert loaded[0].slug == "nested-chart"

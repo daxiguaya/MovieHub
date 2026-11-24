@@ -13,11 +13,19 @@ import type {
 } from "./types";
 import { appPath } from "./paths";
 
+export function setMovieHubApiKey(value: string) {
+  if (typeof window === "undefined") return;
+  if (value.trim()) window.sessionStorage.setItem("moviehubApiKey", value.trim());
+  else window.sessionStorage.removeItem("moviehubApiKey");
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const apiKey = typeof window !== "undefined" ? window.sessionStorage.getItem("moviehubApiKey") : null;
   const response = await fetch(appPath(`api${path}`), {
     ...init,
     headers: {
       Accept: "application/json",
+      ...(apiKey ? { "X-API-Key": apiKey } : {}),
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers
     }

@@ -248,3 +248,43 @@ test("real Top 250 first-launch snapshot renders through the live API and suppor
   await page.getByRole("button", { name: /搜索电影/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
+
+test("real first-launch dataset remains usable on a narrow mobile viewport", async ({ page }) => {
+  test.skip(
+    process.env.MOVIEHUB_REAL_ANNUAL_E2E !== "1",
+    "requires the dedicated CI job with the combined first-launch dataset"
+  );
+
+  await page.unroute("**/api/**");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/charts/top250");
+
+  await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
+  await expect(page.getByText("250 部作品", { exact: true })).toBeVisible();
+  await expect(page.locator("a.movie-title").first()).toBeVisible();
+
+  const chartOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth
+  );
+  expect(chartOverflow, "Top 250 chart should not overflow a 390px viewport").toBe(false);
+
+  const firstMovie = page.locator("a.movie-title").first();
+  const title = (await firstMovie.innerText()).trim();
+  await firstMovie.click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+
+  const detailOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth
+  );
+  expect(detailOverflow, "movie detail should not overflow a 390px viewport").toBe(false);
+
+  await page.goto("/search");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
+  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
+
+  const searchOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth
+  );
+  expect(searchOverflow, "search results should not overflow a 390px viewport").toBe(false);
+});

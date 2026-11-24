@@ -88,3 +88,18 @@ The restore command requires both `--confirm` and `--service-stopped`. These fla
 - Do not delete the pre-restore rollback copy until recovery has been verified.
 - Keep backups outside Git and outside the application source tree.
 - This runbook does not authorize production initialization, Scout import, or deployment.
+
+
+## Isolated lifecycle rehearsal (CI)
+
+The backend test suite includes a single end-to-end filesystem-isolated lifecycle check:
+
+1. Confirm readiness is false before initialization.
+2. Initialize a brand-new MovieHub database in a temporary directory and confirm readiness becomes true.
+3. Insert a known record and create a verified backup.
+4. Insert a post-backup change to simulate later writes.
+5. Restore the selected backup with the explicit confirmation flags.
+6. Confirm the original data is restored, the pre-restore rollback copy contains the later change, readiness is true, schema version is current, and SQLite integrity/foreign-key checks are clean.
+7. Separately verify that initialization refuses an existing external database and leaves its source table and records unchanged.
+
+This is an automated rehearsal of the database lifecycle, not a live Docker/NPM/NAS deployment. Compose configuration validation and container builds are separate CI checks. No production database is initialized or modified by these tests.

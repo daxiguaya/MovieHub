@@ -226,28 +226,54 @@ class TMDBOverviewClient:
 
     def lookup(self, item: Any, language: str = "zh-CN") -> OverviewLookup:
         media_type = self._media_type(getattr(item, "type", "movie"))
-        candidate, method, candidate_count = self._find_by_imdb_id(item, media_type)
-        if candidate is None and method == "no_external_id":
-            candidate, method, candidate_count = self._search_by_title(item, media_type, language)
-        elif candidate is None:
-            return OverviewLookup(
-                status=method,
-                media_type=media_type,
-                candidate_count=candidate_count,
+        known_tmdb_id = (getattr(item, "tmdb_id", None) or "").strip()
+        details: dict[str, Any] | None = None
+
+        if known_tmdb_id:
+            if not known_tmdb_id.isdigit() or int(known_tmdb_id) <= 0:
+                return OverviewLookup(
+                    status="invalid_tmdb_id",
+                    media_type=media_type,
+                )
+            details = self._get(
+                f"/{media_type}/{int(known_tmdb_id)}",
+                {"language": language},
+            )
+            if not self._matches_title_and_year(item, details, media_type):
+                return OverviewLookup(
+                    status="tmdb_id_identity_mismatch",
+                    media_type=media_type,
+                    tmdb_id=int(known_tmdb_id),
+                    match_method="tmdb_id",
+                    candidate_count=1,
+                )
+            method = "tmdb_id"
+            candidate_count = 1
+        else:
+            candidate, method, candidate_count = self._find_by_imdb_id(item, media_type)
+            if candidate is None and method == "no_external_id":
+                candidate, method, candidate_count = self._search_by_title(item, media_type, language)
+            elif candidate is None:
+                return OverviewLookup(
+                    status=method,
+                    media_type=media_type,
+                    candidate_count=candidate_count,
+                )
+
+            if candidate is None:
+                return OverviewLookup(
+                    status=method,
+                    media_type=media_type,
+                    candidate_count=candidate_count,
+                )
+
+            tmdb_id = int(candidate["id"])
+            details = self._get(
+                f"/{media_type}/{tmdb_id}",
+                {"language": language},
             )
 
-        if candidate is None:
-            return OverviewLookup(
-                status=method,
-                media_type=media_type,
-                candidate_count=candidate_count,
-            )
-
-        tmdb_id = int(candidate["id"])
-        details = self._get(
-            f"/{media_type}/{tmdb_id}",
-            {"language": language},
-        )
+        tmdb_id = int(details["id"])
         overview = details.get("overview")
         if not isinstance(overview, str) or not overview.strip():
             return OverviewLookup(

@@ -311,7 +311,11 @@ class ProviderResponseCache:
         return removed
 
     def _compact_if_needed(self) -> None:
-        if not self.path.exists() or self.path.stat().st_size <= MAX_CACHE_DB_BYTES:
+        if not self.path.exists():
+            return
+        wal_path = Path(str(self.path) + "-wal")
+        total_bytes = self.path.stat().st_size + (wal_path.stat().st_size if wal_path.exists() else 0)
+        if total_bytes <= MAX_CACHE_DB_BYTES:
             return
         with self._lock, self._connection() as connection:
             connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")

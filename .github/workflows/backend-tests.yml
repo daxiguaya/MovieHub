@@ -648,7 +648,8 @@ jobs:
       - name: Wait for frontend HTTP and capture startup diagnostics on failure
         run: |
           for attempt in $(seq 1 30); do
-            if docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
+            frontend_state="$(docker inspect --format '{{.State.Status}}' moviehub-web 2>/dev/null || true)"
+            if [ "$frontend_state" = running ] && timeout 5s docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
               'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'; then
               exit 0
             fi

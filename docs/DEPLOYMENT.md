@@ -75,7 +75,7 @@ Use one same-origin MovieHub host:
 
 The frontend and backend are on the existing external Docker network `chatgpt-browser_default`; neither publishes a host port. Same-origin routing means no broad CORS allowlist is required.
 
-Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Compose default trusts loopback only, so rate limiting may see the proxy address until you set `MOVIEHUB_TRUSTED_PROXY_IPS` to the exact NPM container IP or its dedicated Docker subnet. Inspect the actual network first; do not set this to `*`, which would let any reachable container spoof client IP headers.
+Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Compose default trusts loopback only, so rate limiting may see the proxy address until you set `MOVIEHUB_TRUSTED_PROXY_IPS` to the exact NPM container IP or its dedicated Docker subnet. Inspect the actual network first; do not set this to `*` or a default route (`0.0.0.0/0`, `::/0`), which would let any reachable container spoof client IP headers.
 
 ## Health and readiness
 
@@ -103,6 +103,6 @@ Before building or starting either container on the NAS, run the repository's re
 python3 deploy/preflight.py
 ```
 
-It checks the Compose v2 command/configuration, the private API-key placeholder, frontend runtime JSON, expected data/backup directories (including directory write and search mode bits), the external NPM Docker network, likely NPM network members, fixed MovieHub container-name conflicts, and the forwarded-header trust list. The trust list must be explicit IP/CIDR entries; wildcard `*` is rejected. It never creates directories, changes ownership, initializes SQLite, starts/stops containers, changes Docker networks, or edits NPM.
+It checks the Compose v2 command/configuration, the private API-key placeholder, frontend runtime JSON, expected data/backup directories (including directory write and search mode bits), the external NPM Docker network, likely NPM network members, fixed MovieHub container-name conflicts, and the forwarded-header trust list. The trust list must be explicit IP/CIDR entries; wildcard `*` and default routes (`0.0.0.0/0`, `::/0`) are rejected. It never creates directories, changes ownership, initializes SQLite, starts/stops containers, changes Docker networks, or edits NPM.
 
 Treat mode-bit results as advisory on DSM because ACLs may grant or deny access independently. Confirm actual write access as UID/GID 10001 before deployment. The script cannot verify NPM's saved proxy-host configuration, TLS, access lists, or whether import endpoints are denied; those remain a separate manual review gate. A successful preflight is not deployment authorization.

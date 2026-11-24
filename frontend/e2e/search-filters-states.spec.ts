@@ -42,15 +42,15 @@ async function installOptions(page) {
   );
 }
 
-test("submits online search with dynamic multi-select filters and preserves selections in the URL", async ({ page }) => {
+test("submits online Discover with dynamic multi-select filters and preserves selections in the URL", async ({ page }) => {
   const localQueries: URLSearchParams[] = [];
-  let onlineSearchUrl = "";
+  let discoverUrl = "";
 
   await installOptions(page);
-  await page.route("**/api/discovery/search**", async (route) => {
-    onlineSearchUrl = route.request().url();
+  await page.route("**/api/discovery/discover**", async (route) => {
+    discoverUrl = route.request().url();
     await route.fulfill({
-      json: { provider: "tmdb", query: "星际", page: 1, total_pages: 1,
+      json: { provider: "tmdb", media_type: "movie", page: 1, total_pages: 1,
         total_results: 1, items: [discoveryItem], attribution: "TMDB" }
     });
   });
@@ -61,7 +61,6 @@ test("submits online search with dynamic multi-select filters and preserves sele
   });
 
   await page.goto("/search");
-  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill("星际");
   await page.getByLabel("影视类型").selectOption("movie");
   await page.getByLabel("最低 TMDB 评分").selectOption("8");
   await page.getByLabel("最低投票数").fill("1000");
@@ -84,13 +83,19 @@ test("submits online search with dynamic multi-select filters and preserves sele
   expect(local.get("genres")).toBe("剧情,科幻");
   expect(local.get("regions")).toBe("中国大陆");
 
-  const online = new URL(onlineSearchUrl);
-  expect(online.searchParams.get("q")).toBe("星际");
+  const online = new URL(discoverUrl);
   expect(online.searchParams.get("media_type")).toBe("movie");
+  expect(online.searchParams.get("with_genres")).toBe("18|878");
+  expect(online.searchParams.get("region")).toBe("CN");
+  expect(online.searchParams.get("min_rating")).toBe("8");
+  expect(online.searchParams.get("min_votes")).toBe("1000");
+  expect(online.searchParams.get("min_year")).toBe("2020");
+  expect(online.searchParams.get("max_year")).toBe("2024");
+
   const pageUrl = new URL(page.url());
+  expect(pageUrl.searchParams.get("type")).toBe("movie");
   expect(pageUrl.searchParams.get("genre_ids")).toBe("18|878");
   expect(pageUrl.searchParams.get("region_codes")).toBe("CN");
-  expect(pageUrl.searchParams.get("search")).toBe("星际");
 });
 
 test("shows a useful empty state when online and local discovery return no matches", async ({ page }) => {

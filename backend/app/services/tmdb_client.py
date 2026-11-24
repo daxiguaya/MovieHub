@@ -32,6 +32,7 @@ class TMDBClient:
     def __init__(self) -> None:
         self.token = settings.tmdb_api_read_token
         self._requests = 0
+        self._successes = 0
         self._failures = 0
         self._rate_limited = 0
         self._total_latency_ms = 0.0
@@ -45,6 +46,7 @@ class TMDBClient:
     def stats(self) -> dict[str, int | float]:
         return {
             "upstream_requests": self._requests,
+            "upstream_successes": self._successes,
             "upstream_failures": self._failures,
             "upstream_rate_limited": self._rate_limited,
             "upstream_avg_latency_ms": round(self._total_latency_ms / self._requests, 2) if self._requests else 0.0,
@@ -106,6 +108,7 @@ class TMDBClient:
         ttl: int,
     ) -> dict[str, Any]:
         started = time.perf_counter()
+        self._requests += 1
         try:
             async with _semaphore:
                 async with httpx.AsyncClient(
@@ -154,11 +157,13 @@ class TMDBClient:
         if isinstance(payload, list):
             payload = {"items": payload}
         if not isinstance(payload, dict):
+            self._failures += 1
+            self._record_latency(started)
             raise HTTPException(status_code=502, detail="TMDB returned an invalid response")
         if isinstance(payload.get("results"), list) and not payload["results"]:
             ttl = NEGATIVE_TTL
         provider_response_cache.set(key, "tmdb", endpoint, payload, ttl)
-        self._requests += 1
+        self._successes += 1
         self._record_latency(started)
         return payload
 

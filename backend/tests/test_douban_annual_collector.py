@@ -59,7 +59,7 @@ class Client:
 
 def test_director_names_preserve_multiword_names_and_split_explicit_separators():
     split_directors = lambda value: [
-        name.strip() for name in re.split(r"\\s*/\\s*|[、,，;；]", value) if name.strip()
+        name.strip() for name in re.split(r"\s*/\s*|[、,，;；]", value) if name.strip()
     ]
     assert split_directors("木头 / 顾杰") == ["木头", "顾杰"]
     assert split_directors("唐铁军、吴迪") == ["唐铁军", "吴迪"]

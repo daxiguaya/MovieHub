@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.cache import cache_manager
+from app.chart_definitions import get_chart_definition
 from app.database import (
     Chart,
     ChartItem,
@@ -381,6 +382,24 @@ class ChartImportService:
                 raise ChartImportError(
                     "The snapshot contains no movies; existing data was not changed"
                 )
+
+            # Enforce required poster coverage even for internal callers that
+            # bypass the Pydantic import schema with raw mappings.
+            definition = get_chart_definition(slug)
+            if definition is not None and definition.require_posters:
+                missing_posters = [
+                    self._clean_string(self._value(item, "douban_id")) or "unknown"
+                    for item in items
+                    if not self._clean_string_list(
+                        self._value(item, "posters", [])
+                    )
+                ]
+                if missing_posters:
+                    preview = ", ".join(missing_posters[:10])
+                    raise ChartImportError(
+                        f"Chart {slug} requires at least one poster per movie; "
+                        f"missing for Douban IDs: {preview}"
+                    )
 
             # Validate date before opening the write transaction.
             try:

@@ -302,3 +302,17 @@ The PR changes only read-only matching and parsing. No synopsis text is persiste
 
 
 TMDB attribution and persistent-overview retention findings are tracked separately in [TMDB-API-COMPLIANCE.md](TMDB-API-COMPLIANCE.md). The current official FAQ confirms non-commercial-use and attribution/logo/notice requirements, but does not settle persistent synopsis caching duration; overview persistence remains disabled pending review of the full accepted Terms of Use and clarification where needed.
+
+
+## 2026-11-24 — Import endpoint boundary and NPM deny policy tightened
+
+- [x] Added an explicit API-key regression test for `POST /api/charts/import`; missing and incorrect keys must both return HTTP 401 before any chart import can execute.
+- [x] Verified existing favorites endpoints require the API key and existing Scout import endpoints require the API key plus confinement to the read-only import mount (including symlink escape rejection).
+- [x] Expanded the NPM deployment runbook with server-level deny locations for `/api/import` (including `/api/import/status`) and `/api/charts/import`. These rules take precedence over the general `/api/` proxy location; the key is injected only for favorites.
+- [x] Full standard CI for the preceding code commit passed backend tests, frontend tests/build, E2E, and Compose backup/restore smoke in [run #45370748614](https://github.com/daxiguaya/MovieHub/actions/runs/45370748614).
+- [x] The new chart-import API-key test passed in the backend job of [run #45382554819](https://github.com/daxiguaya/MovieHub/actions/runs/45382554819); frontend, Compose and browser E2E jobs were still running at the time this note was prepared.
+- [ ] Confirm the newest documentation-head workflow after the NPM deny runbook update.
+- [ ] Apply and validate the NPM deny rules on the NAS only during the separately approved deployment window; no NPM configuration has been changed by this work.
+- [ ] NAS host checks, independent database initialization, first data import, live backup/restore and TMDB synopsis licensing decision remain outstanding.
+
+**Development delivery estimate remains approximately 88%; NAS deployment remains 0%.** The added API test and NPM runbook improve the deployment security gate but do not count as a NAS-side validation.

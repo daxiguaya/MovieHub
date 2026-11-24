@@ -145,3 +145,26 @@ def test_report_writer_refuses_preexisting_temporary_file(tmp_path):
 
     assert temporary.read_text(encoding="utf-8") == "keep me"
     assert not output.exists()
+
+def test_cli_validates_report_destination_before_running_audits(tmp_path, monkeypatch, capsys):
+    scout, chart = _inputs(tmp_path)
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "prepare_scout_import",
+            "--scout-db", str(scout),
+            "--input", str(chart),
+            "--output", str(scout),
+        ],
+    )
+    monkeypatch.setattr(
+        preparation,
+        "prepare_scout_import",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("audits must not run when report output collides with an input")
+        ),
+    )
+
+    assert preparation.main() == 1
+    assert "different from the Scout database" in capsys.readouterr().err

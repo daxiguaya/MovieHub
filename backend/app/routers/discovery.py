@@ -83,6 +83,22 @@ async def get_online_genres(
     return {"provider": "tmdb", "media_type": media_type, "genres": payload.get("genres", [])}
 
 
+@router.get("/regions")
+@limiter.limit("30/minute")
+async def get_online_regions(request: Request, language: str = Query("zh-CN", min_length=2, max_length=12)) -> dict:
+    payload = await tmdb_client.get_json(
+        "/configuration/countries", {"language": language}, GENRE_TTL
+    )
+    return {
+        "provider": "tmdb",
+        "regions": [
+            {"code": item.get("iso_3166_1"), "name": item.get("native_name") or item.get("english_name")}
+            for item in payload
+            if isinstance(item, dict) and item.get("iso_3166_1")
+        ],
+    }
+
+
 @router.get("/discover")
 @limiter.limit("30/minute")
 async def discover_online(

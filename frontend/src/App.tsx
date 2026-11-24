@@ -14,6 +14,9 @@ import { appPath } from "./paths";
 import type {
   Chart,
   ChartCompareResponse,
+  DiscoveryDetail,
+  DiscoveryItem,
+  ExternalFavorite,
   ChartMovie,
   Favorite,
   Movie,
@@ -39,7 +42,7 @@ function App() {
         </Link>
         <nav className="main-nav" aria-label="主导航">
           <NavLink to="/" end>发现</NavLink>
-          <NavLink to="/search">电影库</NavLink>
+          <NavLink to="/search">全网搜索</NavLink>
           <NavLink to="/favorites">我的收藏</NavLink>
         </nav>
         <Link className="top-search" to="/search" aria-label="搜索电影">
@@ -53,6 +56,7 @@ function App() {
           <Route path="/charts/:slug" element={<ChartPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/movies/:movieId" element={<MoviePage config={publicConfig} />} />
+          <Route path="/tmdb/:mediaType/:providerId" element={<ExternalMoviePage config={publicConfig} />} />
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
@@ -225,6 +229,29 @@ function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
+
+function ExternalMovieCard({ item }: { item: DiscoveryItem }) {
+  const [failed, setFailed] = useState(false);
+  const poster = item.poster_path ? "https://image.tmdb.org/t/p/w342" + item.poster_path : "";
+  return (
+    <article className="movie-card">
+      <Link className="movie-poster" to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
+        <span className="poster-badge">{item.media_type === "tv" ? "剧集" : "电影"}</span>
+        {!failed && poster ? (
+          <img src={poster} alt={item.title} loading="lazy" onError={() => setFailed(true)} />
+        ) : (
+          <div className="poster-placeholder"><span>TMDB</span><small>{item.year ?? "TITLE"}</small></div>
+        )}
+      </Link>
+      <div className="movie-card-info">
+        <Link to={"/tmdb/" + item.media_type + "/" + item.provider_id} className="movie-title">{item.title}</Link>
+        <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
+        <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
+      </div>
+    </article>
+  );
+}
+
 function ChartPage() {
   const { slug = "" } = useParams();
   const [snapshots, setSnapshots] = useState<{ snapshot_date: string; item_count: number }[]>([]);
@@ -380,31 +407,103 @@ function ChartPage() {
 function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get("search") ?? "");
-  const [type, setType] = useState(searchParams.get("type") ?? "");
+  const [type, setType] = useState(searchParams.get("type") ?? "all");
   const [minRating, setMinRating] = useState(searchParams.get("min_rating") ?? "");
-  const [maxRating, setMaxRating] = useState(searchParams.get("max_rating") ?? "");
-  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "");
+  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "100");
   const [minYear, setMinYear] = useState(searchParams.get("min_year") ?? "");
   const [maxYear, setMaxYear] = useState(searchParams.get("max_year") ?? "");
-  const [genres, setGenres] = useState(searchParams.get("genres") ?? "");
-  const [excludeGenres, setExcludeGenres] = useState(searchParams.get("exclude_genres") ?? "");
-  const [regions, setRegions] = useState(searchParams.get("regions") ?? "");
-  const [sortBy, setSortBy] = useState(searchParams.get("sort_by") ?? "rating_count");
-  const [sortOrder, setSortOrder] = useState(searchParams.get("sort_order") ?? "desc");
+  const [genreOptions, setGenreOptions] = useState<{ id: number; name: string }[]>([]);
+  const [regionOptions, setRegionOptions] = useState<{ code: string; name: string }[]>([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(searchParams.get("genre_ids")?.split("|") ?? []);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(searchParams.get("region_codes")?.split("|") ?? []);
   const [results, setResults] = useState<Movie[]>([]);
+  const [onlineResults, setOnlineResults] = useState<DiscoveryItem[]>([]);
   const [total, setTotal] = useState(0);
+  const [onlineTotal, setOnlineTotal] = useState(0);
+  const [onlinePage, setOnlinePage] = useState(1);
+  const [onlinePages, setOnlinePages] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [onlineError, setOnlineError] = useState("");
 
-  async function runSearch(params: URLSearchParams, append = false) {
+  useEffect(() => {
+    let active = true;
+    api.discoveryRegions().then((data) => { if (active) setRegionOptions(data.regions); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    api.discoveryGenres(type === "tv" ? "tv" : "movie")
+      .then((data) => { if (active) setGenreOptions(data.genres); })
+      .catch(() => { if (active) setGenreOptions([]); });
+    return () => { active = false; };
+  }, [type]);
+
+  async function runSearch(params: URLSearchParams, appendLocal = false, appendOnline = false) {
+    const q = (params.get("search") ?? "").trim();
+    const requestedPage = appendOnline ? onlinePage + 1 : 1;
+    const hasFilters = Boolean(
+      params.get("genre_ids") || params.get("region_codes") || params.get("min_year") ||
+      params.get("max_year") || params.get("min_rating") || params.get("min_rating_count")
+    );
     setLoading(true);
     setError("");
+    setOnlineError("");
     try {
-      const data = await api.movies(params);
-      setResults((current) => append ? [...current, ...data.items] : data.items);
-      setTotal(data.total);
-      setNextCursor(data.next_cursor);
+      const localParams = new URLSearchParams();
+      if (q) localParams.set("search", q);
+      if (type !== "all") localParams.set("type", type);
+      if (params.get("min_rating")) localParams.set("min_rating", params.get("min_rating")!);
+      if (params.get("min_rating_count")) localParams.set("min_rating_count", params.get("min_rating_count")!);
+      if (params.get("min_year")) localParams.set("min_year", params.get("min_year")!);
+      if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
+      const genreNames = selectedGenres.map((id) => genreOptions.find((item) => String(item.id) === id)?.name).filter(Boolean);
+      const regionNames = selectedRegions.map((code) => regionOptions.find((item) => item.code === code)?.name).filter(Boolean);
+      if (genreNames.length) localParams.set("genres", genreNames.join(","));
+      if (regionNames.length) localParams.set("regions", regionNames.join(","));
+      const hasLocalCriteria = localParams.size > 0;
+
+      const localPromise = hasLocalCriteria
+        ? api.movies(localParams)
+        : Promise.resolve({ items: [] as Movie[], total: 0, next_cursor: null as string | null });
+
+      let onlinePromise: Promise<import("./types").DiscoverySearchResponse> | null = null;
+      if (q.length >= 2) {
+        onlinePromise = api.discoverySearch(q, type === "all" ? "all" : type, requestedPage);
+      } else if (hasFilters) {
+        const discoverParams = new URLSearchParams({
+          media_type: type === "tv" ? "tv" : "movie",
+          page: String(requestedPage),
+          min_votes: params.get("min_rating_count") || "100",
+          sort_by: "popularity.desc"
+        });
+        if (selectedGenres.length) discoverParams.set("with_genres", selectedGenres.join("|"));
+        if (selectedRegions.length) discoverParams.set("region", selectedRegions[0]);
+        if (minRating) discoverParams.set("min_rating", minRating);
+        if (minYear && minYear === maxYear) discoverParams.set("year", minYear);
+        onlinePromise = api.discoveryDiscover(discoverParams);
+      }
+
+      const [local, online] = await Promise.all([
+        localPromise,
+        onlinePromise ?? Promise.resolve(null)
+      ]);
+      setResults((current) => appendLocal ? current.concat(local.items) : local.items);
+      setTotal(local.total);
+      setNextCursor(local.next_cursor);
+      if (online) {
+        setOnlineResults((current) => appendOnline ? current.concat(online.items) : online.items);
+        setOnlineTotal(online.total_results);
+        setOnlinePage(online.page);
+        setOnlinePages(online.total_pages);
+      } else if (!appendOnline) {
+        setOnlineResults([]);
+        setOnlineTotal(0);
+        setOnlinePage(1);
+        setOnlinePages(0);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -413,70 +512,83 @@ function SearchPage() {
   }
 
   useEffect(() => {
-    void runSearch(new URLSearchParams(searchParams));
-    // The first request is initialized from the URL.
+    if (searchParams.toString()) void runSearch(new URLSearchParams(searchParams));
+    // Initial query state is restored from the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
-    const values: Record<string, string> = {
-      search: keyword.trim(),
-      type,
-      min_rating: minRating,
-      max_rating: maxRating,
-      min_rating_count: minRatingCount,
-      min_year: minYear,
-      max_year: maxYear,
-      genres: genres.trim(),
-      exclude_genres: excludeGenres.trim(),
-      regions: regions.trim(),
-      sort_by: sortBy,
-      sort_order: sortOrder
-    };
-    for (const [key, value] of Object.entries(values)) {
-      if (value) params.set(key, value);
-    }
+    if (keyword.trim()) params.set("search", keyword.trim());
+    if (type !== "all") params.set("type", type);
+    if (minRating) params.set("min_rating", minRating);
+    if (minRatingCount) params.set("min_rating_count", minRatingCount);
+    if (minYear) params.set("min_year", minYear);
+    if (maxYear) params.set("max_year", maxYear);
+    if (selectedGenres.length) params.set("genre_ids", selectedGenres.join("|"));
+    if (selectedRegions.length) params.set("region_codes", selectedRegions.join("|"));
     setSearchParams(params);
     void runSearch(params);
   }
 
-  function loadMore() {
+  function loadMoreLocal() {
     if (!nextCursor) return;
     const params = new URLSearchParams(searchParams);
     params.set("cursor", nextCursor);
-    void runSearch(params, true);
+    void api.movies(params).then((data) => {
+      setResults((current) => current.concat(data.items));
+      setNextCursor(data.next_cursor);
+    }).catch((err: Error) => setError(err.message));
   }
+
+  function loadMoreOnline() {
+    if (onlinePage >= onlinePages || loading) return;
+    void runSearch(new URLSearchParams(searchParams), false, true);
+  }
+
+  const localOnly = results.filter((movie) => !onlineResults.some((item) =>
+    (movie.tmdb_id && movie.tmdb_id === String(item.provider_id) && movie.type === item.media_type) ||
+    (movie.title.trim().toLowerCase() === item.title.trim().toLowerCase() && movie.year === item.year)
+  ));
 
   return (
     <>
-      <PageHeading eyebrow="MOVIE LIBRARY" title="找到下一部想看的" description="按片名、年份、类型、评分、类型标签和地区筛选 MovieHub 已收录的电影与剧集。" />
+      <PageHeading eyebrow="ONLINE DISCOVERY" title="搜索全网电影与剧集" description="在线搜索 TMDB 的电影和剧集目录；搜索结果按页加载，不会把全站资料一次性下载到 NAS。" />
       <form className="search-panel" onSubmit={submit}>
-        <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索中文片名或原名…" /></label>
-        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value)}><option value="">全部</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
-        <label>最低评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option><option value="9">9.0+</option></select></label>
-        <label>最高评分<select value={maxRating} onChange={(e) => setMaxRating(e.target.value)}><option value="">不限</option><option value="7">≤ 7.0</option><option value="8">≤ 8.0</option><option value="9">≤ 9.0</option><option value="10">≤ 10.0</option></select></label>
-        <label>评价人数不少于<input type="number" min="0" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="例如 1000" /></label>
-        <label>起始年份<input type="number" min="1870" max="2200" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
-        <label>结束年份<input type="number" min="1870" max="2200" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
-        <label>包含类型<input value={genres} onChange={(e) => setGenres(e.target.value)} placeholder="剧情,科幻" /></label>
-        <label>排除类型<input value={excludeGenres} onChange={(e) => setExcludeGenres(e.target.value)} placeholder="恐怖,情色" /></label>
-        <label>地区<input value={regions} onChange={(e) => setRegions(e.target.value)} placeholder="中国大陆,日本" /></label>
-        <label>排序依据<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="rating_count">评价人数</option><option value="rating">评分</option><option value="year">年份</option></select></label>
-        <label>排序方向<select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}><option value="desc">从高到低</option><option value="asc">从低到高</option></select></label>
-        <button className="primary-button" type="submit">搜索电影 <span>→</span></button>
+        <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
+        <label>影视类型<select value={type} onChange={(e) => setType(e.target.value)}><option value="all">电影和剧集</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
+        <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
+        <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
+        <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
+        <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
+        <label>类型（可多选）<select multiple value={selectedGenres} onChange={(e) => setSelectedGenres(Array.from(e.target.selectedOptions).map((option) => option.value))}>
+          {genreOptions.map((genre) => <option key={genre.id} value={String(genre.id)}>{genre.name}</option>)}
+        </select></label>
+        <label>制作地区（可多选）<select multiple value={selectedRegions} onChange={(e) => setSelectedRegions(Array.from(e.target.selectedOptions).map((option) => option.value))}>
+          {regionOptions.map((region) => <option key={region.code} value={region.code}>{region.name}</option>)}
+        </select></label>
+        <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <div className="result-caption"><span>搜索结果</span><span>{total.toLocaleString()} 部作品</span></div>
-      {error ? <ErrorState message={error} /> : results.length === 0 && loading ? <Loading /> : results.length === 0 ? (
-        <EmptyState title="没有找到匹配的电影" detail="试试更短的片名，或放宽评分、年份和类型条件。" />
-      ) : (
+      <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
+      {onlineError && <div className="inline-error">{onlineError}</div>}
+      {error && <div className="inline-error">{error}</div>}
+      {onlineResults.length > 0 ? (
         <>
-          <div className="movie-grid">{results.map((movie) => <MovieCard key={movie.id} movie={movie} />)}</div>
-          {loading && <Loading label="正在加载更多…" />}
-          {!loading && nextCursor && <button className="secondary-button load-more" onClick={loadMore}>加载更多</button>}
+          <div className="movie-grid">{onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}</div>
+          {onlinePage < onlinePages && <button className="secondary-button load-more" onClick={loadMoreOnline} disabled={loading}>{loading ? "正在加载…" : "加载更多在线结果"}</button>}
+        </>
+      ) : loading ? <Loading /> : (
+        <EmptyState title="输入片名或选择筛选条件" detail="关键词搜索覆盖在线电影和剧集；不输入关键词时，可以使用类型、地区、年份和评分发现作品。" />
+      )}
+      {localOnly.length > 0 && (
+        <>
+          <div className="section-heading"><div><div className="eyebrow">LOCAL CHART MATCHES</div><h2>本地榜单中的匹配作品</h2></div></div>
+          <div className="movie-grid">{localOnly.map((movie) => <MovieCard key={movie.id} movie={movie} />)}</div>
+          {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}
         </>
       )}
+      <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </>
   );
 }

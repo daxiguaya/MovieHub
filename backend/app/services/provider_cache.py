@@ -103,7 +103,7 @@ class ProviderResponseCache:
     def get(self, key: str, allow_stale: bool = False) -> tuple[dict[str, Any], bool] | None:
         self._init()
         now = int(time.time())
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 """SELECT response_json, expires_at, stale_until
                    FROM provider_response_cache WHERE cache_key=?""",
@@ -146,7 +146,7 @@ class ProviderResponseCache:
             return False
         now = int(time.time())
         ttl = max(1, int(ttl_seconds))
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 """INSERT INTO provider_response_cache
                    (cache_key, provider, endpoint, response_json, response_bytes,
@@ -187,7 +187,7 @@ class ProviderResponseCache:
 
     def stats(self) -> dict[str, int]:
         self._init()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 """SELECT COUNT(*), COALESCE(SUM(response_bytes), 0),
                           COALESCE(SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END), 0)
@@ -208,7 +208,7 @@ class ProviderResponseCache:
         serialized = json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"))
         if len(serialized.encode("utf-8")) > 16 * 1024:
             raise ValueError("Favorite snapshot is too large")
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 """INSERT INTO external_favorites
                    (provider, media_type, provider_id, snapshot_json, note, created_at, updated_at)
@@ -227,7 +227,7 @@ class ProviderResponseCache:
 
     def list_favorites(self) -> list[dict[str, Any]]:
         self._init()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             rows = connection.execute(
                 """SELECT media_type, provider_id, snapshot_json, note, created_at, updated_at
                    FROM external_favorites WHERE provider=? ORDER BY created_at DESC, provider_id DESC""",
@@ -239,7 +239,7 @@ class ProviderResponseCache:
 
     def delete_favorite(self, media_type: str, provider_id: int) -> bool:
         self._init()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             cursor = connection.execute(
                 """DELETE FROM external_favorites
                    WHERE provider=? AND media_type=? AND provider_id=?""",
@@ -301,7 +301,7 @@ class ProviderResponseCache:
 
     def clear_expired(self) -> int:
         self._init()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             cursor = connection.execute(
                 "DELETE FROM provider_response_cache WHERE stale_until <= ?",
                 (int(time.time()),),

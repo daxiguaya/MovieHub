@@ -79,9 +79,11 @@ async function installApiFixtures(page) {
       });
     }
     if (path === "/api/discovery/discover" && method === "GET") {
+      const requestedPage = Number(url.searchParams.get("page") ?? "1");
       return route.fulfill({
-        json: { provider: "tmdb", media_type: "movie", page: 1, total_pages: 1,
-          total_results: 0, items: [], attribution: "TMDB" }
+        json: { provider: "tmdb", media_type: "movie", page: requestedPage, total_pages: 2,
+          total_results: 25, items: [{ ...discoveryItem, provider_id: 999 + requestedPage,
+            title: requestedPage === 1 ? "专题第一页作品" : "专题第二页作品" }], attribution: "TMDB" }
       });
     }
     if (path === "/api/charts" && method === "GET") {
@@ -161,6 +163,34 @@ test("opens a chart and navigates from its ranked item to movie details", async 
   await expect(page.getByRole("heading", { name: "星际穿越" })).toBeVisible();
   await expect(page.getByText("Interstellar")).toBeVisible();
   await expect(page.getByText("A journey through space and time.")).toBeVisible();
+});
+
+test("shows prominent horror and thriller lists and loads their pages on demand", async ({ page }) => {
+  const requestedPages: string[] = [];
+  await page.route("**/api/discovery/discover**", async (route) => {
+    const url = new URL(route.request().url());
+    requestedPages.push(url.searchParams.get("page") ?? "1");
+    const requestedPage = Number(url.searchParams.get("page") ?? "1");
+    await route.fulfill({
+      json: { provider: "tmdb", media_type: "movie", page: requestedPage, total_pages: 2,
+        total_results: 25, items: [{ ...discoveryItem, provider_id: 9000 + requestedPage,
+          title: requestedPage === 1 ? "恐怖榜单首屏作品" : "恐怖榜单第二页作品" }], attribution: "TMDB" }
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "恐怖与惊悚专题" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "恐怖片高分榜" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "惊悚片冷门佳作" })).toBeVisible();
+  await page.getByRole("link", { name: "查看完整榜单" }).first().click();
+
+  await expect(page.getByRole("heading", { name: "恐怖片高分榜" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "恐怖榜单首屏作品" })).toBeVisible();
+  expect(requestedPages).not.toContain("2");
+
+  await page.getByRole("button", { name: "加载下一页" }).click();
+  await expect(page.getByRole("link", { name: "恐怖榜单第二页作品" })).toBeVisible();
+  expect(requestedPages).toContain("2");
 });
 
 test("searches by Chinese title and displays matching movie results", async ({ page }) => {

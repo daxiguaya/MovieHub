@@ -92,3 +92,16 @@ def test_daily_backup_preserves_external_favorites(tmp_path):
     assert len(favorites) == 1
     assert favorites[0]["media_type"] == "tv"
     assert favorites[0]["snapshot"]["title"] == "Test Series"
+
+
+
+def test_forced_daily_backup_refreshes_after_favorite_write(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "source" / "discovery.sqlite3")
+    backup_dir = tmp_path / "backups"
+    first = cache.backup_daily(backup_dir)
+    cache.save_favorite("movie", 77, {"title": "New Favorite"})
+    refreshed = cache.backup_daily(backup_dir, force=True)
+
+    assert first == refreshed
+    restored = ProviderResponseCache(refreshed)
+    assert restored.list_favorites()[0]["snapshot"]["title"] == "New Favorite"

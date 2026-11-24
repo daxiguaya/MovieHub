@@ -185,6 +185,6 @@ The first cursor-hardening CI attempt found an outdated test expectation (264 pa
 - [x] Verify the pre-restore rollback copy retains the later state.
 - [x] Verify schema version 3, SQLite integrity, and foreign-key consistency after restore.
 - [x] Add a safety regression test proving initialization refuses an existing external SQLite database and leaves its table/data untouched.
-- [ ] Await branch-head CI for the new lifecycle tests.
+- [x] Branch-head CI [#45339047025](https://github.com/daxiguaya/MovieHub/actions/runs/45339047025) passed the lifecycle tests: backend 267 passed / 4 skipped; frontend regression tests, type-check/build, browser E2E, both container builds, and both Compose configuration modes succeeded.
 
-This validates the database lifecycle without Docker daemon, NAS access, NPM changes, Scout import, or production data. It is not a live container deployment rehearsal. Overall progress remains **83%** until CI passes and the remaining source-data/licensing and deployment tasks are addressed.
+This validates the database lifecycle in temporary SQLite without Docker daemon, NAS access, NPM changes, Scout import, or production data. It is not a live container deployment rehearsal. A new compose-smoke CI job has now been added to start both actual Compose containers, verify pre-initialization 503 readiness, explicitly initialize a disposable database, and exercise the live API/frontend; its first run is pending. Overall progress remains **83%** until this container rehearsal and the remaining source-data/licensing and deployment tasks are addressed.

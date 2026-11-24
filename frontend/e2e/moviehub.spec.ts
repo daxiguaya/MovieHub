@@ -288,3 +288,43 @@ test("real first-launch dataset remains usable on a narrow mobile viewport", asy
   );
   expect(searchOverflow, "search results should not overflow a 390px viewport").toBe(false);
 });
+
+test("real imported Top 250 movie can be favorited and removed through the live API", async ({ page }) => {
+  test.skip(
+    process.env.MOVIEHUB_REAL_ANNUAL_E2E !== "1",
+    "requires the dedicated CI job with the combined first-launch dataset"
+  );
+
+  // The production reverse proxy injects this server-side key for /api/favorites.
+  // Emulate that trusted proxy boundary without exposing a key to application code.
+  await page.unroute("**/api/**");
+  const proxyApiKey = process.env.MOVIEHUB_E2E_PROXY_API_KEY;
+  if (!proxyApiKey) {
+    throw new Error("MOVIEHUB_E2E_PROXY_API_KEY must be set by the isolated CI job");
+  }
+  await page.route("**/api/favorites**", (route) =>
+    route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-api-key": proxyApiKey
+      }
+    })
+  );
+
+  await page.goto("/charts/top250");
+  const firstMovie = page.locator("a.movie-title").first();
+  await expect(firstMovie).toBeVisible();
+  const title = (await firstMovie.innerText()).trim();
+  await firstMovie.click();
+
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await page.getByRole("button", { name: "♡ 加入收藏" }).click();
+  await expect(page.getByRole("button", { name: "♥ 已收藏" })).toBeVisible();
+
+  await page.goto("/favorites");
+  await expect(page.getByRole("heading", { name: "我的收藏" })).toBeVisible();
+  await expect(page.locator("a.movie-title", { hasText: title })).toBeVisible();
+
+  await page.getByRole("button", { name: "移出收藏 ×" }).click();
+  await expect(page.getByText("收藏夹还是空的")).toBeVisible();
+});

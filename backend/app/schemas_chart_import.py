@@ -130,16 +130,6 @@ class ChartSnapshotImport(BaseModel):
                 raise ValueError(
                     f"chart {self.slug} accepts only {definition.media_type!r} entries"
                 )
-            if definition.require_posters:
-                missing_posters = [
-                    movie.douban_id for movie in self.movies if not movie.posters
-                ]
-                if missing_posters:
-                    preview = ", ".join(missing_posters[:10])
-                    raise ValueError(
-                        f"chart {self.slug} requires at least one poster per movie; "
-                        f"missing for Douban IDs: {preview}"
-                    )
 
         return self
 

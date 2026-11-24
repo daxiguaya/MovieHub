@@ -262,3 +262,6 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
   .spotlight-grid { grid-template-columns: 1fr; }
   .spotlight-panel { padding: 12px 14px; }
 }
+
+.spotlight-more { display: flex; justify-content: flex-end; align-items: center; gap: 5px; padding-top: 9px; margin-top: 5px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10px; font-weight: 600; }
+.spotlight-more:hover { color: #fff; }

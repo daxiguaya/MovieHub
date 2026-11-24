@@ -306,7 +306,7 @@ class DoubanTop250Collector:
     def collect(self, snapshot_date: date) -> ChartSnapshotImport:
         owns_client = self.client is None
         client = self.client or httpx.Client(
-            timeout=httpx.Timeout(15.0),
+            timeout=httpx.Timeout(30.0),
             follow_redirects=False,
             trust_env=False,
             headers={

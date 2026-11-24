@@ -6,6 +6,7 @@ be discarded and rebuilt without affecting favorites or chart snapshots.
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 import json
 import logging
 import sqlite3
@@ -38,13 +39,22 @@ class ProviderResponseCache:
         connection.execute("PRAGMA synchronous=NORMAL")
         return connection
 
+    @contextmanager
+    def _connection(self):
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _init(self) -> None:
         if self._initialized:
             return
         with self._lock:
             if self._initialized:
                 return
-            with self._connect() as connection:
+            with self._connection() as connection:
                 connection.execute("""
                     CREATE TABLE IF NOT EXISTS provider_response_cache (
                         cache_key TEXT PRIMARY KEY,

@@ -73,6 +73,8 @@ class TMDBOverviewClient:
         self._min_interval = min_interval_seconds
         self._sleep = sleep
         self._last_request_at = 0.0
+        # Cache localized TMDB person names across the whole audit run.
+        self._director_name_cache: dict[int, set[str]] = {}
 
     def close(self) -> None:
         if self._owns_client:
@@ -227,7 +229,45 @@ class TMDBOverviewClient:
                 and normalize_title(person.get("name"))
             }
             if not source_directors.intersection(tmdb_directors):
-                continue
+                # Annual Douban charts expose Chinese director names, while
+                # TMDB credits commonly return the person's original/English
+                # name. Resolve the localized person record before rejecting
+                # an otherwise plausible candidate.
+                director_people = [
+                    person for person in crew
+                    if isinstance(person, dict)
+                    and (
+                        person.get("job") == "Director"
+                        or (media_type == "tv" and person.get("department") == "Directing")
+                    )
+                    and isinstance(person.get("id"), int)
+                ]
+                for person in director_people:
+                    person_id = person["id"]
+                    localized_names = self._director_name_cache.get(person_id)
+                    if localized_names is None:
+                        person_details = self._get(
+                            f"/person/{person_id}",
+                            {"language": "zh-CN"},
+                        )
+                        aliases = person_details.get("also_known_as", [])
+                        localized_names = {
+                            normalize_title(person_details.get("name")),
+                            normalize_title(person.get("name")),
+                            normalize_title(person.get("original_name")),
+                        }
+                        if isinstance(aliases, list):
+                            localized_names.update(
+                                normalize_title(alias)
+                                for alias in aliases
+                                if isinstance(alias, str)
+                            )
+                        localized_names.discard("")
+                        self._director_name_cache[person_id] = localized_names
+                    tmdb_directors.update(localized_names)
+
+                if not source_directors.intersection(tmdb_directors):
+                    continue
 
             candidate_titles = self._title_names(candidate, media_type)
             if not source_titles.intersection(candidate_titles):

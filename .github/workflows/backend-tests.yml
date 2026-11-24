@@ -32,7 +32,12 @@ jobs:
         run: python -m pytest -q
         working-directory: backend
 
-      - name: Validate Compose configuration
+      - name: Validate Compose without the optional Scout source
+        run: docker compose config --quiet
+        env:
+          MOVIEHUB_API_KEY: ci-placeholder-only
+          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
+      - name: Validate Compose with an explicitly configured read-only Scout source
         run: docker compose config --quiet
         env:
           MOVIEHUB_IMPORT_PATH: /tmp/scout-import

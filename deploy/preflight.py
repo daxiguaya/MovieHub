@@ -8,7 +8,6 @@ initializes a database, edits NPM, or changes Docker networks.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -134,7 +133,6 @@ def main() -> int:
     try:
         network = docker_json(["network", "inspect", EXPECTED_NETWORK])[0]
         print(f"[OK] External NPM network exists: {EXPECTED_NETWORK}")
-        network_ids = set((network.get("Containers") or {}).keys())
         npm_candidates = []
         for container_id, details in (network.get("Containers") or {}).items():
             name = details.get("Name", "")

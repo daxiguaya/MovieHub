@@ -486,6 +486,7 @@ function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [onlineError, setOnlineError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -509,6 +510,7 @@ function SearchPage() {
       params.get("max_year") || params.get("min_rating") || params.get("min_rating_count")
     );
     setLoading(true);
+    setHasSearched(true);
     setError("");
     setOnlineError("");
     try {

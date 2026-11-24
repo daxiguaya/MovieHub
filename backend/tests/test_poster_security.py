@@ -18,6 +18,9 @@ from app.routers.movies import (
         "https://img12.doubanio.com/path/poster.avif",
         "https://IMG3.DOUBANIO.COM/poster.jpg",
         "https://img1.doubanio.com:443/poster.jpg",
+        "https://image.tmdb.org/t/p/w500/poster.jpg",
+        "https://IMAGE.TMDB.ORG/t/p/w500/poster.jpg",
+        "https://image.tmdb.org:443/t/p/w500/poster.jpg",
     ],
 )
 def test_poster_allowlist_accepts_https_douban_image_cdn(url):
@@ -30,6 +33,9 @@ def test_poster_allowlist_accepts_https_douban_image_cdn(url):
         "http://img1.doubanio.com/poster.jpg",
         "https://doubanio.com/poster.jpg",
         "https://img1.doubanio.com.evil.example/poster.jpg",
+        "https://image.tmdb.org.evil.example/t/p/w500/poster.jpg",
+        "https://evil-image.tmdb.org/t/p/w500/poster.jpg",
+        "https://image.tmdb.org@evil.example/poster.jpg",
         "https://evil.example/img1.doubanio.com/poster.jpg",
         "https://127.0.0.1/poster.jpg",
         "https://localhost/poster.jpg",

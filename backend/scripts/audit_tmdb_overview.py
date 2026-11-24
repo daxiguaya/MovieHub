@@ -21,7 +21,7 @@ def load_snapshots(input_dir: str | Path, snapshot_date: str):
     if not directory.is_dir():
         raise ValueError("Snapshot input directory does not exist")
     snapshots = []
-    for path in sorted(directory.glob("*.json")):
+    for path in sorted(directory.rglob("*.json")):
         snapshot = LocalImportAdapter().load_snapshot(path)
         if snapshot.snapshot_date.isoformat() == snapshot_date:
             snapshots.append(snapshot)

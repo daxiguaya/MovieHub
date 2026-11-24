@@ -162,7 +162,7 @@ All work remained in disposable GitHub Actions storage. No NAS path, production 
 - [x] Decode URL-safe Base64 strictly and require a positive canonical decimal rank.
 - [x] Return HTTP 400 with a stable error message for invalid cursors.
 - [x] Extend the chart HTTP integration test to cover five invalid cursor forms and a valid cursor beyond the final rank (empty page, stable total, no next cursor).
-- [ ] Await the branch-head CI run for this change; no test result is claimed before the workflow completes.
+- [x] Branch-head CI [#45339047025](https://github.com/daxiguaya/MovieHub/actions/runs/45339047025) and merge-gate CI [#45341969331](https://github.com/daxiguaya/MovieHub/actions/runs/45341969331) passed the cursor regression suite.
 
 This is API input hardening only. It does not claim real multi-date source snapshots, synopsis coverage, or deployment completion. Overall delivery estimate remains **83%**. All tests continue to use disposable SQLite; no NAS, production database, NPM configuration, or service was touched.
 
@@ -187,4 +187,13 @@ The first cursor-hardening CI attempt found an outdated test expectation (264 pa
 - [x] Add a safety regression test proving initialization refuses an existing external SQLite database and leaves its table/data untouched.
 - [x] Branch-head CI [#45339047025](https://github.com/daxiguaya/MovieHub/actions/runs/45339047025) passed the lifecycle tests: backend 267 passed / 4 skipped; frontend regression tests, type-check/build, browser E2E, both container builds, and both Compose configuration modes succeeded.
 
-This validates the database lifecycle in temporary SQLite without Docker daemon, NAS access, NPM changes, Scout import, or production data. It is not a live container deployment rehearsal. A new compose-smoke CI job has now been added to start both actual Compose containers, verify pre-initialization 503 readiness, explicitly initialize a disposable database, and exercise the live API/frontend; its first run is pending. Overall progress remains **83%** until this container rehearsal and the remaining source-data/licensing and deployment tasks are addressed.
+The database lifecycle tests passed in temporary SQLite. The live two-container Compose rehearsal also passed in isolated GitHub Actions [#45341969331](https://github.com/daxiguaya/MovieHub/actions/runs/45341969331): both images built and containers started; API liveness worked before initialization; readiness correctly returned 503 until explicit initialization; the seeded chart API and frontend HTTP both responded; backend and frontend health checks became healthy; and the isolated Compose project was removed. This exposed and fixed an Nginx write to /var/cache/nginx under the read-only root filesystem by routing all Nginx temporary paths to /tmp tmpfs. This is an isolated CI runtime rehearsal, not a NAS deployment or NPM integration. Overall progress remains **83%** because source-data licensing/overview coverage, real multi-date history, and production deployment work remain.
+
+
+## 2026-11-24 — Mainline integration
+
+- [x] Opened PR [#1](https://github.com/daxiguaya/MovieHub/pull/1) from `phase4/database-foundation` into `main`.
+- [x] Merge-gate CI [#45341969331](https://github.com/daxiguaya/MovieHub/actions/runs/45341969331) passed: backend, frontend, browser E2E, isolated Docker Compose smoke, and both container builds.
+- [x] Squash-merged PR #1; `main` now points to `0649a4d209f99d91bb192b8c544eed2cd63a993e`.
+
+The merge promotes the current implementation to the repository's default branch. It does not deploy the application or initialize a production database.

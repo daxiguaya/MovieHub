@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.database import (
+    CURRENT_SCHEMA_VERSION,
     DatabaseNotInitializedError,
     database_is_ready,
     get_db_path,
@@ -176,7 +177,7 @@ def readiness_check() -> dict[str, str | int]:
                 "'python -m scripts.init_db' and apply pending migrations."
             ),
         )
-    return {"status": "ready", "schema_version": 2}
+    return {"status": "ready", "schema_version": CURRENT_SCHEMA_VERSION}
 
 
 if __name__ == "__main__":

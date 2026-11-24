@@ -275,3 +275,11 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .credits-copy a { color: var(--accent); font-size: 10px; width: fit-content; }
 .site-footer a { color: var(--accent); font-size: 10px; }
 @media (max-width: 560px) { .credits-panel { align-items: flex-start; padding: 15px; } }
+
+.api-key-gate { max-width: 560px; margin: 22px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.api-key-gate h2 { margin: 0 0 8px; font-size: 16px; }
+.api-key-gate p, .api-key-gate small { display: block; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.api-key-gate form { display: flex; gap: 8px; margin: 14px 0 8px; }
+.api-key-gate input { min-width: 0; flex: 1; }
+.api-key-gate small { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .api-key-gate form { flex-direction: column; } }

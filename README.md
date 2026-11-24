@@ -1,20 +1,23 @@
 # MovieHub
 
-A self-hosted movie discovery and chart-history service with its own SQLite database.
+A self-hosted movie discovery and chart-history service with its own independent SQLite database.
 
 ## Project status
 
-- Phase 4 database foundation: complete.
-- Application integration audit: complete.
-- Current work: annual chart data quality and metadata enrichment preparation; Scout import now uses transactionally committed batch receipts for crash-safe checkpoint recovery. The 2025 annual collector emits four independent normalized snapshots with robots.txt checks and recoverable four-file output. The new batch importer validates all four files together; dry-run is database-free and writes require explicit `--apply`, using one all-or-nothing transaction. Isolated 10k/100k SQLite search and Scout import benchmarks completed in CI #314.
-- Latest full CI [#45212034805](https://github.com/daxiguaya/MovieHub/actions/runs/45212034805) passed backend (224 passed, 4 skipped), frontend (5 passed) and Chromium E2E (4 passed). Annual collection and performance benchmark jobs were skipped by workflow conditions. The 2025 annual artifact contains 38 entries (8/10/10/10) and passed structural review; it has not been imported into a database. Real staged-Scout audit/import, 2026 category verification, visual QA, NPM verification and production rollout remain outstanding.
-- Estimated first-release progress: about 75%; this is a planning estimate, not a test metric.
-- Backend and frontend regression/build checks run on GitHub Actions for pushes to the active development branch.
+- **Current stage:** pre-deployment hardening. MovieHub has not been deployed; its production database has not been created.
+- **Overall first-release progress:** about 75% (planning estimate, not a test metric).
+- **Completed:** independent SQLite schema/initializer/migrations, core FastAPI APIs, React frontend core flows, chart collectors/import pipeline, Docker packaging, backup/restore tooling and automated tests.
+- **Real-data validation:** four official 2025 Douban annual charts (38 records) were imported into a newly initialized disposable SQLite database in GitHub Actions. This is a real-data rehearsal, not a production import or Scout catalogue audit.
+- **Latest CI:** [#45312384087](https://github.com/daxiguaya/MovieHub/actions/runs/45312384087) succeeded: backend 247 passed / 4 skipped, frontend 5 passed, Chromium E2E 4 passed. The real-data rehearsal job was skipped in this docs-only run; its latest successful run is [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353).
+- **Remaining:** enrich and review first-release data, complete visual QA, run an isolated deployment/backup/restore rehearsal, verify NPM/Xiaoya integration, and then separately approve NAS production deployment.
+- **Scout clarification:** Scout is an optional external read-only metadata source. There is no MovieHub source database yet, and a Scout full-catalogue audit is not a prerequisite for MovieHub database initialization or development.
 
-See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checklist and CI result.
+See [the canonical project status and delivery checklist](docs/PROJECT-STATUS.md) for the complete done/remaining list and progress estimate, and [the detailed development history](docs/DEVELOPMENT-PROGRESS.md) for milestones.
 
 ## Documentation
 
+- [Project status and delivery checklist](docs/PROJECT-STATUS.md)
+- [Development progress history](docs/DEVELOPMENT-PROGRESS.md)
 - [Database design](docs/phase4-database-design.md)
 - [Configuration and database lifecycle](docs/CONFIGURATION.md)
 - [Frontend/backend container deployment](docs/DEPLOYMENT.md)
@@ -29,7 +32,7 @@ See [development progress](docs/DEVELOPMENT-PROGRESS.md) for the current checkli
 
 ## Safety model
 
-- MovieHub owns a separate database; it does not migrate or modify Douban Scout.
-- Scout is treated as a read-only import source.
+- MovieHub owns a new, independent SQLite database; it does not migrate or modify another application's database.
+- Scout, if enabled later, is treated as an optional read-only import source.
 - Database initialization is explicit; application startup does not create a database.
-- Production deployment and migration require a separate reviewed procedure.
+- Production database initialization, deployment, NPM changes and service restarts require a separately reviewed and approved procedure.

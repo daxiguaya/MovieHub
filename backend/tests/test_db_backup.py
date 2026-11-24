@@ -8,6 +8,7 @@ import pytest
 
 from scripts import db_backup as db_backup_module
 from scripts.db_backup import create_backup, restore_backup
+from app.database import database_is_ready
 from scripts.init_db import initialize
 
 
@@ -331,3 +332,77 @@ def test_restore_rolls_back_original_database_if_post_replace_validation_fails(
         )
 
     assert _movie_titles(database) == ["Current state", "Original state"]
+
+
+def test_full_deployment_lifecycle_initialize_backup_restore_and_readiness(tmp_path):
+    database = tmp_path / "isolated-data" / "db" / "movies.db"
+    backup_root = tmp_path / "isolated-backups"
+
+    assert database_is_ready(database) is False
+    _initialize_database(database)
+    assert database_is_ready(database) is True
+
+    _insert_movie(database, "Known good pre-backup state")
+    backup_dir = create_backup(database, backup_root)
+    assert (backup_dir / "manifest.json").is_file()
+
+    _insert_movie(database, "Post-backup change")
+    assert _movie_titles(database) == [
+        "Known good pre-backup state",
+        "Post-backup change",
+    ]
+
+    rollback = restore_backup(
+        backup_dir,
+        database,
+        confirm=True,
+        service_stopped=True,
+    )
+
+    assert rollback is not None and rollback.is_file()
+    assert _movie_titles(database) == ["Known good pre-backup state"]
+    assert _movie_titles(rollback) == [
+        "Known good pre-backup state",
+        "Post-backup change",
+    ]
+    assert database_is_ready(database) is True
+
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert connection.execute(
+            "SELECT MAX(version) FROM schema_migrations"
+        ).fetchone()[0] == 3
+    finally:
+        connection.close()
+
+
+def test_initializer_refuses_existing_external_database_without_mutation(tmp_path):
+    external_database = tmp_path / "external-source" / "scout.db"
+    external_database.parent.mkdir(parents=True)
+    connection = sqlite3.connect(external_database)
+    try:
+        connection.execute(
+            "CREATE TABLE scout_records (id INTEGER PRIMARY KEY, title TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO scout_records (title) VALUES ('Scout data must remain untouched')"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    with pytest.raises(RuntimeError, match="Refusing to initialize a non-empty database"):
+        _initialize_database(external_database)
+
+    connection = sqlite3.connect(external_database)
+    try:
+        assert connection.execute(
+            "SELECT title FROM scout_records"
+        ).fetchall() == [("Scout data must remain untouched",)]
+        assert connection.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='movies'"
+        ).fetchone()[0] == 0
+    finally:
+        connection.close()

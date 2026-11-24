@@ -42,6 +42,47 @@ def _strip_unapproved_synopsis(value: Any) -> Any:
 
 
 class TMDBClient:
+    async def _cache_get(self, key: str, allow_stale: bool = False):
+        """Keep SQLite reads and their locks off the ASGI event loop."""
+        try:
+            return await asyncio.to_thread(
+                provider_response_cache.get, key, allow_stale
+            )
+        except Exception as exc:
+            logger.warning("TMDB response-cache read failed: %s", type(exc).__name__)
+            return None
+
+    async def _cache_set(
+        self,
+        key: str,
+        endpoint: str,
+        payload: dict[str, Any],
+        ttl: int,
+    ) -> None:
+        """Cache failure must never turn a successful upstream response into 500."""
+        try:
+            await asyncio.to_thread(
+                provider_response_cache.set, key, "tmdb", endpoint, payload, ttl
+            )
+        except Exception as exc:
+            logger.warning("TMDB response-cache write failed: %s", type(exc).__name__)
+
+    def _inflight_done(
+        self, key: str, completed: asyncio.Task[dict[str, Any]]
+    ) -> None:
+        # Consume an exception if every HTTP waiter disconnected before the
+        # shared request finished, then remove only this exact task.
+        if not completed.cancelled():
+            completed.exception()
+        asyncio.create_task(self._remove_inflight(key, completed))
+
+    async def _remove_inflight(
+        self, key: str, completed: asyncio.Task[dict[str, Any]]
+    ) -> None:
+        async with _inflight_lock:
+            if _inflight.get(key) is completed:
+                _inflight.pop(key, None)
+
     def __init__(self) -> None:
         self.token = settings.tmdb_api_read_token
         self._requests = 0
@@ -83,7 +124,7 @@ class TMDBClient:
     ) -> dict[str, Any]:
         clean_params = {k: v for k, v in (params or {}).items() if v is not None}
         key = provider_response_cache.make_key("tmdb", endpoint, clean_params)
-        cached = provider_response_cache.get(key)
+        cached = await self._cache_get(key)
         if cached:
             payload, _ = cached
             return payload
@@ -95,23 +136,22 @@ class TMDBClient:
                     self._fetch_and_cache(key, endpoint, clean_params, ttl)
                 )
                 _inflight[key] = task
-                owner = True
-            else:
-                owner = False
+                task.add_done_callback(
+                    lambda completed, cache_key=key: self._inflight_done(
+                        cache_key, completed
+                    )
+                )
 
         try:
-            return await task
+            # One disconnected browser request must not cancel the shared
+            # upstream request still needed by other callers.
+            return await asyncio.shield(task)
         except Exception:
-            stale = provider_response_cache.get(key, allow_stale=True)
+            stale = await self._cache_get(key, allow_stale=True)
             if stale:
                 logger.warning("Serving stale TMDB cache after upstream failure: %s", endpoint)
                 return stale[0]
             raise
-        finally:
-            if owner:
-                async with _inflight_lock:
-                    if _inflight.get(key) is task:
-                        _inflight.pop(key, None)
 
     async def _fetch_and_cache(
         self,
@@ -176,7 +216,7 @@ class TMDBClient:
             raise HTTPException(status_code=502, detail="TMDB returned an invalid response")
         if isinstance(payload.get("results"), list) and not payload["results"]:
             ttl = NEGATIVE_TTL
-        provider_response_cache.set(key, "tmdb", endpoint, payload, ttl)
+        await self._cache_set(key, endpoint, payload, ttl)
         self._successes += 1
         self._record_latency(started)
         return payload

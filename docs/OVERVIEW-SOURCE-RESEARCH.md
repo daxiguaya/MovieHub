@@ -91,7 +91,7 @@ Only after the report is reviewed should the importer write to an isolated dispo
 ## Next work order
 
 1. Confirm the non-commercial and intended caching/display terms gate. Add `TMDB_API_READ_TOKEN` as a repository Actions secret (never commit it or paste it into chat).
-2. Run the manual workflow [TMDB overview coverage audit](../actions/workflows/tmdb-overview-audit.yml) using source run `45329522019` (artifact retained until 2026-12-08). Review exact matches, ambiguous/no-match counts, and zh-CN/zh-TW overview coverage.
+2. Run the manual workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml) using source run `45329522019` (artifact retained until 2026-12-08). Review exact matches, ambiguous/no-match counts, and zh-CN/zh-TW overview coverage.
 3. If the measured coverage and terms are acceptable, add the additive provenance migration for license/terms basis, language, attribution and modification marker, then implement the separate NULL-only importer and attribution UI.
 4. If TMDB cannot meet terms or measured coverage, use individually verified Wikimedia film articles as a fallback with CC BY-SA compliance; keep unknown synopsis fields empty.
 5. Then resume real-data pagination, multi-date snapshot selection/comparison, filters and edge-state E2E.

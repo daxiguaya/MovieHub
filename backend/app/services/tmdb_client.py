@@ -35,12 +35,12 @@ class TMDBClient:
     def __init__(
         self,
         token: str | None = None,
-        max_concurrency: int = 4,
+        max_concurrency: int | None = None,
         timeout_seconds: float = 8.0,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._token = (token if token is not None else settings.tmdb_api_read_token).strip()
-        self._semaphore = asyncio.Semaphore(max(1, min(int(max_concurrency), 4)))
+        self._semaphore = asyncio.Semaphore(max(1, min(int(max_concurrency or settings.tmdb_max_concurrency), 4)))
         self._singleflight_lock = asyncio.Lock()
         self._inflight: dict[str, asyncio.Task[dict[str, Any]]] = {}
         self._client = httpx.AsyncClient(

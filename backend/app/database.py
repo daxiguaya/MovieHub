@@ -15,7 +15,7 @@ from app.config import settings
 
 Base = declarative_base()
 DATABASE_NAME = "movies.db"
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 REQUIRED_DATABASE_TABLES = {
     "schema_migrations",
     "movies",
@@ -29,6 +29,7 @@ REQUIRED_DATABASE_TABLES = {
     "list_items",
     "favorites",
     "import_batch_receipts",
+    "movie_metadata_provenance",
 }
 
 
@@ -207,6 +208,29 @@ class Favorite(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     note = Column(Text, nullable=False, default="")
     movie = relationship("Movie", back_populates="favorite")
+
+
+class MovieMetadataProvenance(Base):
+    """Field-level source and observation history for imported movie metadata."""
+
+    __tablename__ = "movie_metadata_provenance"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    field_name = Column(String(32), nullable=False)
+    source = Column(String(32), nullable=False)
+    source_url = Column(String(512), nullable=False, default="")
+    observed_at = Column(DateTime, nullable=False)
+    value_sha256 = Column(String(64), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "movie_id", "field_name", "source", "source_url", "value_sha256",
+            name="uq_movie_metadata_provenance_observation",
+        ),
+        Index("ix_movie_metadata_provenance_movie_field", "movie_id", "field_name"),
+        Index("ix_movie_metadata_provenance_observed_at", "observed_at"),
+    )
 
 
 class ImportBatchReceipt(Base):

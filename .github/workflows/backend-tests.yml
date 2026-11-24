@@ -628,6 +628,118 @@ jobs:
           PY
       - name: Explicitly initialize the disposable MovieHub database
         run: docker compose -p moviehub-ci-smoke run --rm --no-deps moviehub python -m scripts.init_db
+      - name: Seed a disposable movie record through the live database
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import sqlite3
+          from app.database import get_db_path
+
+          connection = sqlite3.connect(get_db_path())
+          try:
+              connection.execute(
+                  """
+                  INSERT INTO movies
+                    (douban_id, title, type, directors, actors, rating_count)
+                  VALUES (?, ?, 'movie', '[]', '[]', 0)
+                  """,
+                  ("999999999999", "Compose restore baseline"),
+              )
+              connection.commit()
+          finally:
+              connection.close()
+          PY
+      - name: Verify baseline movie is visible through the live API
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          from urllib.request import urlopen
+
+          with urlopen("http://127.0.0.1:8000/api/movies/999999999999", timeout=10) as response:
+              movie = json.load(response)
+          assert movie["title"] == "Compose restore baseline", movie
+          PY
+      - name: Create a verified backup from the running container
+        run: |
+          backup_dir="$(docker compose -p moviehub-ci-smoke exec -T moviehub python -m scripts.db_backup backup | tail -n 1 | tr -d '\r')"
+          test -n "$backup_dir"
+          echo "MOVIEHUB_CI_BACKUP_DIR=$backup_dir" >> "$GITHUB_ENV"
+          echo "Created isolated backup: $backup_dir"
+      - name: Mutate the database after backup and verify the changed API value
+        run: |
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import sqlite3
+          from app.database import get_db_path
+
+          connection = sqlite3.connect(get_db_path())
+          try:
+              cursor = connection.execute(
+                  "UPDATE movies SET title = ? WHERE douban_id = ?",
+                  ("Compose restore changed", "999999999999"),
+              )
+              assert cursor.rowcount == 1, cursor.rowcount
+              connection.commit()
+          finally:
+              connection.close()
+          PY
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          from urllib.request import urlopen
+
+          with urlopen("http://127.0.0.1:8000/api/movies/999999999999", timeout=10) as response:
+              movie = json.load(response)
+          assert movie["title"] == "Compose restore changed", movie
+          PY
+      - name: Stop the API and restore the verified backup in a one-shot container
+        run: |
+          docker compose -p moviehub-ci-smoke stop moviehub
+          docker compose -p moviehub-ci-smoke run --rm --no-deps moviehub \
+            python -m scripts.db_backup restore \
+            --backup-dir "$MOVIEHUB_CI_BACKUP_DIR" --confirm --service-stopped
+      - name: Restart API and verify restored API data plus rollback copy
+        run: |
+          docker compose -p moviehub-ci-smoke up -d moviehub
+          docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
+          import json
+          import sqlite3
+          import time
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.request import urlopen
+          from app.database import get_db_path
+
+          for attempt in range(60):
+              try:
+                  with urlopen("http://127.0.0.1:8000/api/ready", timeout=3) as response:
+                      assert response.status == 200
+                  break
+              except (HTTPError, URLError, TimeoutError):
+                  if attempt == 59:
+                      raise
+                  time.sleep(1)
+          else:
+              raise AssertionError("API did not become ready after restore")
+
+          with urlopen("http://127.0.0.1:8000/api/movies/999999999999", timeout=10) as response:
+              restored = json.load(response)
+          assert restored["title"] == "Compose restore baseline", restored
+
+          database = Path(get_db_path())
+          rollback_copies = sorted(database.parent.glob("movies.db.pre-restore-*"))
+          assert rollback_copies, "pre-restore rollback copy was not created"
+          connection = sqlite3.connect(rollback_copies[-1])
+          try:
+              rollback_title = connection.execute(
+                  "SELECT title FROM movies WHERE douban_id = ?",
+                  ("999999999999",),
+              ).fetchone()[0]
+          finally:
+              connection.close()
+          assert rollback_title == "Compose restore changed", rollback_title
+          print({
+              "restored_api_title": restored["title"],
+              "rollback_copy_title": rollback_title,
+          })
+          PY
       - name: Verify API readiness, seeded chart API, and frontend container
         run: |
           docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'

@@ -412,10 +412,21 @@ jobs:
     # Explicitly opt-in: expand the first-launch dataset from public Douban charts in a disposable CI database.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-first-launch-data]'))
     runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
     env:
       MOVIEHUB_DATA_DIR: /tmp/moviehub-first-launch-data
     steps:
       - uses: actions/checkout@v4
+      - name: Download the retained official 2025 annual-chart artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: moviehub-douban-annual-2025
+          repository: ${{ github.repository }}
+          run-id: 45213246118
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/moviehub-annual-2025
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -426,7 +437,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
         working-directory: backend
-      - name: Collect Top 250, popular and high-rated charts
+      - name: Collect the robots-permitted Top 250 snapshot
         run: |
           set -euo pipefail
           output_dir="${RUNNER_TEMP}/moviehub-first-launch"
@@ -435,15 +446,7 @@ jobs:
           python -m scripts.collect_douban_top250 \
             --date "$capture_date" \
             --output "$output_dir/top250-$capture_date.json"
-          python -m scripts.collect_douban_tagged_chart \
-            --chart popular --date "$capture_date" --max-items 100 \
-            --output "$output_dir/popular-$capture_date.json"
-          python -m scripts.collect_douban_tagged_chart \
-            --chart high-rated --date "$capture_date" --max-items 100 \
-            --output "$output_dir/high-rated-$capture_date.json"
-          for file in "$output_dir"/*.json; do
-            python -m scripts.import_chart --input "$file" --dry-run
-          done
+          python -m scripts.import_chart --input "$output_dir/top250-$capture_date.json" --dry-run
           echo "MOVIEHUB_CAPTURE_DATE=$capture_date" >> "$GITHUB_ENV"
           echo "MOVIEHUB_FIRST_LAUNCH_DIR=$output_dir" >> "$GITHUB_ENV"
         working-directory: backend
@@ -460,6 +463,9 @@ jobs:
         run: |
           set -euo pipefail
           for file in "$MOVIEHUB_FIRST_LAUNCH_DIR"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+          for file in "${RUNNER_TEMP}/moviehub-annual-2025"/*.json; do
             python -m scripts.import_chart --input "$file"
           done
         working-directory: backend
@@ -482,28 +488,49 @@ jobs:
                   )
                   assert snapshot is not None, f"missing snapshot {slug}"
                   assert snapshot.item_count == minimum, (slug, snapshot.item_count)
-              for slug in ("popular", "high-rated"):
+              annual_slugs = (
+                  "annual-2025-chinese-movies",
+                  "annual-2025-international-movies",
+                  "annual-2025-hidden-gems",
+                  "annual-2025-chinese-tv",
+              )
+              annual_items = 0
+              for slug in annual_slugs:
                   chart = db.scalar(select(Chart).where(Chart.slug == slug))
                   assert chart is not None, f"missing chart {slug}"
                   snapshot = db.scalar(
                       select(ChartSnapshot).where(
                           ChartSnapshot.list_id == chart.list_id,
-                          ChartSnapshot.snapshot_date == "${MOVIEHUB_CAPTURE_DATE}",
+                          ChartSnapshot.snapshot_date == "2026-11-23",
                       )
                   )
                   assert snapshot is not None and snapshot.item_count > 0, slug
+                  annual_items += snapshot.item_count
 
               movies = db.scalar(select(func.count()).select_from(Movie))
               items = db.scalar(select(func.count()).select_from(ChartItem))
               snapshots = db.scalar(select(func.count()).select_from(ChartSnapshot))
-              assert movies >= 250, movies
-              assert items >= 250, items
-              assert snapshots == 3, snapshots
+              assert annual_items == 38, annual_items
+              assert 250 <= movies <= 288, movies
+              assert items == 288, items
+              assert snapshots == 5, snapshots
+              import sqlite3
+              from app.database import get_db_path
+              connection = sqlite3.connect(get_db_path())
+              try:
+                  integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
+                  fk_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
+                  assert integrity == "ok", integrity
+                  assert not fk_errors, fk_errors
+              finally:
+                  connection.close()
               print({
-                  "persisted_movies": movies,
+                  "persisted_unique_movies": movies,
                   "persisted_chart_items": items,
                   "persisted_snapshots": snapshots,
-                  "deduplicated_across_charts": items - movies,
+                  "cross_chart_deduplication": items - movies,
+                  "integrity_check": integrity,
+                  "foreign_key_errors": len(fk_errors),
               })
           PY
         working-directory: backend
@@ -513,5 +540,6 @@ jobs:
           name: moviehub-first-launch-douban
           path: |
             ${{ runner.temp }}/moviehub-first-launch/*.json
+          ${{ runner.temp }}/moviehub-annual-2025/*.json
           if-no-files-found: error
           retention-days: 14

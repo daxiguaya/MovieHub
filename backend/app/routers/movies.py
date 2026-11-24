@@ -454,6 +454,11 @@ async def get_poster(
     )
     poster_urls = [poster.url for poster in posters]
 
+    # Poster downloads perform asynchronous DNS and external HTTP I/O.
+    # Release the synchronous SQLAlchemy connection before awaiting them so
+    # concurrent cache misses cannot exhaust the database connection pool.
+    db.close()
+
     if not poster_urls:
         raise HTTPException(status_code=404, detail="No poster available for this movie")
 

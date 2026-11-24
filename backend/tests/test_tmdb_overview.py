@@ -27,7 +27,7 @@ def _item(**overrides):
 
 def test_tmdb_lookup_accepts_one_exact_title_year_and_returns_hash_only():
     def handler(request):
-        if request.url.path == "/search/movie":
+        if request.url.path == "/3/search/movie":
             assert request.url.params["language"] == "zh-CN"
             return httpx.Response(200, json={
                 "results": [{
@@ -37,7 +37,7 @@ def test_tmdb_lookup_accepts_one_exact_title_year_and_returns_hash_only():
                     "release_date": "1994-09-23",
                 }]
             })
-        if request.url.path == "/movie/278":
+        if request.url.path == "/3/movie/278":
             assert request.url.params["language"] == "zh-CN"
             return httpx.Response(200, json={
                 "id": 278,
@@ -112,7 +112,7 @@ def test_tmdb_lookup_rejects_year_mismatch_even_when_title_matches():
 
 def test_tmdb_lookup_uses_imdb_external_id_but_cross_checks_identity():
     def handler(request):
-        if request.url.path == "/find/tt0111161":
+        if request.url.path == "/3/find/tt0111161":
             assert request.url.params["external_source"] == "imdb_id"
             return httpx.Response(200, json={
                 "movie_results": [{
@@ -122,7 +122,7 @@ def test_tmdb_lookup_uses_imdb_external_id_but_cross_checks_identity():
                     "release_date": "1994-09-23",
                 }]
             })
-        if request.url.path == "/movie/278":
+        if request.url.path == "/3/movie/278":
             return httpx.Response(200, json={
                 "id": 278,
                 "title": "The Shawshank Redemption",
@@ -159,12 +159,12 @@ def test_tmdb_lookup_rejects_imdb_identity_mismatch_without_search_fallback():
             result = client.lookup(_item(imdb_id="tt0111161"))
 
     assert result.status == "id_mismatch_or_not_found"
-    assert requests == ["/find/tt0111161"]
+    assert requests == ["/3/find/tt0111161"]
 
 
 def test_tmdb_lookup_keeps_empty_localized_overview_empty():
     def handler(request):
-        if request.url.path == "/search/movie":
+        if request.url.path == "/3/search/movie":
             return httpx.Response(200, json={
                 "results": [{
                     "id": 278,

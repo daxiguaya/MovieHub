@@ -266,3 +266,107 @@ def test_tmdb_lookup_rejects_existing_tmdb_id_when_title_or_year_conflicts():
 
     assert result.status == "tmdb_id_identity_mismatch"
     assert result.overview_sha256 is None
+
+
+def test_yearless_annual_item_requires_exact_title_and_matching_director():
+    requests = []
+
+    def handler(request):
+        requests.append(request.url.path)
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={"results": [{
+                "id": 278,
+                "title": "肖申克的救赎",
+                "original_title": "The Shawshank Redemption",
+            }]})
+        if request.url.path == "/3/movie/278/credits":
+            return httpx.Response(200, json={"crew": [{
+                "job": "Director",
+                "name": "Frank Darabont",
+            }]})
+        if request.url.path == "/3/movie/278":
+            return httpx.Response(200, json={
+                "id": 278,
+                "title": "肖申克的救赎",
+                "release_date": "1994-09-23",
+                "overview": "一段真实的剧情简介。",
+            })
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(year=None, directors=["Frank Darabont"]))
+
+    assert result.status == "overview_available"
+    assert result.match_method == "exact_title_director"
+    assert result.tmdb_id == 278
+    assert requests.count("/3/movie/278/credits") == 1
+
+
+def test_yearless_annual_item_rejects_director_mismatch():
+    def handler(request):
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={"results": [{
+                "id": 278,
+                "title": "肖申克的救赎",
+                "original_title": "The Shawshank Redemption",
+            }]})
+        if request.url.path == "/3/movie/278/credits":
+            return httpx.Response(200, json={"crew": [{
+                "job": "Director",
+                "name": "Someone Else",
+            }]})
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(year=None, directors=["Frank Darabont"]))
+
+    assert result.status == "no_exact_match"
+    assert result.tmdb_id is None
+
+
+def test_yearless_annual_item_without_director_is_insufficient_identity():
+    def handler(request):
+        raise AssertionError(f"No provider request expected: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(_item(year=None, directors=[]))
+
+    assert result.status == "insufficient_identity"
+
+
+def test_yearless_annual_identity_uses_source_locale_but_fetches_requested_locale():
+    def handler(request):
+        if request.url.path == "/3/search/movie":
+            assert request.url.params["language"] == "zh-CN"
+            return httpx.Response(200, json={"results": [{
+                "id": 278,
+                "title": "肖申克的救赎",
+                "original_title": "The Shawshank Redemption",
+            }]})
+        if request.url.path == "/3/movie/278/credits":
+            return httpx.Response(200, json={"crew": [{
+                "job": "Director", "name": "Frank Darabont",
+            }]})
+        if request.url.path == "/3/movie/278":
+            assert request.url.params["language"] == "zh-TW"
+            return httpx.Response(200, json={
+                "id": 278,
+                "title": "刺激1995",
+                "release_date": "1994-09-23",
+                "overview": "繁體中文劇情簡介。",
+            })
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(
+                _item(year=None, directors=["Frank Darabont"]),
+                language="zh-TW",
+            )
+
+    assert result.status == "overview_available"
+    assert result.match_method == "exact_title_director"
+    assert result.language == "zh-TW"

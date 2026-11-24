@@ -219,7 +219,7 @@ def parse_annual_article(html: str, snapshot_date: date) -> dict[str, ChartSnaps
             )
             directors = [
                 value.strip()
-                for value in re.split(r"\s*/\s*|\s+", director_text)
+                for value in re.split(r"\s*/\s*|[、,，;；]", director_text)
                 if value.strip()
             ]
 

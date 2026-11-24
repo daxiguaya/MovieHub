@@ -57,10 +57,14 @@ class Client:
         raise AssertionError(url)
 
 
-def test_director_names_split_on_slashes_and_whitespace():
-    assert re.split(r"\s*/\s*|\s+", "木头 顾杰") == ["木头", "顾杰"]
-    assert re.split(r"\s*/\s*|\s+", "唐铁军 / 吴迪") == ["唐铁军", "吴迪"]
-    assert re.split(r"\s*/\s*|\s+", "保罗·托马斯·安德森") == ["保罗·托马斯·安德森"]
+def test_director_names_preserve_multiword_names_and_split_explicit_separators():
+    split_directors = lambda value: [
+        name.strip() for name in re.split(r"\s*/\s*|[、,，;；]", value) if name.strip()
+    ]
+    assert split_directors("木头 / 顾杰") == ["木头", "顾杰"]
+    assert split_directors("唐铁军、吴迪") == ["唐铁军", "吴迪"]
+    assert split_directors("Christopher Nolan") == ["Christopher Nolan"]
+    assert split_directors("保罗·托马斯·安德森") == ["保罗·托马斯·安德森"]
 
 
 def test_parser_builds_four_separate_2025_charts_and_preserves_rank_gaps():

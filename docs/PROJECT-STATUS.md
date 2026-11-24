@@ -253,9 +253,20 @@ The TMDB audit is a coverage/matching dry-run only. It does not authorize bulk s
 - [x] Rechecked the current official TMDB FAQ and rate-limit documentation: non-commercial developer use only, attribution/approved logo and exact disclaimer required, no SLA, and respect changing request limits/HTTP 429.
 - [x] Followed TMDB's official Getting Started link to its Terms of Use. The primary terms page blocks automated retrieval; a third-party transcription dated 2026-11-10 quotes a six-month maximum cache, non-commercial restriction, non-transferable/non-sublicensable license, derivative and AI-related restrictions. This is documented as a risk signal, not treated as the controlling official text.
 - [x] Set a hard compliance hold: no synopsis schema v4, no persistent importer and no synopsis database writes until the owner has reviewed the current official terms and approved the retention/display model.
-- [x] Extended the read-only audit workflow to separately measure Top 250 (snapshot 2026-11-24) and the four annual charts (snapshot 2026-11-23, 38 unique movie/TV records), both in zh-CN and zh-TW. The second real API audit is running from the retained artifact; it will produce two reports with no synopsis text.
-- [ ] Review the annual-chart zh-CN/zh-TW coverage report after the workflow completes.
+- [x] Extended the read-only audit workflow to separately measure Top 250 (snapshot 2026-11-24) and the four annual charts (snapshot 2026-11-23, 38 unique movie/TV records), both in zh-CN and zh-TW. Audit run [#45352538897](https://github.com/daxiguaya/MovieHub/actions/runs/45352538897) completed successfully and uploaded both reports without synopsis text.
+- [x] Review the annual-chart report: 38 unique items × 2 locales = 76 records; all 76 were classified `insufficient_identity` because the official annual snapshot contains no release year and the strict matcher requires title+year. This is **not** a measured 0% TMDB overview coverage; no candidate lookup was attempted for these rows.
+- [ ] Re-run the annual audit after the yearless title+director identity enhancement in PR [#2](https://github.com/daxiguaya/MovieHub/pull/2). The enhancement requires exact title and matching TMDB credits, preserves multi-word director names, and continues to reject ambiguous/unverified matches.
 - [ ] Complete a second genuine Top 250 capture on a different date before claiming real Top 250 historical movement. Do not clone today's data and label it historical.
 - [ ] Complete Scout read-only integration rehearsal and remaining frontend edge-state QA in isolated CI.
 
 The official terms page was not machine-readable in this research session, so the project deliberately does not infer permission for indefinite synopsis retention. No production resources were touched.
+
+
+## 2026-11-24 — Annual-chart identity gap found and fixed in review
+
+- [x] Completed the expanded TMDB audit. Top 250 remained 470/500 (94.0%) with the previously measured per-locale breakdown. The four annual charts returned 76/76 `insufficient_identity` because those source rows legitimately do not carry a release year; the audit did not attempt weak title-only matches.
+- [x] Identified the cause in the matching path and annual parser: yearless annual rows could not use the existing strict title+year resolver, and director names containing spaces were being split into fragments.
+- [x] Opened [PR #2](https://github.com/daxiguaya/MovieHub/pull/2): a yearless record can now be accepted only after exact normalized title plus a matching director from TMDB credits. Ambiguous candidates remain rejected; no-director rows remain insufficient identity. Annual parsing now splits only explicit director separators and preserves multi-word names.
+- [ ] Wait for PR checks, merge only after CI passes, then rerun the annual read-only audit and report measured coverage separately by locale.
+
+The PR changes only read-only matching and parsing. No synopsis text is persisted; no production database or NAS was accessed.

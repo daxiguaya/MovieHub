@@ -26,6 +26,8 @@ def _migrated_database(path: Path) -> None:
         conn.executescript(followup.read_text(encoding="utf-8"))
         provenance = MIGRATION.with_name("003_movie_metadata_provenance.sql")
         conn.executescript(provenance.read_text(encoding="utf-8"))
+        cache = MIGRATION.with_name("004_external_api_cache.sql")
+        conn.executescript(cache.read_text(encoding="utf-8"))
     finally:
         conn.close()
 
@@ -50,7 +52,7 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         with engine.connect() as conn:
             assert conn.exec_driver_sql(
                 "SELECT MAX(version) FROM schema_migrations"
-            ).scalar_one() == 3
+            ).scalar_one() == 4
     finally:
         engine.dispose()
 

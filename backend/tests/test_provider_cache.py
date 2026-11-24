@@ -75,3 +75,18 @@ def test_external_favorites_survive_cache_eviction(tmp_path):
     assert favorites[0]["note"] == "rewatch"
     assert cache.delete_favorite("movie", 550)
     assert cache.list_favorites() == []
+
+
+
+def test_daily_backup_preserves_external_favorites(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "source" / "discovery.sqlite3")
+    cache.save_favorite(
+        "tv", 1234,
+        {"title": "Test Series", "year": 2025, "poster_path": "/series.jpg"},
+    )
+    backup_path = cache.backup_daily(tmp_path / "backups")
+    restored = ProviderResponseCache(backup_path)
+    favorites = restored.list_favorites()
+    assert len(favorites) == 1
+    assert favorites[0]["media_type"] == "tv"
+    assert favorites[0]["snapshot"]["title"] == "Test Series"

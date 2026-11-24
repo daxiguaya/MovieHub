@@ -370,3 +370,71 @@ def test_yearless_annual_identity_uses_source_locale_but_fetches_requested_local
     assert result.status == "overview_available"
     assert result.match_method == "exact_title_director"
     assert result.language == "zh-TW"
+
+
+def test_yearless_annual_item_accepts_exact_tmdb_alternative_title_with_director():
+    requests = []
+
+    def handler(request):
+        requests.append(request.url.path)
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={"results": [{
+                "id": 120467,
+                "title": "The Grand Budapest Hotel",
+                "original_title": "The Grand Budapest Hotel",
+            }]})
+        if request.url.path == "/3/movie/120467/credits":
+            return httpx.Response(200, json={"crew": [{
+                "job": "Director", "name": "Wes Anderson",
+            }]})
+        if request.url.path == "/3/movie/120467/alternative_titles":
+            return httpx.Response(200, json={"titles": [
+                {"title": "布达佩斯大饭店", "iso_3166_1": "CN"},
+            ]})
+        if request.url.path == "/3/movie/120467":
+            return httpx.Response(200, json={
+                "id": 120467,
+                "title": "布达佩斯大饭店",
+                "release_date": "2014-02-08",
+                "overview": "经别名与导演双重核验的简介。",
+            })
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(
+                _item(title="布达佩斯大饭店", year=None, directors=["Wes Anderson"])
+            )
+
+    assert result.status == "overview_available"
+    assert result.match_method == "exact_title_director"
+    assert result.tmdb_id == 120467
+    assert "/3/movie/120467/alternative_titles" in requests
+
+
+def test_yearless_annual_item_rejects_candidate_without_exact_alternative_title():
+    def handler(request):
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={"results": [{
+                "id": 120467,
+                "title": "The Grand Budapest Hotel",
+                "original_title": "The Grand Budapest Hotel",
+            }]})
+        if request.url.path == "/3/movie/120467/credits":
+            return httpx.Response(200, json={"crew": [{
+                "job": "Director", "name": "Wes Anderson",
+            }]})
+        if request.url.path == "/3/movie/120467/alternative_titles":
+            return httpx.Response(200, json={"titles": [
+                {"title": "另一个电影", "iso_3166_1": "CN"},
+            ]})
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(
+                _item(title="布达佩斯大饭店", year=None, directors=["Wes Anderson"])
+            )
+
+    assert result.status == "no_exact_match"
+    assert result.tmdb_id is None

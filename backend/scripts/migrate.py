@@ -463,10 +463,6 @@ def _execute_migration_locked(
             f"Migration SQL file does not exist: {migration_path}"
         )
 
-    migration_sql = migration_path.read_text(encoding="utf-8").strip()
-    if not migration_sql:
-        raise RuntimeError("Migration SQL file is empty")
-
     with open_database(database_path) as conn:
         current_version = get_schema_version(conn)
 
@@ -513,15 +509,31 @@ def _execute_migration_locked(
         logger.info("Existing MovieHub schema passed validation")
         return current_version
 
-    if current_version != 2:
+    if current_version not in (1, 2):
         raise RuntimeError(
             f"Unsupported starting schema version: {current_version}. "
-            "This migration requires schema version 2."
+            "This migration runner upgrades schema version 1 or 2 to version 3."
         )
+
+    migration_paths = []
+    if current_version == 1:
+        migration_paths.append(
+            migration_path.parent / "002_durable_import_batch_receipts.sql"
+        )
+    migration_paths.append(migration_path)
+    migration_sql = []
+    for pending_path in migration_paths:
+        if not pending_path.is_file():
+            raise FileNotFoundError(f"Migration SQL file does not exist: {pending_path}")
+        sql = pending_path.read_text(encoding="utf-8").strip()
+        if not sql:
+            raise RuntimeError(f"Migration SQL file is empty: {pending_path}")
+        migration_sql.append((pending_path, sql))
 
     if check_only:
         logger.info(
-            "Check-only mode: migration is pending; no changes made"
+            "Check-only mode: %s migration(s) are pending; no changes made",
+            len(migration_sql),
         )
         return current_version
 
@@ -529,16 +541,15 @@ def _execute_migration_locked(
     migration_started = False
 
     try:
-        logger.info("Executing migration SQL: %s", migration_path)
-
-        # executescript runs the explicit BEGIN/COMMIT statements contained
-        # in the migration SQL file. The SQL file controls its transaction.
-        conn = open_database(database_path)
-        try:
-            migration_started = True
-            conn.executescript(migration_sql)
-        finally:
-            conn.close()
+        for pending_path, sql in migration_sql:
+            logger.info("Executing migration SQL: %s", pending_path)
+            # Each numbered SQL migration owns its explicit transaction.
+            conn = open_database(database_path)
+            try:
+                migration_started = True
+                conn.executescript(sql)
+            finally:
+                conn.close()
 
         validate_migration(database_path)
 

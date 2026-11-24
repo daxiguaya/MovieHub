@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import time
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -74,7 +75,7 @@ class SQLiteResponseCache:
     def get(self, cache_key: str) -> dict[str, Any] | None:
         """Return a live JSON object and update its LRU/hit metadata."""
         now = int(time.time())
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT response_json, expires_at FROM external_api_cache WHERE cache_key = ?",
                 (cache_key,),
@@ -171,7 +172,7 @@ class SQLiteResponseCache:
         """Delete at most batch_size expired rows per invocation."""
         limit = max(1, min(int(batch_size), 500))
         now = int(time.time())
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             cursor = connection.execute(
                 """
                 DELETE FROM external_api_cache
@@ -186,7 +187,7 @@ class SQLiteResponseCache:
 
     def stats(self) -> dict[str, int]:
         """Return bounded cache accounting for diagnostics."""
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS entries, COALESCE(SUM(payload_bytes), 0) AS bytes, COALESCE(SUM(hit_count), 0) AS hits FROM external_api_cache"
             ).fetchone()

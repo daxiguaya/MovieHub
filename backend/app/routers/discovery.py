@@ -4,9 +4,6 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from slowapi.util import get_remote_address
-
-from app.config import settings
 from app.limiter import limiter
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
@@ -93,7 +90,7 @@ async def get_online_regions(request: Request, language: str = Query("zh-CN", mi
         "provider": "tmdb",
         "regions": [
             {"code": item.get("iso_3166_1"), "name": item.get("native_name") or item.get("english_name")}
-            for item in payload
+            for item in payload.get("items", [])
             if isinstance(item, dict) and item.get("iso_3166_1")
         ],
     }
@@ -161,7 +158,7 @@ async def get_online_detail(
         "provider_id": provider_id,
         "title": payload.get("title") or payload.get("name"),
         "original_title": payload.get("original_title") or payload.get("original_name"),
-        "year": (payload.get("release_date") or payload.get("first_air_date") or "")[:4] or None,
+        "year": int((payload.get("release_date") or payload.get("first_air_date") or "")[:4]) if (payload.get("release_date") or payload.get("first_air_date") or "")[:4].isdigit() else None,
         "rating": payload.get("vote_average"),
         "rating_count": payload.get("vote_count", 0),
         "poster_path": payload.get("poster_path"),

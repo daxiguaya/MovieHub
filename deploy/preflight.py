@@ -81,6 +81,8 @@ def main() -> int:
     if not ENV_FILE.is_file():
         errors.append("Project-root .env is missing; copy deploy/.env.example and configure it.")
     env = load_env(ENV_FILE)
+    if ENV_FILE.is_file() and (ENV_FILE.stat().st_mode & 0o077):
+        warnings.append("Project .env is readable by group/others; restrict it (for example chmod 600 .env) because it contains the API key.")
 
     api_key = env.get("MOVIEHUB_API_KEY", "")
     if len(api_key) < 32 or re.search(r"replace|changeme|example|placeholder", api_key, re.I):
@@ -124,11 +126,25 @@ def main() -> int:
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"Frontend runtime config cannot be read/parsed: {exc}")
 
-    compose_config = run(["docker", "compose", "config", "--quiet"])
+    compose_config = run(["docker", "compose", "config", "--format", "json"])
     if compose_config.returncode:
         errors.append("docker compose config validation failed: " + compose_config.stderr.strip())
     else:
-        print("[OK] Docker Compose configuration validates.")
+        try:
+            rendered = json.loads(compose_config.stdout)
+            services = rendered.get("services", {})
+            for service_name in ("moviehub", "moviehub-web"):
+                service = services.get(service_name)
+                if service is None:
+                    errors.append(f"Compose service is missing: {service_name}")
+                elif service.get("ports"):
+                    errors.append(f"{service_name} publishes host ports; remove host port bindings before deployment.")
+                elif not service.get("read_only"):
+                    errors.append(f"{service_name} must use a read-only root filesystem.")
+            if not errors:
+                print("[OK] Compose config validates; both app services have no published host ports and use read-only roots.")
+        except (json.JSONDecodeError, AttributeError) as exc:
+            errors.append(f"Cannot inspect rendered Compose configuration: {exc}")
 
     try:
         network = docker_json(["network", "inspect", EXPECTED_NETWORK])[0]

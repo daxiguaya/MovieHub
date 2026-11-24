@@ -75,7 +75,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 当前明确待补：
 - [x] 对新采集的 Top 250 JSON artifact 复核评价人数实际覆盖率；已修复当前页面文本解析并在真实数据中验证 250/250。
-- [x] 完成剧情简介来源专项初步研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [ ] 取得 TMDB API read token 后，在 250 条 Top 250 + 38 条年度榜单上运行只读 dry-run；先验证匹配准确率和 zh-CN/zh-TW overview 覆盖，不写库。
+- [x] 完成剧情简介来源专项研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [x] 新增只读 TMDB adapter 与覆盖率审计 CLI：优先已有 TMDB ID，其次 IMDb ID，最后严格标题+年份匹配；拒绝歧义/年份冲突；zh-CN/zh-TW 请求；报告只输出匹配元数据、简介长度和 SHA-256，不输出简介正文、不写数据库。Mocked API/backend tests passed。\n- [x] 新增手动 GitHub Actions workflow [TMDB overview coverage audit](../actions/workflows/tmdb-overview-audit.yml)，从已验证首发 artifact 读取 288 条记录并测量中文覆盖；运行需要仓库 Actions secret `TMDB_API_READ_TOKEN`。\n- [ ] 添加 API token secret 并执行真实只读 dry-run；先验证 250 条 Top 250 的匹配准确率与 zh-CN/zh-TW 简介覆盖，年度榜单缺少年份的记录将保守标为身份信息不足，不盲目匹配。
 - [x] 导入时仅填补空字段，不覆盖已有来源数据；字段级来源、来源 URL、采集时间和内容指纹已落库并通过真实数据验证。
 - [ ] 对多来源冲突制定优先级与审计规则；缺失值仍允许为空。
 - [x] 收藏/取消收藏的真实 API 与 SQLite 写入、读取、删除流程已通过 Playwright。
@@ -85,7 +85,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 ### P0 — 首发内容与体验收尾
 - [x] 复核 Top 250 评价人数真实覆盖率并修复解析器与真实页面结构的差异。
-- [x] 完成来源许可/稳定性/匹配方案研究；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [ ] 完成 TMDB API 非商业/缓存展示条款核验、取得只读 token，并对 288 条真实影片执行只读匹配与中文简介覆盖率试验。
+- [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [ ] 完成 TMDB API 非商业/缓存展示条款核验，添加只读 token secret，并对 288 条真实影片执行只读匹配与中文简介覆盖率试验。
 - [x] schema v3 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与真实数据持久化检查。
 - [x] 真实数据收藏/取消收藏：通过 Playwright 经可信代理注入密钥，验证 live API 与临时 SQLite 的写入、列表读取、删除。
 - [ ] 真实多日期历史快照选择、排名比较、分页和异常状态流程验收。

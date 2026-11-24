@@ -244,7 +244,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
     try:
         assert conn.execute(
             "SELECT COUNT(*) FROM schema_migrations WHERE version=3"
-        ).fetchone()[0] == 2
+        ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
         conn.close()

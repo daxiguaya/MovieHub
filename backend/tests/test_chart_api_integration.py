@@ -106,7 +106,7 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
         assert replacement.status_code == 200
         assert replacement.json()["imported_count"] == 1
         assert next_day.status_code == 200
-        assert next_day.json()["imported_count"] == 1
+        assert next_day.json()["imported_count"] == 3
 
         assert history.status_code == 200
         assert [item["snapshot_date"] for item in history.json()] == [

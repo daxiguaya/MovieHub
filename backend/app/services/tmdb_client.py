@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
 from typing import Any
 
 import httpx
@@ -111,8 +112,10 @@ class TMDBClient:
                             if received > MAX_UPSTREAM_RESPONSE_BYTES:
                                 raise HTTPException(status_code=502, detail="TMDB response exceeded the size limit")
                             chunks.append(chunk)
-                        import json
-                        payload = json.loads(b"".join(chunks))
+                        try:
+                            payload = json.loads(b"".join(chunks))
+                        except json.JSONDecodeError as exc:
+                            raise HTTPException(status_code=502, detail="TMDB returned invalid JSON") from exc
         except httpx.TimeoutException as exc:
             raise HTTPException(status_code=504, detail="TMDB request timed out") from exc
         except httpx.HTTPError as exc:

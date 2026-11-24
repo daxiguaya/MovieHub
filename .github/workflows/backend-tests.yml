@@ -411,7 +411,7 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Run the combined real first-launch browser journeys
-        run: npm run test:e2e -- --grep "real (Top 250 first-launch snapshot|2025 annual snapshots)"
+        run: npm run test:e2e -- --grep "real (Top 250 first-launch snapshot|2025 annual snapshots|first-launch dataset remains usable)"
         working-directory: frontend
 
   first-launch-data-collection:

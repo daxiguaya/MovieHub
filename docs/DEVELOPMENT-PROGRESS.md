@@ -2,7 +2,7 @@
 
 Branch: `main`
 Last updated: 2026-11-24
-Current phase: Pre-deployment hardening — localized TMDB director identity fix under real-data audit; deployment rehearsal and NAS rollout remain pending
+Current phase: Pre-deployment hardening — PR #5 merged; localized TMDB real-data audit complete; NAS deployment gate remains
 
 > **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 87% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
 
@@ -772,3 +772,16 @@ Extended the isolated Compose smoke from startup/readiness checks to the complet
 Also changed the headless browser jobs to install Playwright's Chromium headless shell instead of the full Chromium browser. The browser config uses the default headless mode; the optimization reduces the browser download/install payload. It passed in [CI #45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) with 10 E2E tests passed and 4 skipped. The subsequent documentation/main-head CI [#45344314269](https://github.com/daxiguaya/MovieHub/actions/runs/45344314269) passed all required jobs, including backend (267 passed / 4 skipped), frontend build, browser E2E, both container builds and full Compose backup/restore.
 
 No NAS, NPM, Scout source database, or production database was accessed. Overall progress remains approximately 83%.
+
+
+## 2026-11-24 — PR #5 merged; localized annual TMDB audit completed
+
+- [x] Merged PR [#5](https://github.com/daxiguaya/MovieHub/pull/5) to `main`: `a70d2a38f6edf35856acd8b018a9c1faf238eaf9`.
+- [x] Real read-only audit [#45366496227](https://github.com/daxiguaya/MovieHub/actions/runs/45366496227) completed: Top 250 zh-CN 238/250, zh-TW 232/250 (470/500 total); 2025 annual charts zh-CN 31/38 and zh-TW 31/38 (62/76 total).
+- [x] Annual localized director matching raised accepted exact matches from the previous 0/76 (all classified insufficient identity) to 62/76. The remaining 14 were not force-matched.
+- [x] Backend, frontend, Compose smoke and frontend E2E checks passed for the PR. Several optional jobs were skipped and are not counted as successful.
+- [ ] TMDB synopsis persistence remains on legal hold; this audit did not save overview text or write any database.
+- [ ] NAS deployment remains pending: network/proxy trust boundary, secrets, filesystem ownership, import route protection, backup destination and resource checks must be completed before first launch.
+- [ ] After explicit deployment approval: create a new MovieHub-only SQLite database, initialize it explicitly, import the verified first-launch dataset, then validate NPM routing, readiness, backup and rollback.
+
+Overall delivery estimate remains **approximately 87%**. This is a development estimate, not a deployment percentage. No NAS, NPM, production database or running service was touched in this work.

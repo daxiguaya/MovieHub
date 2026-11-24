@@ -8,7 +8,7 @@ import {
   useParams,
   useSearchParams
 } from "react-router-dom";
-import { api } from "./api";
+import { api, setMovieHubApiKey } from "./api";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
 import { appPath } from "./paths";
 import type {
@@ -860,7 +860,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>
-          {favoriteError && <div className="inline-error">{favoriteError}</div>}
+          {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}
           {movie.directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{movie.directors.join(" / ")}</p></section>}
           {movie.actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{movie.actors.join(" / ")}</p></section>}
@@ -958,6 +958,7 @@ function FavoritesPage() {
   const [externalFavorites, setExternalFavorites] = useState<ExternalFavorite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [apiKeyInput, setApiKeyInput] = useState("");
 
   async function refresh() {
     setLoading(true);
@@ -975,6 +976,13 @@ function FavoritesPage() {
   }
 
   useEffect(() => { void refresh(); }, []);
+
+  function connectApiKey(event: FormEvent) {
+    event.preventDefault();
+    setMovieHubApiKey(apiKeyInput);
+    setApiKeyInput("");
+    void refresh();
+  }
 
   async function removeLocal(movieId: number) {
     try {
@@ -997,7 +1005,17 @@ function FavoritesPage() {
   return (
     <>
       <PageHeading eyebrow="YOUR WATCHLIST" title="我的收藏" description="收藏记录长期保留；搜索和详情缓存过期不会影响你的收藏。" />
-      {loading ? <Loading /> : error && favorites.length === 0 && externalFavorites.length === 0 ? <ErrorState message={error} /> : (
+      {loading ? <Loading /> : error && (error.toLowerCase().includes("api key") || error.toLowerCase().includes("api_key")) ? (
+        <section className="api-key-gate">
+          <h2>连接收藏功能</h2>
+          <p>收藏接口受 MovieHub API Key 保护。密钥只保存在当前浏览器标签页会话中，不会发送给 TMDB 或其他第三方。</p>
+          <form onSubmit={connectApiKey}>
+            <input type="password" value={apiKeyInput} onChange={(event) => setApiKeyInput(event.target.value)} placeholder="输入 NAS 上配置的 MovieHub API Key" autoComplete="off" />
+            <button className="primary-button" type="submit" disabled={!apiKeyInput.trim()}>连接收藏</button>
+          </form>
+          <small>{error}</small>
+        </section>
+      ) : error && favorites.length === 0 && externalFavorites.length === 0 ? <ErrorState message={error} /> : (
         <>
           {externalFavorites.length > 0 && (
             <>

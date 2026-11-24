@@ -130,15 +130,16 @@ def test_explicit_snapshot_date_returns_historical_snapshot():
         engine.dispose()
 
 
-def test_invalid_cursor_is_ignored_and_missing_snapshot_is_empty():
+def test_invalid_cursor_is_rejected_and_missing_snapshot_is_empty():
     engine, db = _database()
     service = ChartService()
     try:
         _seed_chart(db)
 
-        invalid_cursor = service.get_chart_movies(
-            db, "test-chart", cursor="not-a-valid-cursor", limit=1
-        )
+        with pytest.raises(ChartCursorError, match="Invalid chart pagination cursor"):
+            service.get_chart_movies(
+                db, "test-chart", cursor="not-a-valid-cursor", limit=1
+            )
         assert invalid_cursor is not None
         assert [item.rank for item in invalid_cursor.items] == [1]
 

@@ -271,6 +271,39 @@ def test_restore_rejects_invalid_manifest_without_touching_current_database(
 
 
 
+@pytest.mark.parametrize("symlink_kind", ["directory", "manifest", "database"])
+def test_restore_rejects_symlinked_backup_inputs_without_touching_target(
+    tmp_path, symlink_kind
+):
+    database = tmp_path / "data" / "movies.db"
+    _initialize_database(database)
+    _insert_movie(database, "Target must survive")
+    backup_dir = create_backup(database, tmp_path / "backups")
+    supplied = tmp_path / "supplied-backup"
+
+    if symlink_kind == "directory":
+        supplied.symlink_to(backup_dir, target_is_directory=True)
+    else:
+        supplied.mkdir()
+        for name in ("manifest.json", "movies.db"):
+            source = backup_dir / name
+            destination = supplied / name
+            if name == ("manifest.json" if symlink_kind == "manifest" else "movies.db"):
+                destination.symlink_to(source)
+            else:
+                destination.write_bytes(source.read_bytes())
+
+    with pytest.raises(RuntimeError, match="symbolic link"):
+        restore_backup(
+            supplied,
+            database,
+            confirm=True,
+            service_stopped=True,
+        )
+
+    assert _movie_titles(database) == ["Target must survive"]
+
+
 def test_restore_rolls_back_original_database_if_post_replace_validation_fails(
     tmp_path, monkeypatch
 ):

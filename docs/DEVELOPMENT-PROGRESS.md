@@ -712,6 +712,17 @@ This is a test-coverage improvement, not a claim that the real-source dataset no
 - [x] Imported Top 250 plus all four official 2025 annual charts into a disposable CI SQLite database: 288 chart items, 288 unique movies, five snapshots, integrity check `ok`, zero foreign-key errors.
 - [x] Re-ran the live-data browser suite: 4/4 passed — Top 250, 2025 annual snapshots, narrow mobile layout, and live favorite add/list/remove.
 
-Run [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102): real-source collection/import and real-data browser jobs succeeded; backend and frontend jobs succeeded. The regular fixture E2E job was still installing Chromium when this note was written; fixture E2E had already passed 10/10 in CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741).
+Run [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102): real-source collection/import and real-data browser jobs succeeded; backend and frontend jobs succeeded. The regular fixture E2E job subsequently completed successfully in the same run, alongside backend, frontend, and container builds. The opt-in performance and annual import jobs were skipped.
 
 This verifies the current application against a freshly collected real dataset in disposable CI, but does not create two distinct capture dates for the same chart. It also does not execute the TMDB overview audit (the repository secret is still required), nor does it deploy to NAS. Overall estimate remains **83%**.
+
+
+## Chart pagination cursor hardening (2026-11-24)
+
+- [x] Strictly decode URL-safe Base64 cursors; malformed payloads no longer fall back to the first page.
+- [x] Reject empty, zero, negative, and non-canonical rank values with HTTP 400.
+- [x] Preserve valid cursor traversal and define the beyond-last-rank response as an empty page with stable total and no next cursor.
+- [x] Add HTTP integration coverage for all of the above against temporary SQLite.
+- [ ] Branch-head CI verification pending.
+
+This closes an API edge case: a typo or tampered cursor previously restarted pagination at page one without telling the caller. It does not change the current 83% overall estimate. No NAS, production database, Scout source, NPM, or running service was accessed.

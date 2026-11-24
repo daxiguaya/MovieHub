@@ -103,3 +103,18 @@ The backend test suite includes a single end-to-end filesystem-isolated lifecycl
 7. Separately verify that initialization refuses an existing external database and leaves its source table and records unchanged.
 
 This is an automated rehearsal of the database lifecycle, not a live Docker/NPM/NAS deployment. Compose configuration validation and container builds are separate CI checks. No production database is initialized or modified by these tests.
+
+
+## Live Compose backup/restore rehearsal (CI)
+
+The isolated Compose smoke workflow now exercises the backup/restore commands inside the actual built containers, not only in a Python test process:
+
+1. Start both Compose services against disposable runner-local bind mounts and explicitly initialize the MovieHub database.
+2. Insert a sentinel movie and verify its original title through the live HTTP API.
+3. Create a checksum-verified backup from the running API container.
+4. Change the movie title and verify the changed value through the live API.
+5. Stop the API container, restore the backup using the documented one-shot container command and explicit acknowledgement flags, then restart the API.
+6. Verify the API serves the pre-backup title and the pre-restore rollback copy retains the changed title.
+7. Verify both container health checks and remove the isolated Compose project.
+
+This rehearsal passed in GitHub Actions [#45343969389](https://github.com/daxiguaya/MovieHub/actions/runs/45343969389). It uses only temporary CI data and does not authorize or perform a NAS deployment, NPM integration, or production database operation.

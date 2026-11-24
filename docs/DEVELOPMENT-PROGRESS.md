@@ -763,3 +763,12 @@ No NAS, NPM, Scout source database, or production data was accessed. Overall pro
 - [x] PR [#1](https://github.com/daxiguaya/MovieHub/pull/1) merged from `phase4/database-foundation` to `main`.
 - [x] Squash merge commit: `0649a4d209f99d91bb192b8c544eed2cd63a993e`.
 - [x] Future work should continue from `main` to avoid reopening the already integrated phase branch as a large repeat PR.
+
+
+## 2026-11-24 — Live Compose backup/restore acceptance
+
+Extended the isolated Compose smoke from startup/readiness checks to the complete backup and restore lifecycle using actual containers and the live HTTP API. The test seeds a sentinel movie, verifies it via API, creates a backup while the API is running, mutates the title, verifies the changed title via API, stops the backend, restores through a one-shot container, restarts the API, verifies the original title via API, and checks the pre-restore rollback copy contains the changed title. Both container health checks and isolated project cleanup passed in [CI #45343969389](https://github.com/daxiguaya/MovieHub/actions/runs/45343969389).
+
+Also changed the headless browser jobs to install Playwright's Chromium headless shell instead of the full Chromium browser. The browser config uses the default headless mode; the optimization is intended to reduce the variable browser download/install time. Validation is queued in [CI #45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088).
+
+No NAS, NPM, Scout source database, or production database was accessed. Overall progress remains approximately 83%.

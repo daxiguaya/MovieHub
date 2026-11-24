@@ -197,3 +197,17 @@ The database lifecycle tests passed in temporary SQLite. The live two-container 
 - [x] Squash-merged PR #1; `main` now points to `0649a4d209f99d91bb192b8c544eed2cd63a993e`.
 
 The merge promotes the current implementation to the repository's default branch. It does not deploy the application or initialize a production database.
+
+
+## 2026-11-24 — Live container backup/restore rehearsal
+
+- [x] Run the documented backup command inside the actual backend container while the API is running.
+- [x] Verify a seeded sentinel movie through the live API before backup.
+- [x] Mutate the sentinel after backup and verify the changed value through the API.
+- [x] Stop the backend container and restore the selected backup through a one-shot Compose container.
+- [x] Restart the API and verify the original value is served again; verify the pre-restore rollback copy contains the changed value.
+- [x] Verify backend/frontend container health checks and cleanup of the isolated Compose project.
+- [x] Compose lifecycle job passed in CI [#45343969389](https://github.com/daxiguaya/MovieHub/actions/runs/45343969389); backend and frontend build/test jobs passed. Browser E2E was still running at the time of this status update.
+- [x] Optimize CI browser installation to use Playwright's headless Chromium shell for the headless E2E suite; validation run [#45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) is queued.
+
+This remains isolated CI verification. No NAS, NPM, Scout source database, or production data was accessed. Overall progress remains **83%** pending real overview coverage/licensing, genuine multi-date source history, and eventual production deployment.

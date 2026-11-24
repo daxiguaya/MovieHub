@@ -15,7 +15,7 @@ from app.config import settings
 
 Base = declarative_base()
 DATABASE_NAME = "movies.db"
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 REQUIRED_DATABASE_TABLES = {
     "schema_migrations",
     "movies",
@@ -30,8 +30,32 @@ REQUIRED_DATABASE_TABLES = {
     "favorites",
     "import_batch_receipts",
     "movie_metadata_provenance",
+    "external_api_cache",
 }
 
+
+class ExternalAPICache(Base):
+    """Disposable, bounded response cache for upstream APIs."""
+
+    __tablename__ = "external_api_cache"
+
+    cache_key = Column(String(64), primary_key=True)
+    provider = Column(String(32), nullable=False)
+    endpoint = Column(String(128), nullable=False)
+    params_json = Column(Text, nullable=False)
+    response_json = Column(Text, nullable=False)
+    fetched_at = Column(Integer, nullable=False)
+    expires_at = Column(Integer, nullable=False)
+    last_accessed_at = Column(Integer, nullable=False)
+    payload_bytes = Column(Integer, nullable=False)
+    hit_count = Column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        CheckConstraint("payload_bytes >= 0", name="ck_external_api_cache_payload_bytes"),
+        CheckConstraint("hit_count >= 0", name="ck_external_api_cache_hit_count"),
+        Index("ix_external_api_cache_expires_at", "expires_at"),
+        Index("ix_external_api_cache_last_accessed_at", "last_accessed_at"),
+    )
 
 class DatabaseNotInitializedError(RuntimeError):
     """Raised when API access is attempted before explicit DB initialization."""

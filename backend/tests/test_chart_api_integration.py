@@ -77,7 +77,7 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
             next_day = client.post(
                 "/api/charts/import",
                 headers=headers,
-                json=_snapshot("2026-11-24", ["10004"]),
+                json=_snapshot("2026-11-24", ["10004", "10005", "10006"]),
             )
 
             history = client.get("/api/charts/api-fixture-chart/snapshots")
@@ -85,7 +85,21 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
                 "/api/charts/api-fixture-chart",
                 params={"snapshot_date": "2026-11-23"},
             )
-            latest = client.get("/api/charts/api-fixture-chart")
+            latest = client.get(
+                "/api/charts/api-fixture-chart",
+                params={"limit": 2},
+            )
+            latest_second_page = client.get(
+                "/api/charts/api-fixture-chart",
+                params={
+                    "limit": 2,
+                    "cursor": latest.json()["next_cursor"],
+                },
+            )
+            historical_page = client.get(
+                "/api/charts/api-fixture-chart",
+                params={"snapshot_date": "2026-11-23", "limit": 1},
+            )
 
         assert first.status_code == 200
         assert first.json()["imported_count"] == 2
@@ -105,7 +119,14 @@ def test_chart_import_and_history_apis_preserve_date_scoped_snapshots(
         assert historical.json()["items"][0]["douban_id"] == "10003"
 
         assert latest.status_code == 200
-        assert latest.json()["total"] == 1
-        assert latest.json()["items"][0]["douban_id"] == "10004"
+        assert latest.json()["total"] == 3
+        assert [item["douban_id"] for item in latest.json()["items"]] == ["10004", "10005"]
+        assert latest.json()["next_cursor"]
+        assert latest_second_page.status_code == 200
+        assert [item["douban_id"] for item in latest_second_page.json()["items"]] == ["10006"]
+        assert latest_second_page.json()["next_cursor"] is None
+        assert historical_page.status_code == 200
+        assert historical_page.json()["total"] == 1
+        assert historical_page.json()["items"][0]["douban_id"] == "10003"
     finally:
         engine.dispose()

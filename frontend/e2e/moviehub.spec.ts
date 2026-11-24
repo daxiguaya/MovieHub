@@ -211,8 +211,8 @@ test("connects the browser to the real FastAPI service and temporary SQLite data
   await expect(page.getByText("A journey through space and time.")).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际穿越");
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill("星际穿越");
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: "星际穿越" })).toBeVisible();
 });
 
@@ -251,8 +251,8 @@ test("real 2025 annual snapshots render through the live API and support detail/
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
 
@@ -276,8 +276,8 @@ test("real Top 250 first-launch snapshot renders through the live API and suppor
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
 
@@ -311,8 +311,8 @@ test("real first-launch dataset remains usable on a narrow mobile viewport", asy
   expect(detailOverflow, "movie detail should not overflow a 390px viewport").toBe(false);
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 
   const searchOverflow = await page.evaluate(

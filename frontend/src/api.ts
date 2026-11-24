@@ -73,6 +73,8 @@ export const api = {
     ),
   discoveryRegions: () =>
     request<{ provider: string; regions: { code: string; name: string }[] }>("/discovery/regions"),
+  discoveryDiscover: (params: URLSearchParams) =>
+    request<DiscoverySearchResponse>("/discovery/discover?" + params.toString()),
   discoveryDetail: (mediaType: "movie" | "tv", providerId: number) =>
     request<DiscoveryDetail>("/discovery/" + mediaType + "/" + providerId),
   externalFavorites: () => request<ExternalFavorite[]>("/discovery/favorites"),

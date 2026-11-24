@@ -75,6 +75,7 @@ jobs:
               assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
           finally:
               connection.close()
+          db.chmod(0o666)
           print("Created populated schema-v2 fixture with sentinel")
           PY
 

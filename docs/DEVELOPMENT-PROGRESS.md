@@ -626,3 +626,14 @@ The same run collected all four official 2025 annual charts and all four normali
 - [ ] Real schema-v1 database-copy migration acceptance, staged Scout audit and NAS operational rehearsal remain pending.
 
 **Restore hardening milestone: implementation and latest branch-head CI verified.** All checks used isolated CI databases. No NAS database, Scout source, NPM configuration or production service was accessed or changed. The overall first-release estimate remains about 75%; automated restore safety is stronger, but the remaining data and operational acceptance gates are unchanged.
+
+## Scout readiness output safety — branch-head verification (2026-11-24)
+
+- [x] Reject report destinations that resolve to the staged Scout database or any supplied chart snapshot.
+- [x] Reject symlinked report destinations and temporary paths; create the temporary report with exclusive creation so an existing file cannot be truncated or followed.
+- [x] Preserve owner-only report permissions and atomic replacement.
+- [x] Verify branch-head run [#45308944770](https://github.com/daxiguaya/MovieHub/actions/runs/45308944770): backend **246 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; browser E2E **4/4 passed**.
+- [ ] Annual-chart-collection and performance-benchmarks jobs were skipped in this push-triggered run; they are not counted as passing.
+- [x] Add a CLI-order regression test proving an output/input collision is rejected before the expensive Scout audit starts. This new test is committed as `65b4cf2`; its CI result is pending.
+
+**Safety boundary:** report output validation happens before any source audit, and report writing independently refuses symlink/temp-file hazards. The new CLI-order regression test is awaiting CI. No real Scout source, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed. Overall first-release estimate remains about 75%; real staged-data and operational acceptance gates remain open.

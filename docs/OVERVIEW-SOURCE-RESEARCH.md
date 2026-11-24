@@ -88,10 +88,46 @@ Only after the report is reviewed should the importer write to an isolated dispo
 - `backend/tests/test_tmdb_overview.py` and `backend/tests/test_audit_tmdb_overview.py`: mocked API tests cover exact title/year, ambiguity, year mismatch, IMDb cross-check, known TMDB ID, locale, empty overview, nested artifact loading, report deduplication and no synopsis text in reports.
 - Manual workflow: [tmdb-overview-audit.yml](../.github/workflows/tmdb-overview-audit.yml). It downloads the retained first-launch artifact from run `45329522019`, runs zh-CN and zh-TW dry-runs, and uploads a report that contains no synopsis text. It requires the repository Actions secret `TMDB_API_READ_TOKEN`.
 
-## Next work order
+## Terms and compliance re-check (2026-11-24)
 
-1. Confirm the non-commercial and intended caching/display terms gate. Add `TMDB_API_READ_TOKEN` as a repository Actions secret (never commit it or paste it into chat).
-2. Run the manual workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml) using source run `45329522019` (artifact retained until 2026-12-08). Review exact matches, ambiguous/no-match counts, and zh-CN/zh-TW overview coverage.
-3. If the measured coverage and terms are acceptable, add the additive provenance migration for license/terms basis, language, attribution and modification marker, then implement the separate NULL-only importer and attribution UI.
-4. If TMDB cannot meet terms or measured coverage, use individually verified Wikimedia film articles as a fallback with CC BY-SA compliance; keep unknown synopsis fields empty.
-5. Then resume real-data pagination, multi-date snapshot selection/comparison, filters and edge-state E2E.
+### Primary-source findings
+
+The current official TMDB developer FAQ was opened and checked directly:
+- Free developer API use is limited to **non-commercial** purposes and requires attribution.
+- TMDB defines commercial projects by their primary purpose of generating revenue for the owner.
+- TMDB currently provides **no SLA**.
+- Attribution must include the exact notice `This product uses the TMDB API but is not endorsed or certified by TMDB.`, an approved TMDB logo, and placement in an About/Credits section. The logo must not imply endorsement and must be less prominent than MovieHub's own branding.
+- TMDB says it does not claim ownership of API data/images. This FAQ is not, by itself, a blanket copyright grant for permanent synopsis storage or redistribution.
+
+Official FAQ: https://developer.themoviedb.org/docs/faq  
+Official rate-limit guidance: https://developer.themoviedb.org/docs/rate-limiting  
+The rate-limit page says the old fixed limit was disabled, but a changing upper limit around 40 requests/second remains to deter bulk scraping; clients must respect HTTP 429. MovieHub's sequential 0.3-second minimum interval is deliberately more conservative.
+
+### Terms page access limitation and risk treatment
+
+TMDB's official Getting Started page links to its Terms of Use at https://www.themoviedb.org/documentation/api/terms-of-use, but that page blocks automated retrieval. A third-party transcription (APIs.io, stating it read the official page on 2026-11-10) quotes additional terms including: non-commercial-only developer license, non-transferable/non-sublicensable license, no derivatives, a six-month maximum cache period, restrictions on selling/leasing/sublicensing content, and restrictions involving ML/AI applications. This is **secondary transcription, not a substitute for the controlling official agreement**; it must not be treated as definitive legal advice or as proof that MovieHub's intended persistent catalog use is authorized.
+
+Sources:
+- Official Getting Started / Terms link: https://developer.themoviedb.org/docs/getting-started
+- Third-party transcription, explicitly attributed to TMDB's page and dated 2026-11-10: https://apis.io/api-terms/tmdb/tmdb-terms-of-service/
+
+**Decision: keep TMDB synopsis persistence on hold.** Do not create schema v4 for synopsis storage, do not run a NULL-only importer, and do not retain overview text in MovieHub's database until the owner has reviewed/accepted the current official Terms of Use and, if necessary, obtained written clarification from TMDB. The already completed API audit remains read-only and contains no synopsis text.
+
+### Real API coverage already measured
+
+- Top 250: 250 unique movies × zh-CN/zh-TW = 500 language records.
+- 470/500 records had a non-empty, strictly matched localized overview (94.0% overall).
+- zh-CN: 238/250 (95.2%); zh-TW: 232/250 (92.8%).
+- Remaining 30 records were rejected/empty: 3 ambiguous, 4 insufficient identity, 21 no strict match, 2 matched but empty overview.
+- No synopsis body was included in the report and no MovieHub database was opened or changed.
+
+The four annual charts contain a separate 38 unique movie/TV records dated 2026-11-23. Their zh-CN/zh-TW coverage is **not yet measured**; the next audit run will include them as a separate report rather than blending them with Top 250 statistics.
+
+## Revised next work order
+
+1. Extend the existing read-only audit workflow to cover both real source dates: Top 250 (2026-11-24) and the four annual charts (2026-11-23), with separate JSON reports and no synopsis text.
+2. Run the full backend/frontend/Playwright/Compose suite and inspect the real-data API edge cases in disposable CI only.
+3. Obtain the owner's explicit decision on the official TMDB Terms of Use and the intended retention/display model before any synopsis persistence work.
+4. If authorized, design schema v4 with explicit language, provider ID, terms basis, attribution, modification marker, source URL, and an enforceable expiry/retention policy; then add a separate NULL-only importer and About/Credits attribution UI.
+5. Continue true multi-date history only when a second genuine Top 250 capture date exists. Current dated annual charts are different chart slugs, not historical Top 250 snapshots; do not fabricate historical movement by cloning a snapshot.
+6. Complete Scout read-only integration rehearsal and final frontend edge-state QA. Production/NAS deployment remains a separate approval stage.

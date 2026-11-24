@@ -29,12 +29,14 @@ from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
 from app.services.tmdb_client import tmdb_client
+from app.services.response_cache import response_cache
 
 setup_logging()
 
 logger = logging.getLogger("moviehub.main")
 
 POSTER_CACHE_CLEANUP_INTERVAL = 24 * 60 * 60
+RESPONSE_CACHE_CLEANUP_INTERVAL = 60 * 60
 
 
 async def _poster_cache_cleanup_loop() -> None:
@@ -48,6 +50,18 @@ async def _poster_cache_cleanup_loop() -> None:
             )
         except Exception:
             logger.exception("Poster cache cleanup failed")
+
+
+
+async def _response_cache_cleanup_loop() -> None:
+    """Prune a bounded batch of expired API responses every hour."""
+    while True:
+        await asyncio.sleep(RESPONSE_CACHE_CLEANUP_INTERVAL)
+        try:
+            if database_is_ready():
+                await asyncio.to_thread(response_cache.clear_expired, 100)
+        except Exception:
+            logger.exception("Response cache cleanup failed")
 
 
 @asynccontextmanager
@@ -73,17 +87,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         logger.exception("Initial poster cache cleanup failed")
 
-    cleanup_task = asyncio.create_task(
-        _poster_cache_cleanup_loop()
-    )
+    if database_is_ready(db_path):
+        try:
+            await asyncio.to_thread(response_cache.clear_expired, 100)
+        except Exception:
+            logger.exception("Initial response cache cleanup failed")
+
+    cleanup_task = asyncio.create_task(_poster_cache_cleanup_loop())
+    response_cleanup_task = asyncio.create_task(_response_cache_cleanup_loop())
 
     try:
         yield
     finally:
         cleanup_task.cancel()
+        response_cleanup_task.cancel()
 
         with contextlib.suppress(asyncio.CancelledError):
             await cleanup_task
+        with contextlib.suppress(asyncio.CancelledError):
+            await response_cleanup_task
 
         await tmdb_client.aclose()
         logger.info("MovieHub application shutting down...")

@@ -1,16 +1,16 @@
 # MovieHub 项目总进度与交付清单
 
-> **更新基线：2026-11-24**  
+> **更新基线：2026-11-24（NAS 实际验收更新）**  
 > 仓库：`daxiguaya/MovieHub`  
 > 工作分支：`main`  
-> 当前阶段：部署前收尾（Pre-deployment hardening）  
-> 整体进度估算：**约 87%**。这是交付范围估算，不是测试通过率。
+> 当前阶段：已部署，首发数据导入与最终验收（Live acceptance）  
+> 整体进度估算：**约 90%**。这是交付范围估算，不是测试通过率。
 
 ## 一句话结论
 
 MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采集/导入链路、容器与备份恢复工具。首发真实数据为 5 个快照、288 条榜单项、288 个唯一影片；已在 GitHub Actions 临时数据库完成导入，并通过桌面、390px 移动端及真实收藏链路浏览器验收。
 
-**项目尚未部署，MovieHub 正式数据库尚未创建，也没有 NAS 生产实例。** 当前所有真实数据验收均在 GitHub runner 的一次性 SQLite 中完成。
+**NAS MovieHub 实例已部署并通过基础连通性、健康检查、NPM 路由和数据库备份恢复验收。** 但 NAS 正式数据库目前只有 7 个内置榜单定义，尚未导入 5 个真实快照 / 288 条榜单项；GitHub Actions 的真实数据验收仍属于隔离环境，不等于生产数据已经导入。
 
 ## 重要边界
 
@@ -18,7 +18,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - Douban Scout 是可选的外部只读数据源/导入适配器，不是当前项目初始化或数据库重构的前置条件。
 - 当前首发数据来自允许访问的豆瓣 Top 250 页面和已验证的 2025 官方年度榜单。
 - 豆瓣 robots.txt 禁止访问的热门/高分接口已停止使用，不绕过访问限制。
-- 当前阶段不连接 NAS，不部署，不创建生产数据库，不修改 DSM/NPM/Docker/ImmortalWrt，不重启任何服务。
+- NAS 部署与 NPM 路由已由用户实际完成；后续任何 NPM 修改、服务重启、生产数据导入仍需按单独步骤审查，不擅自重启现有服务。
 - 真实来源未提供的字段保持缺失；不根据片名或其他信息推断、伪造评价人数、导演、演员或简介。
 
 ## 已完成
@@ -110,14 +110,18 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - [ ] 根据来源许可、稳定性和维护成本决定是否增加定时采集；目前没有后台定时刷新。
 - [ ] 官方 2026 榜单发布并核实后，再决定是否增加对应分类。
 
-### P3 — 经明确审批后才进行的生产部署
-- [ ] NAS 生产目录创建和权限设置。
-- [ ] 显式初始化 MovieHub 正式数据库。
-- [ ] 首次生产数据导入和完整性检查。
-- [ ] NPM 反向代理/HTTPS 配置及真实域名联调。
-- [ ] 服务启动、readiness、备份恢复抽检和回滚验证。
+### P3 — NAS 部署与生产验收
+- [x] NAS 项目目录、数据目录和备份目录已建立；容器 UID/GID 10001 写入权限已实测。
+- [x] NAS MovieHub 独立数据库已显式初始化，schema v3 readiness 正常。
+- [x] 前后端容器已部署并均为 healthy；无宿主机端口发布。
+- [x] NPM `/moviehub/`、favorites 专用 location、导入路由拒绝规则和 HTTPS 外部访问已实测；DSM 根路径保持正常。
+- [x] 首份数据库备份 SHA-256、文件大小、SQLite integrity、外键和 13 张表均已校验。
+- [x] 临时 SQLite 恢复演练通过，13 张表记录数与备份逐表一致，未修改生产数据库。
+- [ ] 确认 API Key 已完成轮换，且 `.env` 与 NPM favorites location 使用同一把新密钥。
+- [ ] 将经审核的首发数据导入 NAS MovieHub 数据库，并完成 API/前端验收。
+- [ ] 完成 Xiaoya 搜索跳转及异常状态最终验收。
 
-**P3 尚未开始。** 生产数据库初始化、NAS 部署、Scout 实际挂载/导入、NPM 配置变更和服务重启均须单独审批。
+**NAS 基础部署与备份恢复验收已完成；生产电影/榜单数据导入尚未完成。** Scout 仍是可选只读来源，不得把 Scout 数据库当作 MovieHub 目标库。
 
 ## 进度判断
 
@@ -130,7 +134,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | 首发详情元数据丰富度 | 进行中 |
 | 前端核心功能与桌面/移动端真实数据 E2E | 榜单、详情、搜索、收藏链路自动化验收通过；视觉 QA 待做 |
 | 容器、备份恢复和运维文档 | 已实现；真实 288 条榜单项导入、schema v2→v3、双容器 API、备份恢复/回滚均在隔离 CI 通过 |
-| NAS/NPM 实际联调与生产部署 | 未开始 |
+| NAS/NPM 实际联调与基础部署 | 已完成；生产首发数据导入待完成 |
 
 **整体进度调整为约 87%。** 本轮新增两项真实验收：TMDB Top 250 的 500 条简繁体语言记录只读审计，470 条可用（94%）；以及 5 个真实快照/288 条榜单项在 schema v2→v3 升级后的双容器导入、API、备份恢复和回滚闭环。TMDB 审计不写数据库，因此 MovieHub 当前 synopsis 字段仍为 0/250；在缓存、持久化、再分发和展示条款核验完成前，不启动简介导入。下一步优先完成 TMDB 条款审查，再决定是否增加 NULL-only overview importer 与 attribution UI；同时补齐真实多日期历史、Scout 只读导入演练和前端边界 QA。最新真实数据导入/升级 CI [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) 与主 CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) 均通过。
 
@@ -316,3 +320,21 @@ TMDB attribution and persistent-overview retention findings are tracked separate
 - [ ] NAS host checks, independent database initialization, first data import, live backup/restore and TMDB synopsis licensing decision remain outstanding.
 
 **Development delivery estimate remains approximately 88%; NAS deployment remains 0%.** The added API test and NPM runbook improve the deployment security gate but do not count as a NAS-side validation.
+
+
+## 2026-11-24 — NAS live deployment and backup/restore acceptance
+
+This section supersedes older historical notes above that say NAS deployment has not started.
+
+- [x] Deployed baseline: `main` commit `1c6ceffbef43cc10b8261f7e85082ebe87a4f35c`.
+- [x] NAS frontend and backend containers are both healthy; backend logs show normal startup and repeated `/api/ready` HTTP 200.
+- [x] Public HTTPS path checks passed for `/moviehub/`, `/moviehub/search`, and `/moviehub/api/ready`; protected import paths return 404; DSM root remains HTTP 200.
+- [x] Fixed the no-trailing-slash redirect to use a relative redirect and preserve external port `:18443`.
+- [x] Production database readiness reports schema version 3. It currently has 13 tables, 7 built-in chart definitions and no imported movie/chart snapshot rows.
+- [x] Backup `moviehub-20261124T120602000694Z`: 200704 bytes; manifest SHA-256 equals the actual file hash; SQLite integrity `ok`; foreign-key errors 0.
+- [x] Isolated temporary restore drill passed: schema migration version 3, 13 tables, 0 foreign-key errors, and identical row counts in every table. Temporary restore directory was removed. The production database and running containers were not changed by this drill.
+- [ ] API-key rotation remains unconfirmed. The backend restart/readiness result does not prove that `MOVIEHUB_API_KEY` was rotated or that the NPM favorites-only header was updated.
+- [ ] Import the approved 5-snapshot / 288-row first-launch dataset into the NAS-owned database, after reviewing the exact artifact and CLI preflight. This is separate from the already-passed disposable CI import.
+- [ ] TMDB overview persistence remains on legal hold; do not store synopsis text until the terms/retention decision is explicitly resolved.
+
+**Current estimate: approximately 90%.** The remaining critical work is the API-key rotation check, controlled first-launch data import, and final live user-flow validation. No NPM restart or unrelated service restart is part of this next phase.

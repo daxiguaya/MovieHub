@@ -183,3 +183,38 @@ test("connects the browser to the real FastAPI service and temporary SQLite data
   await page.getByRole("button", { name: /搜索电影/ }).click();
   await expect(page.locator("a.movie-title", { hasText: "星际穿越" })).toBeVisible();
 });
+
+test("real 2025 annual snapshots render through the live API and support detail/search navigation", async ({ page }) => {
+  // The dedicated CI job imports the retained official 2025 artifact into a
+  // disposable SQLite database and starts the real FastAPI service.
+  await page.unroute("**/api/**");
+
+  const annualCharts = [
+    { slug: "annual-2025-chinese-movies", name: "2025 评分最高华语电影", count: 8 },
+    { slug: "annual-2025-international-movies", name: "2025 评分最高外语电影", count: 10 },
+    { slug: "annual-2025-hidden-gems", name: "2025 年度冷门佳片", count: 10 },
+    { slug: "annual-2025-chinese-tv", name: "2025 评分最高华语剧集", count: 10 }
+  ];
+
+  for (const chart of annualCharts) {
+    await page.goto("/");
+    await page.locator(`a.chart-tile[href="/charts/${chart.slug}"]`).click();
+    await expect(page.getByRole("heading", { name: chart.name })).toBeVisible();
+    await expect(page.getByText(`${chart.count} 部作品`, { exact: true })).toBeVisible();
+    await expect(page.locator("a.movie-title").first()).toBeVisible();
+  }
+
+  // Follow one real imported record through its detail page and title search.
+  await page.goto("/charts/annual-2025-chinese-movies");
+  const firstMovie = page.locator("a.movie-title").first();
+  await expect(firstMovie).toBeVisible();
+  const title = (await firstMovie.innerText()).trim();
+  expect(title.length).toBeGreaterThan(0);
+  await firstMovie.click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+
+  await page.goto("/search");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
+  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
+});

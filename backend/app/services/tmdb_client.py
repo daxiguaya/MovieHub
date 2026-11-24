@@ -104,15 +104,22 @@ class TMDBClient:
                             raise HTTPException(status_code=502, detail="TMDB is temporarily unavailable")
                         if response.status_code >= 400:
                             raise HTTPException(status_code=502, detail="TMDB rejected the discovery request")
-                        body = await response.aread()
-                        if len(body) > MAX_UPSTREAM_RESPONSE_BYTES:
-                            raise HTTPException(status_code=502, detail="TMDB response exceeded the size limit")
-                        payload = response.json()
+                        chunks: list[bytes] = []
+                        received = 0
+                        async for chunk in response.aiter_bytes():
+                            received += len(chunk)
+                            if received > MAX_UPSTREAM_RESPONSE_BYTES:
+                                raise HTTPException(status_code=502, detail="TMDB response exceeded the size limit")
+                            chunks.append(chunk)
+                        import json
+                        payload = json.loads(b"".join(chunks))
         except httpx.TimeoutException as exc:
             raise HTTPException(status_code=504, detail="TMDB request timed out") from exc
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=502, detail="TMDB request failed") from exc
 
+        if isinstance(payload, list):
+            payload = {"items": payload}
         if not isinstance(payload, dict):
             raise HTTPException(status_code=502, detail="TMDB returned an invalid response")
         if isinstance(payload.get("results"), list) and not payload["results"]:

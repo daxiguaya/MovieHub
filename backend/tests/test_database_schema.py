@@ -50,7 +50,7 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         with engine.connect() as conn:
             assert conn.exec_driver_sql(
                 "SELECT MAX(version) FROM schema_migrations"
-            ).scalar_one() == 2
+            ).scalar_one() == 3
     finally:
         engine.dispose()
 

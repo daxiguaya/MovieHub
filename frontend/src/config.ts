@@ -1,10 +1,11 @@
 import type { PublicConfig } from "./types";
+import { appPath } from "./paths";
 
 const fallback: PublicConfig = { xiaoyaSearchBaseUrl: "" };
 
 export async function loadPublicConfig(): Promise<PublicConfig> {
   try {
-    const response = await fetch("/config.json", { cache: "no-store" });
+    const response = await fetch(appPath("config.json"), { cache: "no-store" });
     if (!response.ok) return fallback;
     const config = (await response.json()) as Partial<PublicConfig>;
     return {

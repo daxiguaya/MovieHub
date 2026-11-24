@@ -60,7 +60,17 @@ Use one same-origin MovieHub host:
    proxy_set_header X-API-Key "<MOVIEHUB_API_KEY>";
    ```
    Replace the placeholder with the private server-side key. Do not put the key in React/Vite environment variables, HTML, JavaScript or browser storage. This location is needed because favorites endpoints are protected but the browser must not know the secret.
-4. Do not inject the key on the whole `/api/` location. In particular, keep `/api/import` and `/api/charts/import` protected from browser access; use NPM access controls or deny those paths externally and run operator imports through the CLI.
+4. Do not inject the key on the whole `/api/` location. The backend independently requires the key on both import endpoints, but browser-facing NPM routing should also deny them so they are not exposed as public operator functions. In the Proxy Host's server-level Advanced Nginx configuration, add:
+   ```nginx
+   location ^~ /api/import {
+       return 404;
+   }
+
+   location ^~ /api/charts/import {
+       return 404;
+   }
+   ```
+   These longer `^~` prefixes take precedence over the general `/api/` proxy location and also cover `/api/import/status`. Validate the NPM configuration before applying it. Run operator imports through the CLI instead.
 5. Keep NPM access controls and TLS enabled as appropriate for the host.
 
 The frontend and backend are on the existing external Docker network `chatgpt-browser_default`; neither publishes a host port. Same-origin routing means no broad CORS allowlist is required.

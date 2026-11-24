@@ -177,3 +177,14 @@ This is API input hardening only. It does not claim real multi-date source snaps
 - [x] Branch CI [#45336510682](https://github.com/daxiguaya/MovieHub/actions/runs/45336510682) completed successfully after the cursor regression-test correction.
 
 The first cursor-hardening CI attempt found an outdated test expectation (264 passed, 1 failed, 4 skipped); it was corrected. The successful follow-up CI completed with **265 backend tests passed, 4 skipped, 1 warning; 10 browser E2E passed, 4 opt-in real-data journeys skipped; frontend tests/build and both container builds passed**. Both Compose validation modes passed: Scout omitted and Scout explicitly configured read-only. Performance and real-data collection/import jobs were skipped in this fixture run and are not counted as passed. Overall estimate remains **83%**; no deployment or production data operation was performed.
+
+
+## 2026-11-24 — Isolated deployment lifecycle rehearsal
+
+- [x] Add one continuous temporary-directory lifecycle test: uninitialized readiness → schema initialization → ready state → data write → verified backup → later write → restore → restored readiness and data verification.
+- [x] Verify the pre-restore rollback copy retains the later state.
+- [x] Verify schema version 3, SQLite integrity, and foreign-key consistency after restore.
+- [x] Add a safety regression test proving initialization refuses an existing external SQLite database and leaves its table/data untouched.
+- [ ] Await branch-head CI for the new lifecycle tests.
+
+This validates the database lifecycle without Docker daemon, NAS access, NPM changes, Scout import, or production data. It is not a live container deployment rehearsal. Overall progress remains **83%** until CI passes and the remaining source-data/licensing and deployment tasks are addressed.

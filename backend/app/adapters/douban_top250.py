@@ -53,6 +53,7 @@ class _Top250PageParser(HTMLParser):
                     "rating": "",
                     "rating_count": "",
                     "details": "",
+                    "all_text": "",
                 }
                 self.div_depth = 1
             elif self.current is not None:
@@ -102,6 +103,7 @@ class _Top250PageParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self.current is None:
             return
+        self.current["all_text"] = str(self.current.get("all_text", "")) + data
         for _, field in self.capture_stack:
             self.current[field] = str(self.current.get(field, "")) + data
 
@@ -121,6 +123,40 @@ class _Top250PageParser(HTMLParser):
 
     def _finish_item(self) -> None:
         assert self.current is not None
+        # Douban's current Top 250 markup no longer consistently exposes
+        # rating counts through the historical span.pl selector. Keep a
+        # text fallback so harmless class/layout changes do not erase fields.
+        normalized_text = re.sub(
+            r"\\s+", " ", str(self.current.get("all_text", ""))
+        ).strip()
+        if not str(self.current.get("rating_count", "")).strip():
+            count_match = re.search(
+                r"([0-9][0-9,]*)\\s*人评价", normalized_text
+            )
+            if count_match:
+                self.current["rating_count"] = count_match.group(1)
+
+        director_match = re.search(
+            r"导演\\s*[:：]\\s*(.+?)(?=\\s*主演\\s*[:：])",
+            normalized_text,
+        )
+        actor_match = re.search(
+            r"主演\\s*[:：]\\s*(.+?)(?=\\s*[0-9]{4}\\s*/)",
+            normalized_text,
+        )
+        if director_match:
+            self.current["directors"] = [
+                value.strip(" /…...")
+                for value in re.split(r"\\s*/\\s*", director_match.group(1))
+                if value.strip(" /…...")
+            ]
+        if actor_match:
+            self.current["actors"] = [
+                value.strip(" /…...")
+                for value in re.split(r"\\s*/\\s*", actor_match.group(1))
+                if value.strip(" /…...")
+            ]
+
         titles = self.current.get("titles", [])
         if isinstance(titles, list):
             title_values = [
@@ -228,6 +264,8 @@ def parse_top250_page(html: str) -> list[ChartMovieImport]:
                 rating=rating,
                 rating_count=rating_count,
                 type="movie",
+                directors=list(item.get("directors", [])),
+                actors=list(item.get("actors", [])),
                 genres=genres,
                 regions=regions,
                 posters=[poster] if poster else [],

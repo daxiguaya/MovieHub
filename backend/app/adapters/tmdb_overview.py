@@ -182,6 +182,7 @@ class TMDBOverviewClient:
         self,
         item: Any,
         media_type: str,
+        language: str,
     ) -> tuple[dict[str, Any] | None, str, int]:
         query_values = []
         for value in (
@@ -203,7 +204,7 @@ class TMDBOverviewClient:
                     "query": query,
                     key: int(item.year),
                     "include_adult": "false",
-                    "language": "zh-CN",
+                    "language": language,
                     "page": 1,
                 },
             )
@@ -227,7 +228,7 @@ class TMDBOverviewClient:
         media_type = self._media_type(getattr(item, "type", "movie"))
         candidate, method, candidate_count = self._find_by_imdb_id(item, media_type)
         if candidate is None and method == "no_external_id":
-            candidate, method, candidate_count = self._search_by_title(item, media_type)
+            candidate, method, candidate_count = self._search_by_title(item, media_type, language)
         elif candidate is None:
             return OverviewLookup(
                 status=method,

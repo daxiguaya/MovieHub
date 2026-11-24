@@ -13,6 +13,8 @@ def test_cache_round_trip_and_key_normalization(tmp_path):
     assert cache.set(key1, "tmdb", "/search/movie", {"results": [{"id": 1}]}, 60)
     cached = cache.get(key1)
     assert cached == ({"results": [{"id": 1}]}, False)
+    assert cache.stats()["hits"] == 1
+    assert cache.stats()["writes"] == 1
 
 
 def test_cache_returns_stale_only_when_requested(tmp_path):

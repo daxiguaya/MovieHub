@@ -61,7 +61,7 @@ jobs:
         run: npm test -- --reporter=dot
         working-directory: frontend
       - name: Type-check and build frontend
-        run: npm run build
+        run: MOVIEHUB_BASE_PATH=/moviehub/ npm run build
         working-directory: frontend
       - name: Build frontend container image
         run: docker build --tag moviehub-frontend:ci ./frontend
@@ -595,7 +595,7 @@ jobs:
         run: |
           mkdir -p "$MOVIEHUB_DATA_PATH" "$MOVIEHUB_BACKUP_PATH"
           sudo chown -R 10001:10001 "$RUNNER_TEMP/moviehub-compose-smoke"
-          docker network create chatgpt-browser_default
+          docker network create nginx-proxy-manager_default
       - name: Validate isolated Compose configuration
         run: docker compose -p moviehub-ci-smoke config --quiet
       - name: Start both containers before database initialization
@@ -764,7 +764,7 @@ jobs:
           for attempt in $(seq 1 30); do
             frontend_state="$(docker inspect --format '{{.State.Status}}' moviehub-web 2>/dev/null || true)"
             if [ "$frontend_state" = running ] && timeout 5s docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
-              'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'; then
+              'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/moviehub/ && grep -q "/moviehub/assets/" /tmp/moviehub-index.html && wget -q -O /dev/null http://127.0.0.1:8080/moviehub/api/ready'; then
               exit 0
             fi
             sleep 2

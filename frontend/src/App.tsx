@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import { api } from "./api";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
+import { appPath } from "./paths";
 import type {
   Chart,
   ChartCompareResponse,
@@ -199,7 +200,7 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
       {movie.douban_id && <span className="poster-badge">{rank ? `#${rank}` : movie.type === "tv" ? "剧集" : "电影"}</span>}
       {!failed ? (
         <img
-          src={`/api/movies/${movie.id}/poster`}
+          src={appPath(`api/movies/${movie.id}/poster`)}
           alt={movie.title}
           loading="lazy"
           onError={() => setFailed(true)}

@@ -46,36 +46,39 @@ The initializer creates a new independent MovieHub database at `/data/db/movies.
 
 Do not run the initializer against any existing Scout database or an existing production MovieHub database.
 
-## NPM reverse proxy
+## NPM reverse proxy under an existing site's path
 
-Use one same-origin MovieHub host:
+The frontend image is built with `MOVIEHUB_BASE_PATH=/moviehub/` by default. It supports both this path deployment and a root deployment (build with `MOVIEHUB_BASE_PATH=/`). React Router, static assets, runtime config, poster URLs, and API requests all use the configured base path.
 
-1. Proxy Host default upstream:
+For an existing NPM Proxy Host that already serves DSM at the root of `zwnas.notedream.com:18443`, add only path-specific locations. Do not change the existing default upstream, TLS certificate, access list, or other site's configuration.
+
+1. Add a custom location `/moviehub/`:
+   - Scheme: `http`
    - Forward hostname: `moviehub-web`
    - Forward port: `8080`
-   - Scheme: `http`
-2. Add a custom location `/api/` forwarding to `moviehub:8000`. Preserve the original URI so `/api/...` reaches FastAPI unchanged.
-3. Add a more specific custom location `/api/favorites` forwarding to `moviehub:8000`, with an upstream-only header:
+   - Preserve the incoming URI. Do not append or strip `/moviehub/`.
+2. Add a more-specific custom location `/moviehub/api/favorites` with the same frontend upstream (`moviehub-web:8080`). In that location's Advanced configuration, inject the secret only on the upstream request:
    ```nginx
    proxy_set_header X-API-Key "<MOVIEHUB_API_KEY>";
    ```
-   Replace the placeholder with the private server-side key. Do not put the key in React/Vite environment variables, HTML, JavaScript or browser storage. This location is needed because favorites endpoints are protected but the browser must not know the secret.
-4. Do not inject the key on the whole `/api/` location. The backend independently requires the key on both import endpoints, but browser-facing NPM routing should also deny them so they are not exposed as public operator functions. In the Proxy Host's server-level Advanced Nginx configuration, add:
+   Replace the placeholder locally with the private key. Never put it in React/Vite variables, HTML, JavaScript, browser storage, or this repository. The frontend Nginx forwards this header to FastAPI. Do not inject it on the entire `/moviehub/` location.
+3. In the Proxy Host's server-level Advanced Nginx configuration, deny both import route families:
    ```nginx
-   location ^~ /api/import {
+   location ^~ /moviehub/api/import {
        return 404;
    }
 
-   location ^~ /api/charts/import {
+   location ^~ /moviehub/api/charts/import {
        return 404;
    }
    ```
-   These longer `^~` prefixes take precedence over the general `/api/` proxy location and also cover `/api/import/status`. Validate the NPM configuration before applying it. Run operator imports through the CLI instead.
-5. Keep NPM access controls and TLS enabled as appropriate for the host.
+   These prefixes also cover their status endpoints. Keep these deny locations more specific than the general `/moviehub/` custom location. Run operator imports through the CLI, not through the public browser route.
+4. The frontend Nginx internally proxies `/moviehub/api/...` to `moviehub:8000/api/...`. Do not create a separate NPM API location to the backend; the backend remains reachable only through the Docker network.
+5. Validate the NPM configuration before applying it. Keep the existing TLS and access controls enabled.
 
-The frontend and backend are on the existing external Docker network `nginx-proxy-manager_default`; neither publishes a host port. Same-origin routing means no broad CORS allowlist is required.
+The frontend container and backend both join `nginx-proxy-manager_default`. NPM forwards to the frontend only; the frontend proxies API requests to the backend. No host ports are published. Same-origin routing means no broad CORS allowlist is required.
 
-Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Compose default trusts loopback only, so rate limiting may see the proxy address until you set `MOVIEHUB_TRUSTED_PROXY_IPS` to the exact NPM container IP or its dedicated Docker subnet. Inspect the actual network first; do not set this to `*` or a default route (`0.0.0.0/0`, `::/0`), which would let any reachable container spoof client IP headers.
+Because the frontend Nginx is now the immediate proxy seen by FastAPI, set `MOVIEHUB_TRUSTED_PROXY_IPS` to the frontend container's exact IP on `nginx-proxy-manager_default` (inspect it after the frontend container is recreated). Do not leave it set to the NPM container IP, and never use `*` or a default route (`0.0.0.0/0`, `::/0`). The frontend forwards the original client address chain to FastAPI.
 
 ## Health and readiness
 
@@ -84,14 +87,14 @@ Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Com
 - Database backup and restore commands are documented in [BACKUP-RESTORE.md](BACKUP-RESTORE.md); backups are stored on the dedicated `/backups` mount.
 - Logs are written to stdout/stderr for Docker log collection.
 
-The container runs as a non-root UID, drops Linux capabilities, uses a read-only root filesystem, and has CPU, memory and PID limits. The database and poster cache are writable only through the dedicated `/data` mount.
+The container runs as a non-root UID, drops Linux capabilities, uses a read-only root filesystem, and has memory and PID limits. CPU quota is omitted because some DSM kernels do not support Docker's CFS/NanoCPU controls. The database and poster cache are writable only through the dedicated `/data` mount.
 
 ## Operational boundaries
 
 - This package is an initial dual-container runtime baseline, not a production rollout approval.
 - No production database, Scout import, NPM proxy host, firewall rule, or NAS service is changed by preparing these files.
 - Before deployment, verify host directory permissions, Docker network name, backup/restore procedure, and API access policy.
-- The frontend container and same-origin routing are packaged but not deployed. Actual NPM locations, TLS, access controls, and API-key injection remain operator configuration steps.
+- The frontend container and same-origin routing are packaged and can be deployed under `/moviehub/`. Actual NPM locations, TLS, access controls, and API-key injection remain operator configuration steps.
 - Automated Douban chart acquisition and any Scout import schedule remain separate future work.
 
 

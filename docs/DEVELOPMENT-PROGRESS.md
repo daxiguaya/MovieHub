@@ -611,3 +611,18 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] Verify the latest branch-head backend suite: **232 passed, 4 skipped, 1 warning**; backend compile, Compose validation and image build passed.
 
 **Scope:** backup creation and retention only; no production database, NAS service, NPM configuration or deployment was accessed. The annual-chart and performance jobs were skipped in this push-triggered run and are not counted as passing.
+
+
+## Restore manifest validation and rollback verification (2026-11-24)
+
+- [x] Require restore manifests to be JSON objects and reject malformed JSON/encoding/read failures with explicit errors.
+- [x] Require exact integer manifest versions (booleans are not accepted as integers), the expected database filename and current schema version.
+- [x] Verify the declared database size and SHA-256 format/value before accepting a backup.
+- [x] Add regression tests for array/null manifests, boolean version fields, wrong size, malformed digest and malformed JSON; confirm rejected restores leave the existing database unchanged.
+- [x] Add failure-injection coverage proving a failed post-replacement validation restores the original target database.
+- [x] Fix the legacy tamper-test assertion to accept the earlier size-integrity rejection as well as SHA-256 mismatch; no integrity validation was weakened.
+- [x] Verify branch-head CI run [#45305231961](https://github.com/daxiguaya/MovieHub/actions/runs/45305231961): backend **240 passed, 4 skipped, 1 warning**; frontend **5 tests passed**, type-check/build and frontend image build passed; browser E2E **4/4 passed**; backend image build and Compose validation passed.
+- [ ] Performance-benchmarks and annual-chart-collection jobs were skipped by workflow conditions in this run; they are not counted as passing.
+- [ ] Real schema-v1 database-copy migration acceptance, staged Scout audit and NAS operational rehearsal remain pending.
+
+**Restore hardening milestone: implementation and latest branch-head CI verified.** All checks used isolated CI databases. No NAS database, Scout source, NPM configuration or production service was accessed or changed. The overall first-release estimate remains about 75%; automated restore safety is stronger, but the remaining data and operational acceptance gates are unchanged.

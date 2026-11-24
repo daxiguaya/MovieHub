@@ -3,12 +3,29 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, Field
 from app.limiter import limiter
+from app.dependencies.auth import verify_api_key
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
+
+
+class FavoriteSnapshot(BaseModel):
+    title: str = Field(min_length=1, max_length=256)
+    original_title: str | None = Field(default=None, max_length=256)
+    year: int | None = Field(default=None, ge=1870, le=2100)
+    rating: float | None = Field(default=None, ge=0, le=10)
+    rating_count: int = Field(default=0, ge=0)
+    poster_path: str | None = Field(default=None, max_length=512)
+    backdrop_path: str | None = Field(default=None, max_length=512)
+
+
+class ExternalFavoritePayload(BaseModel):
+    snapshot: FavoriteSnapshot
+    note: str = Field(default="", max_length=1000)
 
 
 def _normalize_result(item: dict, media_type: str) -> dict:
@@ -178,3 +195,37 @@ async def get_online_detail(
 @limiter.limit("10/minute")
 async def get_cache_stats(request: Request) -> dict[str, int]:
     return provider_response_cache.stats()
+
+
+@router.get("/favorites", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def list_external_favorites(request: Request) -> list[dict]:
+    return provider_response_cache.list_favorites()
+
+
+@router.put("/favorites/{media_type}/{provider_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def save_external_favorite(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+    payload: ExternalFavoritePayload,
+) -> dict:
+    if provider_id < 1:
+        raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    return provider_response_cache.save_favorite(
+        media_type, provider_id, payload.snapshot.model_dump(), payload.note
+    )
+
+
+@router.delete("/favorites/{media_type}/{provider_id}", status_code=status.HTTP_204_NO_CONTENT,
+               dependencies=[Depends(verify_api_key)])
+@limiter.limit("30/minute")
+async def remove_external_favorite(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+) -> Response:
+    if not provider_response_cache.delete_favorite(media_type, provider_id):
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -438,3 +438,59 @@ def test_yearless_annual_item_rejects_candidate_without_exact_alternative_title(
 
     assert result.status == "no_exact_match"
     assert result.tmdb_id is None
+
+
+
+def test_yearless_annual_item_matches_localized_tmdb_director_name():
+    requests = []
+
+    def handler(request):
+        requests.append((request.url.path, dict(request.url.params)))
+        if request.url.path == "/3/search/movie":
+            return httpx.Response(200, json={"results": [{
+                "id": 12345,
+                "title": "Ne Zha 2",
+                "original_title": "Ne Zha 2",
+            }]})
+        if request.url.path == "/3/movie/12345/credits":
+            return httpx.Response(200, json={"crew": [{
+                "id": 2710,
+                "job": "Director",
+                "name": "Jiaozi",
+                "original_name": "Jiaozi",
+            }]})
+        if request.url.path == "/3/person/2710":
+            assert request.url.params["language"] == "zh-CN"
+            return httpx.Response(200, json={
+                "id": 2710,
+                "name": "饺子",
+                "also_known_as": ["Jiaozi"],
+            })
+        if request.url.path == "/3/movie/12345/alternative_titles":
+            return httpx.Response(200, json={"titles": [
+                {"title": "哪吒之魔童闹海", "iso_3166_1": "CN"},
+            ]})
+        if request.url.path == "/3/movie/12345":
+            return httpx.Response(200, json={
+                "id": 12345,
+                "title": "哪吒之魔童闹海",
+                "release_date": "2025-01-29",
+                "overview": "经中文导演身份核验的剧情简介。",
+            })
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    with _client(handler) as transport:
+        with TMDBOverviewClient("test-token", client=transport, min_interval_seconds=0) as client:
+            result = client.lookup(
+                _item(
+                    title="哪吒之魔童闹海",
+                    original_title=None,
+                    year=None,
+                    directors=["饺子"],
+                )
+            )
+
+    assert result.status == "overview_available"
+    assert result.match_method == "exact_title_director"
+    assert result.tmdb_id == 12345
+    assert any(path == "/3/person/2710" for path, _ in requests)

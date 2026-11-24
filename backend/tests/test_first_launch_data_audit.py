@@ -52,9 +52,9 @@ def test_audit_reports_unique_movies_overlap_and_field_coverage():
 
 def test_audit_fails_when_a_required_first_launch_chart_is_missing():
     report = summarize_snapshots([
-        _snapshot("top250", [_movie("100", 1)]),
         _snapshot("popular", [_movie("200", 1)]),
+        _snapshot("high-rated", [_movie("300", 1)]),
     ])
 
     assert report["valid"] is False
-    assert any("high-rated" in error for error in report["errors"])
+    assert any("top250" in error for error in report["errors"])

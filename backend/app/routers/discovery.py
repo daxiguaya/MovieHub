@@ -1,16 +1,33 @@
 """Online movie and TV discovery endpoints backed by TMDB."""
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
+from app.config import settings
 from app.limiter import limiter
 from app.dependencies.auth import verify_api_key
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
+logger = logging.getLogger("moviehub.discovery")
+
+
+async def _backup_favorites_after_write() -> None:
+    try:
+        await asyncio.to_thread(
+            provider_response_cache.backup_daily,
+            settings.backup_dir / "discovery",
+            7,
+            True,
+        )
+    except Exception:
+        logger.exception("Unable to refresh discovery favorites backup")
+
 
 
 class FavoriteSnapshot(BaseModel):
@@ -218,9 +235,11 @@ async def save_external_favorite(
 ) -> dict:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
-    return provider_response_cache.save_favorite(
+    saved = provider_response_cache.save_favorite(
         media_type, provider_id, payload.snapshot.model_dump(), payload.note
     )
+    await _backup_favorites_after_write()
+    return saved
 
 
 @router.delete("/favorites/{media_type}/{provider_id}", status_code=status.HTTP_204_NO_CONTENT,
@@ -233,4 +252,5 @@ async def remove_external_favorite(
 ) -> Response:
     if not provider_response_cache.delete_favorite(media_type, provider_id):
         raise HTTPException(status_code=404, detail="Favorite not found")
+    await _backup_favorites_after_write()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

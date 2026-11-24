@@ -189,3 +189,29 @@ def test_backup_retention_ignores_valid_json_non_object_manifests(
     assert owned != newer
     assert newer.is_dir()
     assert foreign.is_dir()
+
+
+
+def test_backup_retention_never_follows_symlinked_backup_directories(tmp_path):
+    database = tmp_path / "data" / "movies.db"
+    backup_root = tmp_path / "backups"
+    external = tmp_path / "external-export"
+    _initialize_database(database)
+
+    external.mkdir()
+    (external / "movies.db").write_bytes(b"external data")
+    (external / "manifest.json").write_text(
+        '{"format_version": 1, "database_file": "movies.db", '
+        '"schema_version": 2}',
+        encoding="utf-8",
+    )
+    backup_root.mkdir()
+    link = backup_root / "moviehub-external-link"
+    link.symlink_to(external, target_is_directory=True)
+
+    created = create_backup(database, backup_root, keep_last=1)
+
+    assert created.is_dir()
+    assert link.is_symlink()
+    assert external.is_dir()
+    assert (external / "movies.db").read_bytes() == b"external data"

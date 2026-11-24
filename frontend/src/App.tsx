@@ -941,7 +941,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
             <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.external_ids.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.external_ids.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
           </div>
-          {favoriteError && <div className="inline-error">{favoriteError}</div>}
+          {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{directors.join(" / ")}</p></section>}
           {actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{actors.join(" / ")}</p></section>}
           {movie.runtime && <section className="detail-section"><h3>片长</h3><p>{movie.runtime} 分钟</p></section>}

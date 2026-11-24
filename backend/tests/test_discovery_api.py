@@ -4,10 +4,18 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers import discovery
+from app.services.poster_service import poster_cache_service
+from app.services.provider_cache import provider_response_cache
 
 
-def test_search_requires_two_character_query():
-    with TestClient(app) as client:
+def _client(monkeypatch):
+    monkeypatch.setattr(poster_cache_service, "clear_expired_cache", lambda: 0)
+    monkeypatch.setattr(provider_response_cache, "clear_expired", lambda: 0)
+    return TestClient(app)
+
+
+def test_search_requires_two_character_query(monkeypatch):
+    with _client(monkeypatch) as client:
         response = client.get("/api/discovery/search", params={"q": "a"})
     assert response.status_code == 422
 
@@ -31,7 +39,7 @@ def test_search_fetches_only_requested_page(monkeypatch):
         }
 
     monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
-    with TestClient(app) as client:
+    with _client(monkeypatch) as client:
         response = client.get(
             "/api/discovery/search",
             params={"q": "Alien", "page": 3, "media_type": "all"},
@@ -48,7 +56,7 @@ def test_search_fetches_only_requested_page(monkeypatch):
     assert body["items"][0]["year"] == 1979
 
 
-def test_discover_enforces_page_and_vote_threshold_defaults():
-    with TestClient(app) as client:
+def test_discover_enforces_page_and_vote_threshold_defaults(monkeypatch):
+    with _client(monkeypatch) as client:
         response = client.get("/api/discovery/discover", params={"page": 501})
     assert response.status_code == 422

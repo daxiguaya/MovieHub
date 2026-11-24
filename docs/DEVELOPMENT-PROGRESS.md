@@ -2,9 +2,9 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-24
-Current phase: Pre-deployment hardening — real annual-data import rehearsal complete; first-release data and deployment rehearsal remain
+Current phase: Pre-deployment hardening — first-launch real-data browser journeys and favorites verified; visual QA and isolated deployment rehearsal remain
 
-> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist, current 75% estimate, real-data rehearsal result and next priorities. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
+> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 83% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
 
 
 ## Phase 4 — independent database foundation
@@ -667,9 +667,13 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] Full branch-head CI run [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353) completed: backend **247 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; Playwright E2E **4/4 passed**; real annual-data import rehearsal **passed**.
 - [ ] Annual-chart-collection and performance-benchmarks jobs were skipped in this push-triggered run; the imported artifact was the previously retained real collector output, not a new collection.
 
-## 2026-11-24 — 真实年度数据浏览器验收接线
+## 2026-11-24 — 首发真实数据浏览器与收藏链路验收
 
-- 新增 Playwright 场景：使用 live API 遍历四个真实 2025 年度榜单（8/10/10/10），打开其中一部真实影片详情，并以真实标题完成搜索。
-- 新增独立 CI job：从已留存的官方采集 artifact 建立临时 SQLite，执行正式年度批量导入命令，启动 FastAPI 并运行该浏览器场景。
-- 当前状态：代码与 workflow 已提交，等待带标记的 push 触发 CI。CI 未通过前不计为完成，不上调整体进度。
+- [x] 使用 live API 遍历四个真实 2025 年度榜单（8/10/10/10），打开真实影片详情并以真实标题完成搜索。
+- [x] 使用 live API 浏览 Top 250 的 250 条真实榜单数据，并验证详情和搜索。
+- [x] 在 390×844 视口下验证真实榜单、详情、搜索结果无横向溢出。
+- [x] 新增真实收藏浏览器旅程：从真实榜单进入影片详情，加入收藏、在收藏页读取、再移除收藏；请求经 Playwright 模拟可信反向代理注入服务端 API key，实际读写隔离 SQLite。
+- [x] CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019)：真实数据浏览器 job 4/4 passed；后端、前端、首发数据采集/导入 job 均通过。
+- [x] 最新首发数据仍为 5 个快照、288 条榜单项、288 个唯一影片；完整性检查 ok、外键错误 0、跨榜重复 0。Top 250 真实字段覆盖：评分 250/250、评价人数 250/250、导演 238/250、演员 233/250、海报 250/250、简介 0/250。
+- [ ] 后续继续补充合规剧情简介来源，并完成多日期历史/排名比较、真实分页、空值/长标题/海报失败异常状态和视觉 QA。
 - 安全边界：所有数据与服务均在 GitHub runner 临时环境；不访问 NAS/Scout，不部署、不初始化生产库、不改 NPM、不重启任何服务。

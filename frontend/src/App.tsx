@@ -243,9 +243,18 @@ function ChartPage() {
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setError("");
     setItems([]);
+    setSnapshots([]);
     setSnapshotDate("");
+    setChartName("");
+    setTotal(0);
+    setNextCursor(null);
+    setCompareFrom("");
+    setCompareTo("");
     setComparison(null);
+    setCompareError("");
+    setCompareLoading(false);
     Promise.all([api.snapshots(slug), api.chart(slug)])
       .then(([history, latest]) => {
         if (!active) return;

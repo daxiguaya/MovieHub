@@ -303,16 +303,20 @@ def _poster_bytes_match_content_type(content: bytes, content_type: str) -> bool:
     return False
 
 def _is_allowed_poster_url(url: str) -> bool:
-    """Allow only HTTPS Douban image CDN hosts, never arbitrary URLs."""
+    """Allow HTTPS poster images only from explicitly trusted image CDNs."""
     try:
         parsed = urlsplit(url)
         host = (parsed.hostname or "").lower()
+        allowed_host = (
+            host == "image.tmdb.org"
+            or re.fullmatch(r"img[0-9]+\.doubanio\.com", host) is not None
+        )
         return (
             parsed.scheme == "https"
             and parsed.username is None
             and parsed.password is None
             and parsed.port in (None, 443)
-            and re.fullmatch(r"img[0-9]+\.doubanio\.com", host) is not None
+            and allowed_host
         )
     except ValueError:
         return False
@@ -365,10 +369,10 @@ async def _download_poster_image(
     ) as client:
         for redirect_count in range(POSTER_MAX_REDIRECTS + 1):
             if not _is_allowed_poster_url(current_url):
-                logger.warning("Rejected poster URL outside the Douban image CDN allowlist")
+                logger.warning("Rejected poster URL outside the trusted image CDN allowlist")
                 return None
             if not await _poster_host_resolves_publicly(current_url):
-                logger.warning("Rejected poster CDN host resolving to a non-public address")
+                logger.warning("Rejected poster image host resolving to a non-public address")
                 return None
 
             try:

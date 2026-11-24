@@ -25,6 +25,7 @@ from app.logging_config import setup_logging
 from app.routers.chart_import import router as chart_import_router
 from app.routers.charts import router as charts_router
 from app.routers.data_import import router as import_router
+from app.routers.discovery import router as discovery_router
 from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
@@ -152,6 +153,7 @@ app.add_middleware(
 
 # Read APIs
 app.include_router(movies_router, prefix="/api")
+app.include_router(discovery_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(favorites_router, prefix="/api")
 

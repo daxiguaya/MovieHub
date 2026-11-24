@@ -703,3 +703,15 @@ The same run collected all four official 2025 annual charts and all four normali
 CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741): 265 backend tests passed, 4 skipped; 10 browser E2E passed, 4 opt-in real-data journeys skipped; frontend tests/build and both container builds passed. The skipped live-data journeys and performance/collection jobs are not counted as passed.
 
 This is a test-coverage improvement, not a claim that the real-source dataset now contains multiple dated snapshots. Overall delivery estimate remains **83%**. Real TMDB overview coverage, real-source multi-date snapshot verification, isolated Compose operations rehearsal, and separately authorized NAS deployment remain outstanding.
+
+## Fresh real-source first-launch acceptance (2026-11-24)
+
+- [x] Re-collected the robots-permitted Top 250 snapshot; source audit found 250/250 chart rows with continuous ranks and no collection errors.
+- [x] Verified Top 250 source coverage: rating 250/250, rating count 250/250, directors 238/250, actors 233/250, year 248/250, original title 223/250, genres 248/250, regions 248/250, posters 250/250.
+- [x] Confirmed plot overview remains **0/250**; the project does not substitute reviews, slogans, or tags for a synopsis.
+- [x] Imported Top 250 plus all four official 2025 annual charts into a disposable CI SQLite database: 288 chart items, 288 unique movies, five snapshots, integrity check `ok`, zero foreign-key errors.
+- [x] Re-ran the live-data browser suite: 4/4 passed — Top 250, 2025 annual snapshots, narrow mobile layout, and live favorite add/list/remove.
+
+Run [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102): real-source collection/import and real-data browser jobs succeeded; backend and frontend jobs succeeded. The regular fixture E2E job was still installing Chromium when this note was written; fixture E2E had already passed 10/10 in CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741).
+
+This verifies the current application against a freshly collected real dataset in disposable CI, but does not create two distinct capture dates for the same chart. It also does not execute the TMDB overview audit (the repository secret is still required), nor does it deploy to NAS. Overall estimate remains **83%**.

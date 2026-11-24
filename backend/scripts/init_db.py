@@ -20,7 +20,7 @@ from app.database import Base
 from app.services.chart_init_service import initialize_chart_definitions
 
 logger = logging.getLogger("moviehub.init_db")
-MIGRATION_VERSION = 2
+MIGRATION_VERSION = 3
 REQUIRED_TABLES = {
     "schema_migrations",
     "movies",
@@ -34,6 +34,7 @@ REQUIRED_TABLES = {
     "list_items",
     "favorites",
     "import_batch_receipts",
+    "movie_metadata_provenance",
 }
 
 
@@ -183,12 +184,25 @@ def initialize(path: Path, migration_path: Path) -> None:
         followup_sql = followup_migration.read_text(encoding="utf-8").strip()
         if not followup_sql:
             raise RuntimeError("Follow-up migration SQL is empty")
+        provenance_migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "003_movie_metadata_provenance.sql"
+        )
+        if not provenance_migration.is_file():
+            raise FileNotFoundError(
+                f"Required provenance migration not found: {provenance_migration}"
+            )
+        provenance_sql = provenance_migration.read_text(encoding="utf-8").strip()
+        if not provenance_sql:
+            raise RuntimeError("Provenance migration SQL is empty")
 
         conn = sqlite3.connect(str(temporary_path), timeout=30)
         try:
             conn.execute("PRAGMA foreign_keys=ON")
             conn.executescript(sql)
             conn.executescript(followup_sql)
+            conn.executescript(provenance_sql)
         finally:
             conn.close()
 

@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - "phase4/**"
   pull_request:
     branches:
       - main
@@ -324,7 +323,7 @@ jobs:
 
 
   performance-benchmarks:
-    # Opt-in on demand: manual dispatch or an explicitly marked commit on phase4.
+    # Opt-in on demand: manual dispatch or an explicitly marked commit on main.
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[run-benchmarks]'))
     runs-on: ubuntu-24.04
     steps:

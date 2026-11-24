@@ -12,7 +12,7 @@ Compose now defines two application containers: a static React frontend and the 
   - SQLite database: `/data/db/movies.db`.
   - Poster cache: `/data/posters/`.
 - Optional Scout import source: when `MOVIEHUB_IMPORT_PATH` is set, that host directory is mounted at `/imports:ro`; when omitted, Compose mounts the tracked empty directory `./deploy/empty-imports`. MovieHub's own database initialization and normal runtime do not require Scout.
-- Nginx Proxy Manager: the frontend and backend join the existing external Docker network `chatgpt-browser_default`; configure the default upstream as `moviehub-web:8080` and API custom locations as `moviehub:8000`.
+- Nginx Proxy Manager: the frontend and backend join the existing external Docker network `nginx-proxy-manager_default`; configure the default upstream as `moviehub-web:8080` and API custom locations as `moviehub:8000`.
 
 The source mount is read-only at the container boundary. Keep the MovieHub database and Scout source in separate host directories. Never point `MOVIEHUB_DATA_PATH` at the Scout database directory.
 
@@ -21,12 +21,12 @@ The source mount is read-only at the container boundary. Keep the MovieHub datab
 1. Copy `deploy/.env.example` to the project root as `.env`.
 2. Scout is optional. If you need to import from Scout, set `MOVIEHUB_IMPORT_PATH` to a dedicated host directory containing a readable Scout SQLite source/export. If not using Scout, leave it unset; Compose uses an empty read-only mount. Never point it at the MovieHub data directory.
 3. Generate a unique long `MOVIEHUB_API_KEY`.
-4. Confirm the external Docker network `chatgpt-browser_default` exists. It is the shared network currently used by NPM in this NAS setup.
+4. Confirm the external Docker network `nginx-proxy-manager_default` exists. It is the shared network currently used by NPM in this NAS setup.
 5. Create the data and backup directories and grant the configured container UID/GID write access. Defaults are UID/GID 10001:
    ```sh
    mkdir -p /volume1/docker/moviehub/data
-   mkdir -p /volume1/backup/moviehub
-   chown -R 10001:10001 /volume1/docker/moviehub/data /volume1/backup/moviehub
+   mkdir -p /volume1/docker/moviehub/backup
+   chown -R 10001:10001 /volume1/docker/moviehub/data /volume1/docker/moviehub/backup
    ```
 6. Ensure the import directory and Scout database are readable by UID/GID 10001. Do not change Scout ownership or permissions broadly just for MovieHub; use a dedicated read-only export/copy directory if required.
 
@@ -73,7 +73,7 @@ Use one same-origin MovieHub host:
    These longer `^~` prefixes take precedence over the general `/api/` proxy location and also cover `/api/import/status`. Validate the NPM configuration before applying it. Run operator imports through the CLI instead.
 5. Keep NPM access controls and TLS enabled as appropriate for the host.
 
-The frontend and backend are on the existing external Docker network `chatgpt-browser_default`; neither publishes a host port. Same-origin routing means no broad CORS allowlist is required.
+The frontend and backend are on the existing external Docker network `nginx-proxy-manager_default`; neither publishes a host port. Same-origin routing means no broad CORS allowlist is required.
 
 Uvicorn trusts forwarded client headers only from `FORWARDED_ALLOW_IPS`. The Compose default trusts loopback only, so rate limiting may see the proxy address until you set `MOVIEHUB_TRUSTED_PROXY_IPS` to the exact NPM container IP or its dedicated Docker subnet. Inspect the actual network first; do not set this to `*` or a default route (`0.0.0.0/0`, `::/0`), which would let any reachable container spoof client IP headers.
 

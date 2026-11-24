@@ -197,12 +197,16 @@ class TMDBOverviewClient:
             for candidate in results:
                 if not isinstance(candidate, dict) or candidate.get("id") is None:
                     continue
-                if normalize_title(getattr(item, "title", None)) in self._title_names(candidate, media_type) or normalize_title(getattr(item, "original_title", None)) in self._title_names(candidate, media_type):
-                    candidates_by_id[int(candidate["id"])] = candidate
+                candidates_by_id[int(candidate["id"])] = candidate
 
         if not candidates_by_id:
             return None, "no_exact_match", 0
 
+        source_titles = {
+            normalize_title(value)
+            for value in query_values
+            if normalize_title(value)
+        }
         verified: list[dict[str, Any]] = []
         for candidate_id, candidate in candidates_by_id.items():
             credits = self._get(
@@ -222,8 +226,26 @@ class TMDBOverviewClient:
                 )
                 and normalize_title(person.get("name"))
             }
-            if source_directors & tmdb_directors:
-                verified.append(candidate)
+            if not source_directors.intersection(tmdb_directors):
+                continue
+
+            candidate_titles = self._title_names(candidate, media_type)
+            if not source_titles.intersection(candidate_titles):
+                alternative_payload = self._get(
+                    f"/{media_type}/{candidate_id}/alternative_titles",
+                    {},
+                )
+                alternatives = alternative_payload.get("titles")
+                if not isinstance(alternatives, list):
+                    alternatives = alternative_payload.get("results", [])
+                alternative_names = {
+                    normalize_title(entry.get("title") or entry.get("name"))
+                    for entry in alternatives
+                    if isinstance(entry, dict)
+                } if isinstance(alternatives, list) else set()
+                if not source_titles.intersection(alternative_names):
+                    continue
+            verified.append(candidate)
 
         if len(verified) == 1:
             return verified[0], "exact_title_director", 1

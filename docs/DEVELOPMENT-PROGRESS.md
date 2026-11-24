@@ -1,8 +1,11 @@
 # MovieHub Development Progress
 
 Branch: `phase4/database-foundation`
-Last updated: 2026-11-23
-Current phase: Frontend validation, chart acquisition and pre-deployment hardening
+Last updated: 2026-11-24
+Current phase: Pre-deployment hardening — real annual-data import rehearsal complete; first-release data and deployment rehearsal remain
+
+> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist, current 75% estimate, real-data rehearsal result and next priorities. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
+
 
 ## Phase 4 — independent database foundation
 
@@ -120,7 +123,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - [x] Keep the aggregate denominator restricted to unique Scout ID matches with matching media type.
 - [x] Add regression coverage for duplicate audit inputs and aggregate coverage output.
 
-**Scout audit reporting hardening: implementation and regression tests added.** A consistent staged Scout copy is still required for a real coverage report; no NAS/production database was accessed.
+**Scout audit reporting hardening: implementation and regression tests added.** A consistent staged Scout copy is required only if a Scout coverage report is desired; no NAS/production database was accessed.
 
 ## Overall first-release progress (estimate)
 
@@ -132,14 +135,14 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 | Manual normalized chart snapshot import | Complete; CI verified |
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
-| 2025 annual charts | Official four-list collector, recoverable output, strict preflight and atomic four-chart import implemented; actual reviewed snapshot import remains pending |
+| 2025 annual charts | Official four-list collector, recoverable output and strict atomic import implemented; 38 real records successfully imported and verified in a disposable CI database |
 | Favorites API and frontend UI | Implemented; unit and Chromium E2E passed |
 | Xiaoya handoff | Implemented; URL encoding and browser handoff passed; actual NPM route verification pending |
 | React frontend and user workflows | Core flows implemented; 5 frontend tests and 4 browser E2E tests passed; visual QA and real-data review pending |
 | Container packaging and backup/restore preparation | 100% packaged and CI-built; NAS operational validation pending |
-| Actual NAS deployment and end-to-end production verification | 0%; intentionally not started |
+| Actual NAS deployment and end-to-end production verification | 0%; intentionally not started and requires separate approval |
 
-**Estimated first-release progress: about 75%.** This is a planning estimate, not a test metric. The independent database, backend baseline, importer safety/recovery, chart acquisition/import pipeline, frontend core flows, container packaging and backup/restore tooling are implemented and CI-verified. The remaining quarter is concentrated in real-source/data validation, chart refresh/content readiness, visual and NPM verification, staged operational testing, and the separately authorized NAS rollout.
+**Estimated first-release progress: about 75%.** This is a planning estimate, not a test metric. The independent database, backend baseline, importer safety/recovery, chart acquisition/import pipeline, frontend core flows, container packaging and backup/restore tooling are implemented and CI-verified. The 2025 annual data has also been imported into a disposable CI database. The remaining work is first-release content enrichment/review, visual QA, isolated deployment and backup/restore rehearsal, actual NPM/Xiaoya integration verification, and separately authorized NAS rollout. MovieHub has no production source database because it has not yet been deployed; Scout is an optional external read-only source, not a prerequisite.
 ## Chart and Scout import numeric integrity (2026-11-23)
 
 - [x] Reject boolean and fractional values where integer ranks, years, or counts are expected.
@@ -263,7 +266,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 
 ## Next work
 
-- [ ] Run the read-only Scout coverage audit against a separately staged, consistent Scout copy; review ID matches, media-type mismatches and metadata coverage before deciding whether to enrich/import the four separate 2025 snapshots. The local dry-run already enforces each built-in chart's category, period and media type.
+- [ ] Enrich and review first-release chart/movie content using verified, permitted sources; the existing 38-record annual artifact is not sufficient as a complete searchable catalogue. Scout coverage audit is optional and only applies if Scout is deliberately selected as an external metadata source.
 - [ ] Review 2026 annual categories after official publication; do not expose empty placeholders.
 - [x] Implement a one-shot official 2025 annual article collector that emits four separate normalized JSON snapshots and refuses collection when robots.txt or access controls do not permit it.
 - [ ] Decide whether scheduled refresh is appropriate after verifying source authorization, robots rules and stability.
@@ -378,7 +381,7 @@ Current phase: Frontend validation, chart acquisition and pre-deployment hardeni
 - Scout synthetic import: 10k rows in 10.62 s (**941.6 rows/s**); 100k rows in 109.54 s (**912.9 rows/s**), batch size 500. These are GitHub-hosted runner results, not NAS performance or memory measurements.
 - The run emitted non-blocking dependency/toolchain deprecation warnings (Starlette/httpx, Node.js 20 action runtime, and Node URL/punycode warnings); no job failed.
 
-**Result:** acquisition, validation, benchmark execution and end-to-end CI are verified on the branch. Actual Scout ID/metadata coverage and deliberate import remain blocked on a separately staged, consistent Scout database copy. No production Scout DB, NAS service, deployment or NPM configuration was accessed or changed.
+**Result:** acquisition, validation, benchmark execution and end-to-end CI are verified on the branch. The 2025 annual artifact has passed an isolated real-data import rehearsal. Optional Scout ID/metadata coverage remains available if Scout is selected later; it does not block MovieHub initialization or development. No production Scout DB, NAS service, deployment or NPM configuration was accessed or changed.
 
 
 ## Scout import record-error observability (2026-11-23)

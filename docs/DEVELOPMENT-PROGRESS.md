@@ -648,3 +648,15 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] Run #45309959771 subsequently completed: backend **247 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; Playwright E2E **4/4 passed**. Annual-chart-collection and performance-benchmarks were skipped and are not counted as passing.
 
 **Real-data conclusion:** the actual annual snapshot is adequate for an isolated chart import rehearsal but is not a complete catalogue and cannot replace Scout. Do not infer missing release years from `period=2025`, and do not invent missing ranks or metadata. The next real-data gate is a consistent read-only staged Scout SQLite copy. Its concrete source path was not established in the earlier NAS scan; no NAS connection or source-file access occurred in this round. No production MovieHub database, NPM configuration or service was touched. Overall first-release estimate remains about 75%.
+
+## Real annual-data import rehearsal completed (2026-11-24)
+
+- [x] Add opt-in CI job `real-annual-data-import-rehearsal` to download the retained real Douban artifact and import it through the production annual-chart batch service into a newly initialized disposable CI database.
+- [x] Verify run [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353), job `real-annual-data-import-rehearsal`: successful.
+- [x] Actual persisted result: **4 annual snapshots, 38 movie rows, 38 chart items**; all rank sequences continuous; zero cross-chart duplicate Douban IDs.
+- [x] Database verification: `PRAGMA integrity_check = ok`; `PRAGMA foreign_key_check` returned zero violations.
+- [x] Record the import rehearsal and metadata coverage in [REAL-DATA-AUDIT-2025-ANNUAL.md](reports/REAL-DATA-AUDIT-2025-ANNUAL.md).
+
+**What this proves:** the real collected 2025 annual data can traverse the current four-file validation and atomic batch-import path and persist correctly in an isolated SQLite database. It does **not** validate the Scout catalogue, NAS I/O/performance, or production deployment. The 38-row annual artifact remains metadata-sparse (year/actors/genres/regions/posters/overview/rating_count and IMDb/TMDB IDs are absent).
+
+**Next blocker:** the actual Scout SQLite source path was not identified in the earlier NAS scan. A consistent read-only staged copy is still required for whole-catalog audit, chart-coverage reconciliation and Scout-to-MovieHub preview/import rehearsal. No NAS connection, Scout source write, production MovieHub database operation, NPM change or service restart occurred. Overall first-release estimate remains about 75%; the real annual-data import milestone is complete, but it is a small dataset and does not close the Scout acceptance gate.

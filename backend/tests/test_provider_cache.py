@@ -1,6 +1,7 @@
 """Persistent provider cache bounds and expiry behavior."""
 import time
 
+from app.services import provider_cache as provider_cache_module
 from app.services.provider_cache import ProviderResponseCache
 
 
@@ -79,6 +80,19 @@ def test_external_favorites_survive_cache_eviction(tmp_path):
     assert cache.list_favorites() == []
 
 
+
+
+def test_cache_evicts_least_recently_used_rows_at_hard_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(provider_cache_module, "MAX_CACHE_ROWS", 5)
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    keys = []
+    for index in range(8):
+        key = cache.make_key("tmdb", "/search", {"q": str(index)})
+        keys.append(key)
+        cache.set(key, "tmdb", "/search", {"results": [{"id": index}]}, 3600)
+    assert cache.stats()["entries"] == 5
+    assert cache.get(keys[0]) is None
+    assert cache.get(keys[-1]) is not None
 
 def test_daily_backup_preserves_external_favorites(tmp_path):
     cache = ProviderResponseCache(tmp_path / "source" / "discovery.sqlite3")

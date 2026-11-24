@@ -108,7 +108,8 @@ export interface DiscoveryItem {
 
 export interface DiscoverySearchResponse {
   provider: "tmdb";
-  query: string;
+  query?: string;
+  media_type?: "movie" | "tv";
   page: number;
   total_pages: number;
   total_results: number;

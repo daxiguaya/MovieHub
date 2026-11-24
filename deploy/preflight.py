@@ -76,11 +76,15 @@ def validate_trusted_proxy_ips(value: str) -> list[str]:
         raise ValueError("MOVIEHUB_TRUSTED_PROXY_IPS must never be '*'; use an exact proxy IP or subnet.")
     for entry in entries:
         try:
-            ipaddress.ip_network(entry, strict=False)
+            network = ipaddress.ip_network(entry, strict=False)
         except ValueError as exc:
             raise ValueError(
                 f"Invalid MOVIEHUB_TRUSTED_PROXY_IPS entry: {entry!r}; use an IP address or CIDR."
             ) from exc
+        if network.prefixlen == 0:
+            raise ValueError(
+                "MOVIEHUB_TRUSTED_PROXY_IPS must not contain a default route (0.0.0.0/0 or ::/0); use the exact proxy IP or its dedicated subnet."
+            )
     return entries
 
 

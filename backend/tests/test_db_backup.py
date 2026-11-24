@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import db_backup as db_backup_module
 from scripts.db_backup import create_backup, restore_backup
 from scripts.init_db import initialize
 
@@ -267,3 +268,33 @@ def test_restore_rejects_invalid_manifest_without_touching_current_database(
         )
 
     assert _movie_titles(database) == ["Current database must survive"]
+
+
+
+def test_restore_rolls_back_original_database_if_post_replace_validation_fails(
+    tmp_path, monkeypatch
+):
+    database = tmp_path / "data" / "movies.db"
+    _initialize_database(database)
+    _insert_movie(database, "Original state")
+    backup_dir = create_backup(database, tmp_path / "backups")
+
+    _insert_movie(database, "Current state")
+    original_validate = db_backup_module._validate_database
+
+    def fail_restored_target(path):
+        if Path(path) == database:
+            raise RuntimeError("injected post-replace validation failure")
+        return original_validate(path)
+
+    monkeypatch.setattr(db_backup_module, "_validate_database", fail_restored_target)
+
+    with pytest.raises(RuntimeError, match="post-replace validation failure"):
+        restore_backup(
+            backup_dir,
+            database,
+            confirm=True,
+            service_stopped=True,
+        )
+
+    assert _movie_titles(database) == ["Current state", "Original state"]

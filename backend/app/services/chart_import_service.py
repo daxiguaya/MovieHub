@@ -1,6 +1,7 @@
 
 """Transactional chart snapshot importer for MovieHub."""
 
+import hashlib
 import json
 import logging
 import math
@@ -18,6 +19,7 @@ from app.database import (
     Favorite,
     Genre,
     Movie,
+    MovieMetadataProvenance,
     MovieGenre,
     MoviePoster,
     MovieRegion,
@@ -141,6 +143,46 @@ class ChartImportService:
             result.update({item.name: item.id for item in rows})
 
         return result
+
+    @staticmethod
+    def _record_metadata_provenance(
+        db: Session,
+        movie: Movie,
+        field_name: str,
+        value: Any,
+        source: str,
+        source_url: str,
+        observed_at: datetime,
+    ) -> None:
+        """Record a source observation without duplicating the metadata value."""
+        if value is None or value == "" or value == "[]":
+            return
+        serialized = (
+            json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            if isinstance(value, (list, dict))
+            else str(value)
+        )
+        value_sha256 = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        existing = db.scalar(
+            select(MovieMetadataProvenance.id).where(
+                MovieMetadataProvenance.movie_id == movie.id,
+                MovieMetadataProvenance.field_name == field_name,
+                MovieMetadataProvenance.source == source,
+                MovieMetadataProvenance.source_url == source_url,
+                MovieMetadataProvenance.value_sha256 == value_sha256,
+            )
+        )
+        if existing is None:
+            db.add(
+                MovieMetadataProvenance(
+                    movie_id=movie.id,
+                    field_name=field_name,
+                    source=source,
+                    source_url=source_url,
+                    observed_at=observed_at,
+                    value_sha256=value_sha256,
+                )
+            )
 
     @staticmethod
     def _update_movie(
@@ -540,6 +582,11 @@ class ChartImportService:
                         db.flush()
                         movie_map[douban_id] = movie
 
+                    tracked_fields = (
+                        "original_title", "year", "rating", "rating_count",
+                        "directors", "actors", "overview",
+                    )
+                    before = {field: getattr(movie, field) for field in tracked_fields}
                     self._update_movie(
                         db=db,
                         movie=movie,
@@ -547,6 +594,23 @@ class ChartImportService:
                         genre_map=genre_map,
                         region_map=region_map,
                     )
+                    source_url = self._clean_string(
+                        self._value(item, "douban_url")
+                    ) or ""
+                    for field in tracked_fields:
+                        previous = before[field]
+                        current = getattr(movie, field)
+                        was_empty = previous in (None, "", "[]", 0)
+                        if was_empty and current not in (None, "", "[]", 0):
+                            self._record_metadata_provenance(
+                                db=db,
+                                movie=movie,
+                                field_name=field,
+                                value=current,
+                                source=source,
+                                source_url=source_url,
+                                observed_at=imported_at,
+                            )
 
                     db.flush()
                     imported_movie_ids[douban_id] = movie.id

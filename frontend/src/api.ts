@@ -3,6 +3,10 @@ import type {
   ChartMoviesResponse,
   ChartCompareResponse,
   ChartSnapshot,
+  DiscoveryDetail,
+  DiscoveryItem,
+  DiscoverySearchResponse,
+  ExternalFavorite,
   Favorite,
   MovieDetail,
   MoviesResponse
@@ -59,6 +63,36 @@ export const api = {
   movie: (movieId: number) =>
     request<MovieDetail>(`/movies/id/${movieId}`),
   favorites: () => request<Favorite[]>("/favorites"),
+  discoverySearch: (query: string, mediaType: "all" | "movie" | "tv" = "all", page = 1) => {
+    const params = new URLSearchParams({ q: query, media_type: mediaType, page: String(page) });
+    return request<DiscoverySearchResponse>("/discovery/search?" + params.toString());
+  },
+  discoveryGenres: (mediaType: "movie" | "tv" = "movie") =>
+    request<{ provider: string; media_type: string; genres: { id: number; name: string }[] }>(
+      "/discovery/genres?media_type=" + mediaType
+    ),
+  discoveryRegions: () =>
+    request<{ provider: string; regions: { code: string; name: string }[] }>("/discovery/regions"),
+  discoveryDetail: (mediaType: "movie" | "tv", providerId: number) =>
+    request<DiscoveryDetail>("/discovery/" + mediaType + "/" + providerId),
+  externalFavorites: () => request<ExternalFavorite[]>("/discovery/favorites"),
+  saveExternalFavorite: (item: DiscoveryDetail | DiscoveryItem) =>
+    request<ExternalFavorite>("/discovery/favorites/" + item.media_type + "/" + item.provider_id, {
+      method: "PUT",
+      body: JSON.stringify({
+        snapshot: {
+          title: item.title,
+          original_title: item.original_title,
+          year: item.year,
+          rating: item.rating,
+          rating_count: item.rating_count,
+          poster_path: item.poster_path,
+          backdrop_path: item.backdrop_path
+        }
+      })
+    }),
+  removeExternalFavorite: (mediaType: "movie" | "tv", providerId: number) =>
+    request<void>("/discovery/favorites/" + mediaType + "/" + providerId, { method: "DELETE" }),
   addFavorite: (movieId: number, note = "") =>
     request<Favorite>(`/favorites/${movieId}`, {
       method: "PUT",

@@ -9,8 +9,8 @@ def _snapshot(slug, entries):
         slug=slug,
         name=slug,
         source="douban",
-        category="classic" if slug == "top250" else "popular",
-        period=None if slug == "top250" else "realtime",
+        category={"top250": "classic", "popular": "popular", "high-rated": "rating"}[slug],
+        period={"top250": None, "popular": "realtime", "high-rated": None}[slug],
         snapshot_date=date(2026, 11, 24),
         movies=entries,
     )

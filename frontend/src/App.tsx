@@ -717,7 +717,18 @@ function SearchPage() {
 
   function loadMoreLocal() {
     if (!nextCursor) return;
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams();
+    const q = (searchParams.get("search") ?? "").trim();
+    if (q) params.set("search", q);
+    if (type !== "all") params.set("type", type);
+    if (searchParams.get("min_rating")) params.set("min_rating", searchParams.get("min_rating")!);
+    if (searchParams.get("min_rating_count")) params.set("min_rating_count", searchParams.get("min_rating_count")!);
+    if (searchParams.get("min_year")) params.set("min_year", searchParams.get("min_year")!);
+    if (searchParams.get("max_year")) params.set("max_year", searchParams.get("max_year")!);
+    const genreNames = selectedGenres.map((id) => genreOptions.find((item) => String(item.id) === id)?.name).filter(Boolean);
+    const regionNames = selectedRegions.map((code) => regionOptions.find((item) => item.code === code)?.name).filter(Boolean);
+    if (genreNames.length) params.set("genres", genreNames.join(","));
+    if (regionNames.length) params.set("regions", regionNames.join(","));
     params.set("cursor", nextCursor);
     void api.movies(params).then((data) => {
       setResults((current) => current.concat(data.items));

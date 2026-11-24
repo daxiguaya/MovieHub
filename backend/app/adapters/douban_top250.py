@@ -127,33 +127,33 @@ class _Top250PageParser(HTMLParser):
         # rating counts through the historical span.pl selector. Keep a
         # text fallback so harmless class/layout changes do not erase fields.
         normalized_text = re.sub(
-            r"\\s+", " ", str(self.current.get("all_text", ""))
+            r"\s+", " ", str(self.current.get("all_text", ""))
         ).strip()
         if not str(self.current.get("rating_count", "")).strip():
             count_match = re.search(
-                r"([0-9][0-9,]*)\\s*人评价", normalized_text
+                r"([0-9][0-9,]*)\s*人评价", normalized_text
             )
             if count_match:
                 self.current["rating_count"] = count_match.group(1)
 
         director_match = re.search(
-            r"导演\\s*[:：]\\s*(.+?)(?=\\s*主演\\s*[:：])",
+            r"导演\s*[:：]\s*(.+?)(?=\s*主演\s*[:：])",
             normalized_text,
         )
         actor_match = re.search(
-            r"主演\\s*[:：]\\s*(.+?)(?=\\s*[0-9]{4}\\s*/)",
+            r"主演\s*[:：]\s*(.+?)(?=\s*[0-9]{4}\s*/)",
             normalized_text,
         )
         if director_match:
             self.current["directors"] = [
                 value.strip(" /…...")
-                for value in re.split(r"\\s*/\\s*", director_match.group(1))
+                for value in re.split(r"\s*/\s*", director_match.group(1))
                 if value.strip(" /…...")
             ]
         if actor_match:
             self.current["actors"] = [
                 value.strip(" /…...")
-                for value in re.split(r"\\s*/\\s*", actor_match.group(1))
+                for value in re.split(r"\s*/\s*", actor_match.group(1))
                 if value.strip(" /…...")
             ]
 

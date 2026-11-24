@@ -4,7 +4,7 @@
 > 仓库：`daxiguaya/MovieHub`  
 > 工作分支：`main`  
 > 当前阶段：部署前收尾（Pre-deployment hardening）  
-> 整体进度估算：**约 84%**。这是交付范围估算，不是测试通过率。
+> 整体进度估算：**约 87%**。这是交付范围估算，不是测试通过率。
 
 ## 一句话结论
 
@@ -76,7 +76,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 当前明确待补：
 - [x] 对新采集的 Top 250 JSON artifact 复核评价人数实际覆盖率；已修复当前页面文本解析并在真实数据中验证 250/250。
-- [x] 完成剧情简介来源专项研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [x] 新增只读 TMDB adapter 与覆盖率审计 CLI：优先已有 TMDB ID，其次 IMDb ID，最后严格标题+年份匹配；拒绝歧义/年份冲突；zh-CN/zh-TW 请求；报告只输出匹配元数据、简介长度和 SHA-256，不输出简介正文、不写数据库。Mocked API/backend tests passed。\n- [x] 新增手动 GitHub Actions workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml)，从已验证首发 artifact 读取 288 条记录并测量中文覆盖；运行需要仓库 Actions secret `TMDB_API_READ_TOKEN`。\n- [ ] 添加 API token secret 并执行真实只读 dry-run；先验证 250 条 Top 250 的匹配准确率与 zh-CN/zh-TW 简介覆盖，年度榜单缺少年份的记录将保守标为身份信息不足，不盲目匹配。
+- [x] 完成剧情简介来源专项研究并形成 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)：TMDB 列为首选试验候选（非商业许可、署名、无 SLA、中文覆盖待实测）；Wikipedia 作为逐条核验的 CC BY-SA 备用；OMDb 因禁止索引/归档/分发排除；不使用受 robots 限制的豆瓣接口。\n- [x] 新增只读 TMDB adapter 与覆盖率审计 CLI：优先已有 TMDB ID，其次 IMDb ID，最后严格标题+年份匹配；拒绝歧义/年份冲突；zh-CN/zh-TW 请求；报告只输出匹配元数据、简介长度和 SHA-256，不输出简介正文、不写数据库。Mocked API/backend tests passed。\n- [x] 新增手动 GitHub Actions workflow [TMDB overview coverage audit](../.github/workflows/tmdb-overview-audit.yml)，从已验证首发 artifact 读取 2026-11-24 Top 250 快照（250 部影片），分别测量 zh-CN/zh-TW；运行需要仓库 Actions secret `TMDB_API_READ_TOKEN`。\n- [x] 已配置 `TMDB_API_READ_TOKEN` 并完成真实只读 API 审计：Top 250 的 250 部影片分别检查 zh-CN/zh-TW，共 500 条语言记录；470 条确认有对应语言剧情简介（94%），其余 3 条歧义、4 条身份信息不足、21 条无严格匹配、2 条无简介均未接受。审计只输出匹配元数据/长度/SHA-256，不输出简介正文、不写数据库。
 - [x] 导入时仅填补空字段，不覆盖已有来源数据；字段级来源、来源 URL、采集时间和内容指纹已落库并通过真实数据验证。
 - [ ] 对多来源冲突制定优先级与审计规则；缺失值仍允许为空。
 - [x] 收藏/取消收藏的真实 API 与 SQLite 写入、读取、删除流程已通过 Playwright。
@@ -86,7 +86,8 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 ### P0 — 首发内容与体验收尾
 - [x] 复核 Top 250 评价人数真实覆盖率并修复解析器与真实页面结构的差异。
-- [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [ ] 完成 TMDB API 非商业/缓存展示条款核验，添加只读 token secret，并对 288 条真实影片执行只读匹配与中文简介覆盖率试验。
+- [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。\n- [x] 已配置只读 token 并完成 Top 250 的 500 条 zh-CN/zh-TW 真实 API 审计，简介可用覆盖率 470/500（94%）。
+- [ ] 继续核验 TMDB 当前条款中缓存、持久化、再分发和展示限制；未核验/批准前不把简介写入 MovieHub 数据库。
 - [x] schema v3 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与真实数据持久化检查。
 - [x] 真实数据收藏/取消收藏：通过 Playwright 经可信代理注入密钥，验证 live API 与临时 SQLite 的写入、列表读取、删除。
 - [ ] 真实多日期历史快照选择、排名比较、分页和异常状态流程验收。
@@ -94,7 +95,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 ### P1 — 隔离环境部署演练（不触碰 NAS）
 - [x] 在 GitHub 隔离 runner 完成 Compose 启动、显式初始化、readiness、API 读写、备份、恢复、恢复后 API 验证和回滚副本验收。
-- [ ] 继续补齐隔离环境下的真实规范化数据导入、镜像升级、版本回滚演练。
+- [x] 完成隔离环境下真实规范化数据导入、schema v2→v3 镜像升级、容器 API 验证、备份恢复和回滚副本演练（CI #45350740671）。
 - [ ] 检查密钥注入、反向代理信任边界、容器权限、数据卷和日志策略。
 - [ ] 制定目标 NAS 资源预算、目录权限、备份落点和性能测量方案。
 - [ ] 将 NPM 与 Xiaoya 集成验收步骤整理为可执行清单。
@@ -124,10 +125,10 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | 榜单采集、规范化和真实导入 | 已完成首发数据演练 |
 | 首发详情元数据丰富度 | 进行中 |
 | 前端核心功能与桌面/移动端真实数据 E2E | 榜单、详情、搜索、收藏链路自动化验收通过；视觉 QA 待做 |
-| 容器、备份恢复和运维文档 | 已实现；隔离 Compose 启动及备份恢复闭环通过，数据导入/升级演练待做 |
+| 容器、备份恢复和运维文档 | 已实现；真实 288 条榜单项导入、schema v2→v3、双容器 API、备份恢复/回滚均在隔离 CI 通过 |
 | NAS/NPM 实际联调与生产部署 | 未开始 |
 
-**整体进度调整为约 84%。** 本轮完成了剧情简介来源的许可、稳定性和匹配路径专项研究，新增 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。TMDB 是首选试验候选，但尚未批准批量导入：免费开发 API 仅适用于非商业用途、要求署名且无 SLA，中文覆盖率及实际缓存/展示条款仍须实测/核验；Wikipedia 是带 CC BY-SA 义务的逐条备用；OMDb 因索引/归档/分发限制排除。简介仍为 0/250，不虚报进度。下一步先运行 TMDB 只读 dry-run（需 API read token），核验 288 条匹配与中文简介覆盖，再决定是否做 schema v4 与导入。随后继续真实数据分页、多日期历史/排名比较、筛选和异常状态验收。最新真实数据浏览器 CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的核心 job 通过，真实浏览器 4/4 通过；被 skip 的 job 不计通过。
+**整体进度调整为约 87%。** 本轮新增两项真实验收：TMDB Top 250 的 500 条简繁体语言记录只读审计，470 条可用（94%）；以及 5 个真实快照/288 条榜单项在 schema v2→v3 升级后的双容器导入、API、备份恢复和回滚闭环。TMDB 审计不写数据库，因此 MovieHub 当前 synopsis 字段仍为 0/250；在缓存、持久化、再分发和展示条款核验完成前，不启动简介导入。下一步优先完成 TMDB 条款审查，再决定是否增加 NULL-only overview importer 与 attribution UI；同时补齐真实多日期历史、Scout 只读导入演练和前端边界 QA。最新真实数据导入/升级 CI [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) 与主 CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) 均通过。
 
 ## 2026-11-24 — Pagination, history, search-filter acceptance expansion
 
@@ -225,3 +226,20 @@ The documentation/main-head CI [#45344314269](https://github.com/daxiguaya/Movie
 - [x] Switch headless browser CI to Playwright Chromium headless shell; [#45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) and documentation/main-head CI [#45344314269](https://github.com/daxiguaya/MovieHub/actions/runs/45344314269) passed, with 10 browser E2E passed / 4 skipped and backend 267 passed / 4 skipped.
 
 The remaining 16% is concentrated in licensed/accurate synopsis coverage, genuine same-chart multi-date source history, final import/upgrade rehearsal, and separately approved production integration/deployment. No NAS or production database was touched.
+
+
+## 2026-11-24 — Real TMDB audit and real-data container upgrade rehearsal
+
+- [x] Run the real read-only TMDB audit against the verified 2026-11-24 Top 250 snapshot: 250 unique movies × 2 locales = 500 language records.
+- [x] Confirm 470/500 locale records have a non-empty matching synopsis (**94.0% overall**): zh-CN 238/250 (95.2%), zh-TW 232/250 (92.8%).
+- [x] Keep uncertain results out of the accepted set: 3 ambiguous, 4 insufficient identity, 21 no exact match, and 2 matched records with no overview. No synopsis text is written to the report or database.
+- [x] Add a separate workflow, [real-data-compose-upgrade.yml](../.github/workflows/real-data-compose-upgrade.yml), so the long real-data rehearsal cannot destabilize required Backend CI.
+- [x] Create a populated disposable schema-v2 SQLite database with a sentinel, then use the actual `scripts.migrate` runner to upgrade to schema v3. The migration passed ORM/schema, integrity and foreign-key validation and retained its verified v2 pre-migration backup.
+- [x] Import all five normalized real snapshots into the upgraded database: **289 movies including the sentinel, 5 chart snapshots, 288 chart items**.
+- [x] Verify field provenance was written for imported metadata: actors 233, directors 276, original_title 223, rating 288, rating_count 250, year 248 observations.
+- [x] Verify the live API: readiness passed, five charts returned, Top 250 API reported 250 total entries and served a 50-item page.
+- [x] Create a verified post-import backup; mutate the sentinel; stop the API; restore via the documented one-shot container; restart and verify the original sentinel plus all 5 snapshots/288 chart items returned.
+- [x] Verify the pre-restore rollback copy retained the post-backup mutation and both backend/frontend container health checks reported healthy.
+- [x] Real-data rehearsal [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) passed every step. Main CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) passed backend **267 passed / 4 skipped**, frontend regression/type-check/build, browser E2E **10 passed / 4 skipped**, and the standard isolated Compose smoke test. Optional benchmark/collection jobs were skipped and are not counted as passed.
+
+The TMDB audit is a coverage/matching dry-run only. It does not authorize bulk synopsis persistence or redistribution. The real-data rehearsal used only disposable GitHub Actions storage and was fully cleaned up. **No NAS, NPM, production database, Scout source database, or NAS service was accessed or changed.** Production deployment remains a separate, not-yet-started approval stage.

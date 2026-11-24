@@ -218,13 +218,14 @@ async def get_online_detail(
 @router.get("/cache-stats")
 @limiter.limit("10/minute")
 async def get_cache_stats(request: Request) -> dict[str, int | float]:
-    return {**provider_response_cache.stats(), **tmdb_client.stats()}
+    cache_stats = await asyncio.to_thread(provider_response_cache.stats)
+    return {**cache_stats, **tmdb_client.stats()}
 
 
 @router.get("/favorites", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def list_external_favorites(request: Request) -> list[dict]:
-    return provider_response_cache.list_favorites()
+    return await asyncio.to_thread(provider_response_cache.list_favorites)
 
 
 @router.put("/favorites/{media_type}/{provider_id}", dependencies=[Depends(verify_api_key)])
@@ -237,8 +238,12 @@ async def save_external_favorite(
 ) -> dict:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
-    saved = provider_response_cache.save_favorite(
-        media_type, provider_id, payload.snapshot.model_dump(), payload.note
+    saved = await asyncio.to_thread(
+        provider_response_cache.save_favorite,
+        media_type,
+        provider_id,
+        payload.snapshot.model_dump(),
+        payload.note,
     )
     await _backup_favorites_after_write()
     return saved
@@ -252,7 +257,10 @@ async def remove_external_favorite(
     media_type: Literal["movie", "tv"],
     provider_id: int,
 ) -> Response:
-    if not provider_response_cache.delete_favorite(media_type, provider_id):
+    removed = await asyncio.to_thread(
+        provider_response_cache.delete_favorite, media_type, provider_id
+    )
+    if not removed:
         raise HTTPException(status_code=404, detail="Favorite not found")
     await _backup_favorites_after_write()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

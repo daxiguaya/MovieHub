@@ -141,3 +141,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 **Verification:** CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741) passed: backend 265 passed / 4 skipped; frontend unit tests, type-check/build, and container builds passed; browser E2E 10 passed / 4 skipped. The four skipped browser cases are the separately opt-in real first-launch dataset journeys, so this run verifies fixture-based browser flows and isolated API/SQLite integration, not a new real-source collection or real multi-date dataset. Performance benchmarks and opt-in collection/import jobs were also skipped and are not counted as passed.
 
 **Progress remains approximately 83%.** This acceptance expansion closes important automated test gaps but does not change the outstanding real TMDB synopsis audit, real multi-date source-data verification, isolated Compose deployment rehearsal, or separately approved NAS deployment. No production database was initialized and no NAS service was changed.
+
+## Next isolated real-data validation
+
+The fixture-based pagination/history/filter acceptance above is green. The next opt-in CI run is intended to re-check the current application against a freshly collected, robots-permitted Top 250 snapshot plus the retained official 2025 annual-chart artifact, using a disposable SQLite database and the real-data browser journeys. This does not deploy MovieHub, write to NAS, or create a production database. The run is tracked separately so skipped or failed real-data jobs cannot be mistaken for the fixture-based CI result.

@@ -136,13 +136,13 @@ Current phase: Pre-deployment hardening — first-launch real-data browser journ
 | One-shot Douban Top 250 collection | Implemented; robots-aware and low-rate |
 | One-shot popular/high-rated collection | Implemented; bounded, robots-aware and low-rate |
 | 2025 annual charts | Official four-list collector, recoverable output and strict atomic import implemented; 38 real records successfully imported and verified in a disposable CI database |
-| Favorites API and frontend UI | Implemented; unit and Chromium E2E passed |
+| Favorites API and frontend UI | Implemented; unit, fixture E2E, and live real-data add/list/remove E2E passed |
 | Xiaoya handoff | Implemented; URL encoding and browser handoff passed; actual NPM route verification pending |
-| React frontend and user workflows | Core flows implemented; 5 frontend tests and 4 browser E2E tests passed; visual QA and real-data review pending |
+| React frontend and user workflows | Core flows implemented; frontend tests, fixture E2E, and 4/4 live real-data browser journeys passed; visual QA and remaining real-data edge cases pending |
 | Container packaging and backup/restore preparation | 100% packaged and CI-built; NAS operational validation pending |
 | Actual NAS deployment and end-to-end production verification | 0%; intentionally not started and requires separate approval |
 
-**Estimated first-release progress: about 75%.** This is a planning estimate, not a test metric. The independent database, backend baseline, importer safety/recovery, chart acquisition/import pipeline, frontend core flows, container packaging and backup/restore tooling are implemented and CI-verified. The 2025 annual data has also been imported into a disposable CI database. The remaining work is first-release content enrichment/review, visual QA, isolated deployment and backup/restore rehearsal, actual NPM/Xiaoya integration verification, and separately authorized NAS rollout. MovieHub has no production source database because it has not yet been deployed; Scout is an optional external read-only source, not a prerequisite.
+**Estimated first-release progress: about 83%.** This is a delivery-scope estimate, not a test metric. The 288-record first-launch dataset, schema-v3 provenance, backend/frontend builds, and 4/4 live real-data browser journeys (including favorite add/list/remove) have passed in disposable CI. Remaining work is compliant overview enrichment, real-data pagination and multi-snapshot edge cases, visual QA, isolated Compose deployment/backup/restore rehearsal, and separately authorized NAS rollout. MovieHub has no production source database because it has not yet been deployed; Scout is an optional external read-only source, not a prerequisite.
 ## Chart and Scout import numeric integrity (2026-11-23)
 
 - [x] Reject boolean and fractional values where integer ranks, years, or counts are expected.

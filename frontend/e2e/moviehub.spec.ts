@@ -185,6 +185,11 @@ test("connects the browser to the real FastAPI service and temporary SQLite data
 });
 
 test("real 2025 annual snapshots render through the live API and support detail/search navigation", async ({ page }) => {
+  test.skip(
+    process.env.MOVIEHUB_REAL_ANNUAL_E2E !== "1",
+    "requires the dedicated CI job with imported official annual snapshots"
+  );
+
   // The dedicated CI job imports the retained official 2025 artifact into a
   // disposable SQLite database and starts the real FastAPI service.
   await page.unroute("**/api/**");

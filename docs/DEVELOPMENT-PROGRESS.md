@@ -800,3 +800,14 @@ Overall delivery estimate remains **approximately 87%**. This is a development e
 - [ ] First NAS deployment, independent database initialization, data import and live rollback rehearsal remain pending.
 
 Overall development delivery estimate: **approximately 88%**. No NAS, NPM, existing service, or production database was touched.
+
+
+## 2026-11-24 — Protected import routes and NPM deployment rules
+
+- Added a dedicated integration test proving `POST /api/charts/import` rejects both missing and invalid API keys with HTTP 401.
+- Existing security checks also cover favorites API-key enforcement and Scout import source confinement, including symlink escapes outside the read-only import directory.
+- Updated the deployment runbook with explicit NPM server-level deny locations for `/api/import` and `/api/charts/import`. The favorites-only upstream API-key injection remains separate; the key is never exposed to the frontend.
+- The preceding complete CI passed all required jobs in [#45370748614](https://github.com/daxiguaya/MovieHub/actions/runs/45370748614). The new backend test passed in [#45382554819](https://github.com/daxiguaya/MovieHub/actions/runs/45382554819); its browser E2E job was still running when recorded.
+- The follow-up documentation-head CI is tracked separately; no CI result is inferred from a queued or in-progress run.
+
+This closes a code/test gap in the operator import security boundary and makes the NPM deployment step reproducible. It does not configure NPM on the NAS or change API runtime behavior. Development delivery remains approximately **88%**; NAS deployment remains **not started (0%)**.

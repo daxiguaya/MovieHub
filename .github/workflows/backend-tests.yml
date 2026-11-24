@@ -645,8 +645,18 @@ jobs:
               assert isinstance(charts, list) and charts, charts
               assert any(chart.get("slug") == "top250" for chart in charts), charts
           PY
-          docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
-            'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'
+      - name: Wait for frontend HTTP and capture startup diagnostics on failure
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker compose -p moviehub-ci-smoke exec -T moviehub-web sh -c \
+              'wget -q -O /tmp/moviehub-index.html http://127.0.0.1:8080/ && test -s /tmp/moviehub-index.html'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -p moviehub-ci-smoke logs --no-color moviehub-web
+          docker inspect moviehub-web
+          exit 1
       - name: Verify both container health checks report healthy
         run: |
           for attempt in $(seq 1 45); do

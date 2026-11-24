@@ -9,7 +9,7 @@ Source page declared by the collector: https://blog.douban.com/douban/2026/01/15
 
 ## Scope
 
-This audit inspects the four normalized JSON files actually produced by the opt-in collector. It is real collected source data, not synthetic fixtures. It is **not** the Scout SQLite catalogue and was not imported into any MovieHub database. The collector workflow previously completed its four-file dry-run; this audit independently inspected the downloaded artifact contents and metadata coverage.
+This audit inspects the four normalized JSON files actually produced by the opt-in collector. It is real collected source data, not synthetic fixtures. It is **not** the Scout SQLite catalogue. The collector workflow completed its four-file dry-run; this audit independently inspected the downloaded artifact contents and metadata coverage. A subsequent disposable-CI rehearsal imported this exact artifact into a newly initialized temporary MovieHub database; details are recorded below.
 
 ## File-level results
 
@@ -51,3 +51,22 @@ Cross-chart duplicate Douban IDs: **0**. All 38 records have a non-empty title a
 The next meaningful dataset is a **consistent, read-only staged copy of the actual Scout SQLite source**, including its WAL state or produced through SQLite's online backup mechanism. The source database's concrete path was not established in the earlier NAS scan, and this run did not connect to the NAS. Once a staged copy is supplied, run the whole-catalog identity/numeric audit, annual-chart coverage audit and preview/reconciliation against that copy. Keep the destination MovieHub database isolated and disposable for any import rehearsal.
 
 No Scout source file, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed.
+
+## Isolated real-data import rehearsal
+
+**Workflow:** [GitHub Actions #45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353)  
+**Job:** `real-annual-data-import-rehearsal` — completed successfully.
+
+The workflow downloaded the same retained artifact (ID `14835864058`), initialized a new database under the GitHub runner's temporary `/tmp/moviehub-real-annual-data/db/movies.db`, and invoked the production `scripts.import_annual_charts --apply` path. It then independently queried the persisted SQLite database.
+
+| Assertion | Result |
+|---|---:|
+| Annual chart snapshots | 4 |
+| Movie records | 38 |
+| Chart-item records | 38 |
+| Cross-chart duplicate IDs | 0 |
+| Rank sequences | Continuous in all 4 charts |
+| `PRAGMA integrity_check` | `ok` |
+| `PRAGMA foreign_key_check` violations | 0 |
+
+The import service reported all four snapshots committed in one batch transaction. The database was a disposable GitHub-hosted runner file and was not uploaded to NAS or retained as a production database. This proves the real annual artifact can pass the current import path and persist consistently in an isolated database; it does not prove Scout catalogue compatibility, NAS performance or production deployment readiness.

@@ -91,3 +91,57 @@ def test_readiness_report_is_written_atomically_with_private_permissions(tmp_pat
     assert json.loads(output.read_text(encoding="utf-8")) == report
     assert output.stat().st_mode & 0o777 == 0o600
     assert not output.with_name(output.name + ".tmp").exists()
+
+
+
+def test_report_output_cannot_overwrite_scout_database_or_chart_snapshot(tmp_path):
+    scout, chart = _inputs(tmp_path)
+    for protected_input in (scout, chart):
+        try:
+            preparation.validate_report_output_path(
+                protected_input,
+                scout,
+                [chart],
+            )
+        except ValueError as exc:
+            assert "different from the Scout database" in str(exc)
+        else:
+            raise AssertionError("protected input path was accepted")
+
+
+def test_report_output_rejects_symlink_destination_and_temporary_file(tmp_path):
+    scout, chart = _inputs(tmp_path)
+    destination = tmp_path / "report.json"
+    destination.symlink_to(scout)
+    try:
+        preparation.validate_report_output_path(destination, scout, [chart])
+    except ValueError as exc:
+        assert "symbolic link" in str(exc)
+    else:
+        raise AssertionError("symlink destination was accepted")
+
+    destination.unlink()
+    temporary = destination.with_name(destination.name + ".tmp")
+    temporary.symlink_to(scout)
+    try:
+        preparation.validate_report_output_path(destination, scout, [chart])
+    except ValueError as exc:
+        assert "temporary path" in str(exc)
+    else:
+        raise AssertionError("symlink temporary path was accepted")
+
+
+def test_report_writer_refuses_preexisting_temporary_file(tmp_path):
+    output = tmp_path / "ready.json"
+    temporary = output.with_name(output.name + ".tmp")
+    temporary.write_text("keep me", encoding="utf-8")
+
+    try:
+        preparation.write_report(output, {"read_only": True})
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("pre-existing temporary file was overwritten")
+
+    assert temporary.read_text(encoding="utf-8") == "keep me"
+    assert not output.exists()

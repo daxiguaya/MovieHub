@@ -432,14 +432,14 @@ jobs:
           output_dir="${RUNNER_TEMP}/moviehub-first-launch"
           capture_date="$(date -u +%F)"
           mkdir -p "$output_dir"
-          python -m scripts.collect_douban_top250 \\
-            --date "$capture_date" \\
+          python -m scripts.collect_douban_top250 \
+            --date "$capture_date" \
             --output "$output_dir/top250-$capture_date.json"
-          python -m scripts.collect_douban_tagged_chart \\
-            --chart popular --date "$capture_date" --max-items 100 \\
+          python -m scripts.collect_douban_tagged_chart \
+            --chart popular --date "$capture_date" --max-items 100 \
             --output "$output_dir/popular-$capture_date.json"
-          python -m scripts.collect_douban_tagged_chart \\
-            --chart high-rated --date "$capture_date" --max-items 100 \\
+          python -m scripts.collect_douban_tagged_chart \
+            --chart high-rated --date "$capture_date" --max-items 100 \
             --output "$output_dir/high-rated-$capture_date.json"
           for file in "$output_dir"/*.json; do
             python -m scripts.import_chart --input "$file" --dry-run
@@ -449,8 +449,8 @@ jobs:
         working-directory: backend
       - name: Audit source coverage and cross-chart overlap
         run: |
-          python -m scripts.audit_first_launch_data \\
-            --input-dir "$MOVIEHUB_FIRST_LAUNCH_DIR" \\
+          python -m scripts.audit_first_launch_data \
+            --input-dir "$MOVIEHUB_FIRST_LAUNCH_DIR" \
             --date "$MOVIEHUB_CAPTURE_DATE"
         working-directory: backend
       - name: Initialize a disposable MovieHub database

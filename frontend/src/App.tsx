@@ -289,23 +289,19 @@ function DiscoverySpotlight() {
 
   useEffect(() => {
     let active = true;
-    const definitions = [
-      { key: "horror-high", title: "恐怖片高分榜", genre: "27", votes: "500", sort: "vote_average.desc" },
-      { key: "horror-gems", title: "恐怖片冷门佳作", genre: "27", votes: "50", sort: "vote_average.desc" },
-      { key: "thriller-high", title: "惊悚片高分榜", genre: "53", votes: "500", sort: "vote_average.desc" },
-      { key: "thriller-gems", title: "惊悚片冷门佳作", genre: "53", votes: "50", sort: "vote_average.desc" }
-    ];
-    Promise.all(definitions.map(async (definition) => {
+    const definitions = Object.entries(DISCOVERY_LISTS);
+    Promise.all(definitions.map(async ([key, definition]) => {
       const params = new URLSearchParams({
         media_type: "movie",
         page: "1",
         with_genres: definition.genre,
-        min_votes: definition.votes,
-        min_rating: definition.votes === "50" ? "6.5" : "7",
-        sort_by: definition.sort
+        min_votes: String(definition.minVotes),
+        min_rating: String(definition.minRating),
+        sort_by: "vote_average.desc"
       });
+      if (definition.maxVotes) params.set("max_votes", String(definition.maxVotes));
       const data = await api.discoveryDiscover(params);
-      return { key: definition.key, title: definition.title, items: data.items.slice(0, 5) };
+      return { key, title: definition.title, items: data.items.slice(0, 5) };
     })).then((data) => { if (active) setLists(data); })
       .catch(() => { if (active) setLists([]); })
       .finally(() => { if (active) setLoading(false); });
@@ -332,6 +328,7 @@ function DiscoverySpotlight() {
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
+              <Link className="spotlight-more" to={"/discover/" + list.key}>查看完整榜单 <span>→</span></Link>
             </section>
           ))}
         </div>

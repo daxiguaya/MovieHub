@@ -76,7 +76,6 @@ test("submits online search with dynamic multi-select filters and preserves sele
   await expect(page.getByRole("link", { name: "在线匹配影片" })).toBeVisible();
   await expect.poll(() => localQueries.length).toBeGreaterThan(0);
   const local = localQueries[localQueries.length - 1];
-  expect(local.get("search")).toBe("星际");
   expect(local.get("type")).toBe("movie");
   expect(local.get("min_rating")).toBe("8");
   expect(local.get("min_rating_count")).toBe("1000");
@@ -91,6 +90,7 @@ test("submits online search with dynamic multi-select filters and preserves sele
   const pageUrl = new URL(page.url());
   expect(pageUrl.searchParams.get("genre_ids")).toBe("18|878");
   expect(pageUrl.searchParams.get("region_codes")).toBe("CN");
+  expect(pageUrl.searchParams.get("search")).toBe("星际");
 });
 
 test("shows a useful empty state when online and local discovery return no matches", async ({ page }) => {

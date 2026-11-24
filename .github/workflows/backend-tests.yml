@@ -340,11 +340,11 @@ jobs:
         working-directory: backend
 
   real-annual-data-browser-e2e:
-    # Real collected source data, isolated SQLite, and the live API/browser journey.
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[run-real-annual-e2e]')
+    # Combined first-launch Top 250 + official annual charts in isolated SQLite and live browser journey.
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[run-first-launch-data]')
     runs-on: ubuntu-24.04
     env:
-      MOVIEHUB_DATA_DIR: /tmp/moviehub-real-annual-e2e
+      MOVIEHUB_DATA_DIR: /tmp/moviehub-first-launch-browser
       MOVIEHUB_REAL_ANNUAL_E2E: "1"
     steps:
       - uses: actions/checkout@v4
@@ -356,32 +356,35 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Download the retained official 2025 annual-chart artifact
+      - name: Download the verified combined first-launch dataset
         uses: actions/download-artifact@v4
         with:
-          name: moviehub-douban-annual-2025
+          name: moviehub-first-launch-douban
           repository: ${{ github.repository }}
-          run-id: 45213246118
+          run-id: 45320596952
           github-token: ${{ github.token }}
-          path: ${{ runner.temp }}/moviehub-real-annual-2025
+          path: ${{ runner.temp }}/moviehub-first-launch-bundle
       - name: Install backend dependencies
         run: pip install -r requirements.txt
         working-directory: backend
       - name: Initialize isolated MovieHub database
         run: python -m scripts.init_db
         working-directory: backend
-      - name: Import all four real annual snapshots
+      - name: Import Top 250 and all four official annual snapshots
         run: |
-          python -m scripts.import_annual_charts \
-            --input-dir "${RUNNER_TEMP}/moviehub-real-annual-2025" \
-            --date 2026-11-23 \
-            --apply
+          set -euo pipefail
+          for file in "${RUNNER_TEMP}/moviehub-first-launch-bundle/moviehub-first-launch"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
+          for file in "${RUNNER_TEMP}/moviehub-first-launch-bundle/moviehub-annual-2025"/*.json; do
+            python -m scripts.import_chart --input "$file"
+          done
         working-directory: backend
       - name: Start FastAPI against the real-data database
         run: |
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
-            > "${RUNNER_TEMP}/moviehub-real-annual-api.log" 2>&1 &
-          echo $! > "${RUNNER_TEMP}/moviehub-real-annual-api.pid"
+            > "${RUNNER_TEMP}/moviehub-first-launch-api.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/moviehub-first-launch-api.pid"
         working-directory: backend
       - name: Wait for API readiness
         run: |
@@ -404,8 +407,8 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - name: Run the real annual-data browser journey
-        run: npm run test:e2e -- --grep "real 2025 annual snapshots"
+      - name: Run the combined real first-launch browser journeys
+        run: npm run test:e2e -- --grep "real (Top 250 first-launch snapshot|2025 annual snapshots)"
         working-directory: frontend
 
   first-launch-data-collection:

@@ -11,6 +11,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from app.config import settings
 from app.database import get_db_path
 
 logger = logging.getLogger("moviehub.response_cache")
@@ -200,6 +201,10 @@ class SQLiteResponseCache:
             }
 
 
-response_cache = SQLiteResponseCache()
+response_cache = SQLiteResponseCache(
+    max_entries=settings.tmdb_cache_max_entries,
+    max_bytes=settings.tmdb_cache_max_bytes,
+    max_entry_bytes=settings.tmdb_cache_max_entry_bytes,
+)
 
 __all__ = ["SQLiteResponseCache", "build_cache_key", "response_cache"]

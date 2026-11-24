@@ -142,6 +142,15 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 
 **Progress remains approximately 83%.** This acceptance expansion closes important automated test gaps but does not change the outstanding real TMDB synopsis audit, real multi-date source-data verification, isolated Compose deployment rehearsal, or separately approved NAS deployment. No production database was initialized and no NAS service was changed.
 
-## Next isolated real-data validation
+## 2026-11-24 — Fresh real-source dataset and browser acceptance
 
-The fixture-based pagination/history/filter acceptance above is green. The next opt-in CI run is intended to re-check the current application against a freshly collected, robots-permitted Top 250 snapshot plus the retained official 2025 annual-chart artifact, using a disposable SQLite database and the real-data browser journeys. This does not deploy MovieHub, write to NAS, or create a production database. The run is tracked separately so skipped or failed real-data jobs cannot be mistaken for the fixture-based CI result.
+- [x] Re-collect the robots-permitted Top 250 snapshot and audit its source metadata.
+- [x] Import the fresh Top 250 snapshot plus all four retained official 2025 annual charts into a disposable SQLite database.
+- [x] Verify 288 chart items, 288 unique MovieHub movies, five snapshots, SQLite integrity `ok`, and zero foreign-key errors.
+- [x] Run the real-data browser journeys against the freshly imported database: Top 250, all 2025 annual snapshots, narrow mobile viewport, and live favorite add/list/remove.
+
+**Run:** [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102). The first-launch collection/import job and the real-data browser job both succeeded; the real-data browser suite passed **4/4**. The normal backend/frontend jobs also succeeded. The regular fixture E2E job was still running at the time of this status update; the prior complete fixture CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741) passed 10 browser tests and 265 backend tests.
+
+Fresh Top 250 source audit: rating 250/250, rating count 250/250, directors 238/250, actors 233/250, year 248/250, original title 223/250, genres 248/250, regions 248/250, posters 250/250. **Plot overview remains 0/250**; no short reviews or taglines are substituted. This real-data run does not establish multiple distinct capture dates for the same chart; it verifies the available 2026-11-24 Top 250 and retained 2025 annual snapshots.
+
+All work remained in disposable GitHub Actions storage. No NAS path, production database, NPM configuration, or NAS service was touched.

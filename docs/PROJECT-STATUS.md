@@ -126,3 +126,18 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | NAS/NPM 实际联调与生产部署 | 未开始 |
 
 **整体进度仍约 83%。** 本轮完成了剧情简介来源的许可、稳定性和匹配路径专项研究，新增 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。TMDB 是首选试验候选，但尚未批准批量导入：免费开发 API 仅适用于非商业用途、要求署名且无 SLA，中文覆盖率及实际缓存/展示条款仍须实测/核验；Wikipedia 是带 CC BY-SA 义务的逐条备用；OMDb 因索引/归档/分发限制排除。简介仍为 0/250，不虚报进度。下一步先运行 TMDB 只读 dry-run（需 API read token），核验 288 条匹配与中文简介覆盖，再决定是否做 schema v4 与导入。随后继续真实数据分页、多日期历史/排名比较、筛选和异常状态验收。最新真实数据浏览器 CI [#45329522019](https://github.com/daxiguaya/MovieHub/actions/runs/45329522019) 的核心 job 通过，真实浏览器 4/4 通过；被 skip 的 job 不计通过。
+
+## 2026-11-24 — Pagination, history, search-filter acceptance expansion
+
+- [x] Add Playwright coverage for chart first/last-page traversal, ensuring page-one items remain visible after loading the final page.
+- [x] Add Playwright coverage for switching to a historical snapshot after pagination and ensuring items from the previous snapshot are cleared.
+- [x] Add Playwright coverage for comparing two dates and rendering moved/new ranking states.
+- [x] Add Playwright coverage for submitting combined search filters (keyword, media type, rating, rating count, year range, included/excluded genres, region, and sort).
+- [x] Add Playwright coverage for zero-result and API-error states.
+- [x] Extend the backend chart API integration test to traverse cursor pages and request a historical snapshot through the HTTP API.
+- [x] Add backend API integration coverage proving combined movie filters apply together, including AND genre matching and excluded genres.
+- [x] Fix Playwright strict-mode selectors by scoping rank-comparison assertions to the relevant result row.
+
+**Verification:** CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741) passed: backend 265 passed / 4 skipped; frontend unit tests, type-check/build, and container builds passed; browser E2E 10 passed / 4 skipped. The four skipped browser cases are the separately opt-in real first-launch dataset journeys, so this run verifies fixture-based browser flows and isolated API/SQLite integration, not a new real-source collection or real multi-date dataset. Performance benchmarks and opt-in collection/import jobs were also skipped and are not counted as passed.
+
+**Progress remains approximately 83%.** This acceptance expansion closes important automated test gaps but does not change the outstanding real TMDB synopsis audit, real multi-date source-data verification, isolated Compose deployment rehearsal, or separately approved NAS deployment. No production database was initialized and no NAS service was changed.

@@ -599,3 +599,15 @@ SQLite reports `SCAN movies` for all LIKE scenarios because the current contains
 The same run collected all four official 2025 annual charts and all four normalized files passed dry-run. Artifact: [moviehub-douban-annual-2025](https://github.com/daxiguaya/MovieHub/actions/runs/45213246118/artifacts/14835864058), 4,321 bytes, SHA-256 `d7d050a5816dcf645d367de4dc3182f5e629060ef70f95e498a75ac60b8de689`, retained until 2026-12-07. This job collected and validated files only; it did not import them into any database.
 
 **Safety boundary:** no Scout database, MovieHub production database, NAS service, NPM configuration or production deployment was accessed or changed. The 75% first-release estimate is unchanged because the remaining critical gates require staged real-source data, visual/NPM acceptance and separately approved operational work.
+
+
+
+## Backup retention hardening (2026-11-24)
+
+- [x] Restrict retention pruning to recognized MovieHub backup directories with the supported manifest format and schema version.
+- [x] Ignore malformed manifests, valid JSON values that are not objects, and unsupported manifest versions without aborting backup creation.
+- [x] Never follow symlinked backup directories during destructive retention cleanup.
+- [x] Add regression tests proving foreign/incomplete directories and symlink targets survive while old recognized MovieHub backups are pruned.
+- [x] Verify the latest branch-head backend suite: **232 passed, 4 skipped, 1 warning**; backend compile, Compose validation and image build passed.
+
+**Scope:** backup creation and retention only; no production database, NAS service, NPM configuration or deployment was accessed. The annual-chart and performance jobs were skipped in this push-triggered run and are not counted as passing.

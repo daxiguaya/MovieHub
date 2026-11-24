@@ -136,9 +136,15 @@ def _prune_backups(root: Path, keep_last: int, current: Path) -> None:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             continue
+        # Valid JSON can still be a list, scalar or null. Treat every
+        # unrecognized manifest shape as foreign data and leave it untouched.
+        if not isinstance(manifest, dict):
+            continue
         if (
-            manifest.get("format_version") != 1
+            type(manifest.get("format_version")) is not int
+            or manifest.get("format_version") != 1
             or manifest.get("database_file") != DATABASE_FILENAME
+            or type(manifest.get("schema_version")) is not int
             or manifest.get("schema_version") != CURRENT_SCHEMA_VERSION
         ):
             continue

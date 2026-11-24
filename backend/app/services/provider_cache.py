@@ -239,20 +239,49 @@ class ProviderResponseCache:
             return cursor.rowcount > 0
 
     def backup_daily(self, backup_dir: Path, keep_days: int = 7) -> Path:
-        """Create one consistent SQLite backup per day, retaining a short history."""
+        """Create one verified SQLite backup per day, retaining a short history."""
         self._init()
+        import os
+
         backup_dir.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d", time.localtime())
         destination = backup_dir / ("discovery-cache-" + stamp + ".sqlite3")
-        if not destination.exists():
-            source = self._connect()
-            target = sqlite3.connect(destination, timeout=10)
+        if destination.exists():
+            probe = sqlite3.connect(destination, timeout=5)
             try:
-                source.backup(target)
-                target.execute("PRAGMA integrity_check").fetchone()
+                integrity = probe.execute("PRAGMA integrity_check").fetchone()
             finally:
+                probe.close()
+            if integrity and integrity[0] == "ok":
+                self._prune_backups(backup_dir, keep_days)
+                return destination
+            destination.unlink(missing_ok=True)
+
+        temporary = backup_dir / (".discovery-cache-" + stamp + ".tmp")
+        temporary.unlink(missing_ok=True)
+        source = self._connect()
+        target = sqlite3.connect(temporary, timeout=10)
+        try:
+            source.backup(target)
+            integrity = target.execute("PRAGMA integrity_check").fetchone()
+            if not integrity or integrity[0] != "ok":
+                raise RuntimeError("Discovery cache backup failed SQLite integrity_check")
+            target.commit()
+            target.close()
+            source.close()
+            os.replace(temporary, destination)
+        except Exception:
+            try:
                 target.close()
+            finally:
                 source.close()
+                temporary.unlink(missing_ok=True)
+            raise
+        self._prune_backups(backup_dir, keep_days)
+        return destination
+
+    @staticmethod
+    def _prune_backups(backup_dir: Path, keep_days: int) -> None:
         cutoff = time.time() - max(1, keep_days) * 86400
         for candidate in backup_dir.glob("discovery-cache-????????.sqlite3"):
             try:
@@ -260,7 +289,6 @@ class ProviderResponseCache:
                     candidate.unlink()
             except OSError:
                 logger.warning("Unable to prune old discovery cache backup: %s", candidate)
-        return destination
 
     def clear_expired(self) -> int:
         self._init()

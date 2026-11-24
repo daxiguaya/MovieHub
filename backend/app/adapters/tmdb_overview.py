@@ -185,7 +185,9 @@ class TMDBOverviewClient:
                 {
                     "query": query,
                     "include_adult": "false",
-                    "language": language,
+                    # The annual source title is captured in Simplified Chinese;
+                    # keep identity resolution locale-stable for both audit locales.
+                    "language": "zh-CN",
                     "page": 1,
                 },
             )

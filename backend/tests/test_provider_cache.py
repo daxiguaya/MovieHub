@@ -20,7 +20,7 @@ def test_cache_returns_stale_only_when_requested(tmp_path):
     key = cache.make_key("tmdb", "/search/movie", {"q": "Alien"})
     cache.set(key, "tmdb", "/search/movie", {"results": []}, 60)
 
-    with cache._connect() as connection:
+    with cache._connection() as connection:
         connection.execute(
             "UPDATE provider_response_cache SET expires_at=? WHERE cache_key=?",
             (int(time.time()) - 1, key),
@@ -45,7 +45,7 @@ def test_cache_stats_and_expiry_cleanup(tmp_path):
     assert cache.stats()["entries"] == 1
     assert cache.stats()["bytes"] > 0
 
-    with cache._connect() as connection:
+    with cache._connection() as connection:
         connection.execute(
             "UPDATE provider_response_cache SET stale_until=? WHERE cache_key=?",
             (int(time.time()) - 1, key),
@@ -66,7 +66,7 @@ def test_external_favorites_survive_cache_eviction(tmp_path):
     assert saved["snapshot"]["title"] == "Fight Club"
 
     cache.set("search-cache-key", "tmdb", "/search", {"results": []}, 1)
-    with cache._connect() as connection:
+    with cache._connection() as connection:
         connection.execute("DELETE FROM provider_response_cache")
 
     favorites = cache.list_favorites()

@@ -259,11 +259,19 @@ def restore_backup(
             "Stop the MovieHub API container before restoring."
         )
 
-    backup_root = Path(backup_directory).expanduser().resolve()
+    supplied_backup_root = Path(backup_directory).expanduser()
+    if supplied_backup_root.is_symlink():
+        raise RuntimeError("Backup directory must not be a symbolic link")
+    backup_root = supplied_backup_root.resolve()
     target_path = Path(database_path or get_db_path()).expanduser().resolve()
     manifest_path = backup_root / "manifest.json"
     backup_file = backup_root / DATABASE_FILENAME
 
+    # Do not follow file-level symlinks inside an otherwise valid-looking
+    # backup directory. The manifest and database must be regular files owned
+    # by the selected backup directory, not externally redirected paths.
+    if manifest_path.is_symlink() or backup_file.is_symlink():
+        raise RuntimeError("Backup manifest and database must not be symbolic links")
     if not manifest_path.is_file() or not backup_file.is_file():
         raise FileNotFoundError("Backup must contain manifest.json and movies.db")
 

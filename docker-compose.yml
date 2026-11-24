@@ -19,7 +19,7 @@ services:
       FORWARDED_ALLOW_IPS: ${MOVIEHUB_TRUSTED_PROXY_IPS:-127.0.0.1}
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
-      - ${MOVIEHUB_BACKUP_PATH:-/volume1/backup/moviehub}:/backups
+      - ${MOVIEHUB_BACKUP_PATH:-/volume1/docker/moviehub/backup}:/backups
       - ${MOVIEHUB_IMPORT_PATH:-./deploy/empty-imports}:/imports:ro
     expose:
       - "8000"
@@ -89,4 +89,4 @@ networks:
     driver: bridge
   npm_proxy:
     external: true
-    name: chatgpt-browser_default
+    name: nginx-proxy-manager_default

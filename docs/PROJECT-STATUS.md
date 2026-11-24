@@ -149,8 +149,19 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - [x] Verify 288 chart items, 288 unique MovieHub movies, five snapshots, SQLite integrity `ok`, and zero foreign-key errors.
 - [x] Run the real-data browser journeys against the freshly imported database: Top 250, all 2025 annual snapshots, narrow mobile viewport, and live favorite add/list/remove.
 
-**Run:** [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102). The first-launch collection/import job and the real-data browser job both succeeded; the real-data browser suite passed **4/4**. The normal backend/frontend jobs also succeeded. The regular fixture E2E job was still running at the time of this status update; the prior complete fixture CI [#45334459741](https://github.com/daxiguaya/MovieHub/actions/runs/45334459741) passed 10 browser tests and 265 backend tests.
+**Run:** [#45334724102](https://github.com/daxiguaya/MovieHub/actions/runs/45334724102). The first-launch collection/import job and the real-data browser job both succeeded; the real-data browser suite passed **4/4**. The normal backend/frontend jobs also succeeded. The regular fixture E2E job has since completed successfully in the same run; its browser tests, backend, frontend, and container build jobs all succeeded. Performance benchmarks and the separately opt-in annual collection/import rehearsal jobs were skipped and are not counted as passed.
 
 Fresh Top 250 source audit: rating 250/250, rating count 250/250, directors 238/250, actors 233/250, year 248/250, original title 223/250, genres 248/250, regions 248/250, posters 250/250. **Plot overview remains 0/250**; no short reviews or taglines are substituted. This real-data run does not establish multiple distinct capture dates for the same chart; it verifies the available 2026-11-24 Top 250 and retained 2025 annual snapshots.
 
 All work remained in disposable GitHub Actions storage. No NAS path, production database, NPM configuration, or NAS service was touched.
+
+
+## 2026-11-24 — Chart pagination cursor hardening
+
+- [x] Reject explicitly empty, malformed, zero, negative, and non-canonical chart pagination cursors instead of silently treating them as page one.
+- [x] Decode URL-safe Base64 strictly and require a positive canonical decimal rank.
+- [x] Return HTTP 400 with a stable error message for invalid cursors.
+- [x] Extend the chart HTTP integration test to cover five invalid cursor forms and a valid cursor beyond the final rank (empty page, stable total, no next cursor).
+- [ ] Await the branch-head CI run for this change; no test result is claimed before the workflow completes.
+
+This is API input hardening only. It does not claim real multi-date source snapshots, synopsis coverage, or deployment completion. Overall delivery estimate remains **83%**. All tests continue to use disposable SQLite; no NAS, production database, NPM configuration, or service was touched.

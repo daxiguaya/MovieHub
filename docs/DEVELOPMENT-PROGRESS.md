@@ -785,3 +785,18 @@ No NAS, NPM, Scout source database, or production database was accessed. Overall
 - [ ] After explicit deployment approval: create a new MovieHub-only SQLite database, initialize it explicitly, import the verified first-launch dataset, then validate NPM routing, readiness, backup and rollback.
 
 Overall delivery estimate remains **approximately 87%**. This is a development estimate, not a deployment percentage. No NAS, NPM, production database or running service was touched in this work.
+
+
+## 2026-11-24 — Synology deployment preflight completed
+
+- [x] Added read-only `deploy/preflight.py` for host-side Compose, secrets, directory, NPM network, NPM container, host-port exposure, read-only-root and container-name checks.
+- [x] The preflight never creates directories, changes ownership, starts/stops services, initializes the database, modifies Docker networks, or changes NPM.
+- [x] Added Python syntax validation to Backend CI; fixed the env-file quote parser after CI caught its initial syntax error.
+- [x] Strengthened checks for .env group/other readability and accidental host port publication.
+- [x] Final standard CI run [#45369731877](https://github.com/daxiguaya/MovieHub/actions/runs/45369731877) passed backend, frontend, browser E2E, and Compose backup/restore smoke.
+- [x] Removed the obsolete phase4 push trigger; main remains the only active development branch.
+- [ ] NAS-specific NPM IP, DSM ACL, real .env permissions, route restrictions, TLS and backup destination still require actual NAS inspection.
+- [ ] TMDB synopsis text remains excluded pending licensing/attribution review.
+- [ ] First NAS deployment, independent database initialization, data import and live rollback rehearsal remain pending.
+
+Overall development delivery estimate: **approximately 88%**. No NAS, NPM, existing service, or production database was touched.

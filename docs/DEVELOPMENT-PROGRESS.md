@@ -2,7 +2,7 @@
 
 Branch: `phase4/database-foundation`
 Last updated: 2026-11-24
-Current phase: Pre-deployment hardening — first-launch real-data browser journeys and favorites verified; visual QA and isolated deployment rehearsal remain
+Current phase: Pre-deployment hardening — synopsis-source research completed; TMDB dry-run and real-data pagination/history/filter acceptance next
 
 > **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 83% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
 
@@ -662,7 +662,7 @@ The same run collected all four official 2025 annual charts and all four normali
 
 **What this proves:** the real collected 2025 annual data can traverse the current four-file validation and atomic batch-import path and persist correctly in an isolated SQLite database. It does **not** validate the Scout catalogue, NAS I/O/performance, or production deployment. The 38-row annual artifact remains metadata-sparse (year/actors/genres/regions/posters/overview/rating_count and IMDb/TMDB IDs are absent).
 
-**Current next work:** enrich and review first-release content, validate the real-data user journey, complete visual QA, and rehearse deployment/backup/restore in an isolated environment. Scout source discovery and audit are optional future integration tasks, not current project blockers. No NAS connection, Scout source write, production MovieHub database operation, NPM change or service restart occurred. Overall first-release estimate remains about 75%.
+**Current next work (2026-11-24):** first resolve the overview source. Research is recorded in [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md): TMDB is the leading non-commercial pilot candidate but needs a read-only token, current caching/display terms review and real zh-CN coverage measurement; Wikimedia is a CC BY-SA fallback; OMDb is excluded. Run a read-only matching/coverage dry-run before any write. Then continue real-data pagination, multi-date history/rank comparison, filters and edge-state browser acceptance. Overall first-release estimate remains about 83%; source research is complete, but synopsis coverage remains 0/250 and no content-enrichment milestone is claimed. No NAS connection, Scout source write, production MovieHub database operation, NPM change or service restart occurred.
 
 - [x] Full branch-head CI run [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353) completed: backend **247 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; Playwright E2E **4/4 passed**; real annual-data import rehearsal **passed**.
 - [ ] Annual-chart-collection and performance-benchmarks jobs were skipped in this push-triggered run; the imported artifact was the previously retained real collector output, not a new collection.
@@ -677,3 +677,16 @@ The same run collected all four official 2025 annual charts and all four normali
 - [x] 最新首发数据仍为 5 个快照、288 条榜单项、288 个唯一影片；完整性检查 ok、外键错误 0、跨榜重复 0。Top 250 真实字段覆盖：评分 250/250、评价人数 250/250、导演 238/250、演员 233/250、海报 250/250、简介 0/250。
 - [ ] 后续继续补充合规剧情简介来源，并完成多日期历史/排名比较、真实分页、空值/长标题/海报失败异常状态和视觉 QA。
 - 安全边界：所有数据与服务均在 GitHub runner 临时环境；不访问 NAS/Scout，不部署、不初始化生产库、不改 NPM、不重启任何服务。
+
+## 2026-11-24 — 剧情简介来源专项研究
+
+- [x] 审查 TMDB API：有结构化 overview、支持 zh-CN 本地化请求和 IMDb external-ID 查找；免费 API 仅限非商业用途，要求指定署名/Logo，官方 FAQ 明确没有 SLA。
+- [x] 审查 Wikimedia：多数 Wikipedia 正文为 CC BY-SA 4.0，适合逐条核验文章中的剧情段落，但需要署名、变更说明和 ShareAlike，且电影文章/剧情段落覆盖未知。
+- [x] 排除 OMDb：其条款限制个人非商业用途，并禁止未经授权的复制、归档、分发和建立 Contributions 索引，不适合作为 MovieHub 持久目录来源。
+- [x] 确认当前 Top 250 采集器不提取 IMDb ID；schema 已有可选 imdb_id/tmdb_id 字段。后续 TMDB 匹配需先精确 ID，再严格 title+year+原名校验；歧义一律拒绝，不盲选首个搜索结果。
+- [x] 新增研究记录：[OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。
+- [ ] 获取 TMDB API read token，完成 250 条 Top 250 + 38 条年度数据的只读匹配/zh-CN 简介覆盖 dry-run；本轮没有访问 API 或声称已验证覆盖率。
+- [ ] 在接受任何简介写入前，为 provenance 增加许可依据、语言、署名和修改标记，并确保详情页显示来源归属。
+- 当前简介覆盖率仍为 **0/250**。不使用短评、宣传标语、自动生成内容或受 robots 限制的豆瓣接口填充。
+- 安全边界：只审查公开官方文档和 GitHub 代码；未访问 NAS、Scout 数据库或生产服务，未创建生产库、未部署、未修改 NPM、未重启服务。
+

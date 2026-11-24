@@ -25,9 +25,11 @@ from app.logging_config import setup_logging
 from app.routers.chart_import import router as chart_import_router
 from app.routers.charts import router as charts_router
 from app.routers.data_import import router as import_router
+from app.routers.discovery import router as discovery_router
 from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
+from app.services.provider_cache import provider_response_cache
 
 setup_logging()
 
@@ -37,16 +39,18 @@ POSTER_CACHE_CLEANUP_INTERVAL = 24 * 60 * 60
 
 
 async def _poster_cache_cleanup_loop() -> None:
-    """Periodically remove expired poster cache files."""
+    """Periodically remove expired cache entries and back up discovery data."""
     while True:
         await asyncio.sleep(POSTER_CACHE_CLEANUP_INTERVAL)
-
         try:
+            await asyncio.to_thread(poster_cache_service.clear_expired_cache)
+            await asyncio.to_thread(provider_response_cache.clear_expired)
             await asyncio.to_thread(
-                poster_cache_service.clear_expired_cache
+                provider_response_cache.backup_daily,
+                settings.backup_dir / "discovery",
             )
         except Exception:
-            logger.exception("Poster cache cleanup failed")
+            logger.exception("MovieHub cache maintenance failed")
 
 
 @asynccontextmanager
@@ -66,11 +70,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Using database at %s", db_path)
 
     try:
+        await asyncio.to_thread(poster_cache_service.clear_expired_cache)
+        await asyncio.to_thread(provider_response_cache.clear_expired)
         await asyncio.to_thread(
-            poster_cache_service.clear_expired_cache
+            provider_response_cache.backup_daily,
+            settings.backup_dir / "discovery",
         )
     except Exception:
-        logger.exception("Initial poster cache cleanup failed")
+        logger.exception("Initial cache maintenance failed")
 
     cleanup_task = asyncio.create_task(
         _poster_cache_cleanup_loop()
@@ -152,6 +159,7 @@ app.add_middleware(
 
 # Read APIs
 app.include_router(movies_router, prefix="/api")
+app.include_router(discovery_router, prefix="/api")
 app.include_router(charts_router, prefix="/api")
 app.include_router(favorites_router, prefix="/api")
 

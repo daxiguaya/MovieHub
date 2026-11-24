@@ -13,6 +13,20 @@ const chart = {
   last_updated: null
 };
 
+const discoveryItem = {
+  provider: "tmdb",
+  provider_id: 999,
+  media_type: "movie",
+  title: "星际穿越",
+  original_title: "Interstellar",
+  year: 2014,
+  rating: 8.7,
+  rating_count: 1000,
+  poster_path: null,
+  backdrop_path: null,
+  genre_ids: [878]
+};
+
 const movie = {
   id: 42,
   douban_id: "1292052",
@@ -52,6 +66,26 @@ async function installApiFixtures(page) {
     const path = url.pathname;
     const method = request.method();
 
+    if (path === "/api/discovery/regions" && method === "GET") {
+      return route.fulfill({ json: { provider: "tmdb", regions: [{ code: "US", name: "美国" }] } });
+    }
+    if (path === "/api/discovery/genres" && method === "GET") {
+      return route.fulfill({ json: { provider: "tmdb", media_type: "movie", genres: [{ id: 878, name: "科幻" }] } });
+    }
+    if (path === "/api/discovery/search" && method === "GET") {
+      return route.fulfill({
+        json: { provider: "tmdb", query: url.searchParams.get("q"), page: 1, total_pages: 1,
+          total_results: 1, items: [discoveryItem], attribution: "TMDB" }
+      });
+    }
+    if (path === "/api/discovery/discover" && method === "GET") {
+      const requestedPage = Number(url.searchParams.get("page") ?? "1");
+      return route.fulfill({
+        json: { provider: "tmdb", media_type: "movie", page: requestedPage, total_pages: 2,
+          total_results: 25, items: [{ ...discoveryItem, provider_id: 999 + requestedPage,
+            title: requestedPage === 1 ? "专题第一页作品" : "专题第二页作品" }], attribution: "TMDB" }
+      });
+    }
     if (path === "/api/charts" && method === "GET") {
       return route.fulfill({ json: [chart] });
     }
@@ -131,13 +165,41 @@ test("opens a chart and navigates from its ranked item to movie details", async 
   await expect(page.getByText("A journey through space and time.")).toBeVisible();
 });
 
+test("shows prominent horror and thriller lists and loads their pages on demand", async ({ page }) => {
+  const requestedPages: string[] = [];
+  await page.route("**/api/discovery/discover**", async (route) => {
+    const url = new URL(route.request().url());
+    requestedPages.push(url.searchParams.get("page") ?? "1");
+    const requestedPage = Number(url.searchParams.get("page") ?? "1");
+    await route.fulfill({
+      json: { provider: "tmdb", media_type: "movie", page: requestedPage, total_pages: 2,
+        total_results: 25, items: [{ ...discoveryItem, provider_id: 9000 + requestedPage,
+          title: requestedPage === 1 ? "恐怖榜单首屏作品" : "恐怖榜单第二页作品" }], attribution: "TMDB" }
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "恐怖与惊悚专题" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "恐怖片高分榜" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "惊悚片冷门佳作" })).toBeVisible();
+  await page.getByRole("link", { name: "查看完整榜单" }).first().click();
+
+  await expect(page.getByRole("heading", { name: "恐怖片高分榜" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "恐怖榜单首屏作品" })).toBeVisible();
+  expect(requestedPages).not.toContain("2");
+
+  await page.getByRole("button", { name: "加载下一页" }).click();
+  await expect(page.getByRole("link", { name: "恐怖榜单第二页作品" })).toBeVisible();
+  expect(requestedPages).toContain("2");
+});
+
 test("searches by Chinese title and displays matching movie results", async ({ page }) => {
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际穿越");
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill("星际穿越");
+  await page.getByRole("button", { name: /搜索/ }).click();
 
   await expect(page.getByRole("link", { name: "星际穿越" }).first()).toBeVisible();
-  await expect(page.getByText("1 部作品")).toBeVisible();
+  await expect(page.getByText(/1 部 · 本地匹配 1 部/)).toBeVisible();
   expect(new URL(page.url()).searchParams.get("search")).toBe("星际穿越");
 });
 
@@ -179,8 +241,8 @@ test("connects the browser to the real FastAPI service and temporary SQLite data
   await expect(page.getByText("A journey through space and time.")).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill("星际穿越");
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill("星际穿越");
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: "星际穿越" })).toBeVisible();
 });
 
@@ -219,8 +281,8 @@ test("real 2025 annual snapshots render through the live API and support detail/
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
 
@@ -244,8 +306,8 @@ test("real Top 250 first-launch snapshot renders through the live API and suppor
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
 
@@ -279,8 +341,8 @@ test("real first-launch dataset remains usable on a narrow mobile viewport", asy
   expect(detailOverflow, "movie detail should not overflow a 390px viewport").toBe(false);
 
   await page.goto("/search");
-  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
-  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await page.getByPlaceholder("输入片名，例如：异形、蝙蝠侠…").fill(title);
+  await page.getByRole("button", { name: /搜索/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 
   const searchOverflow = await page.evaluate(
@@ -328,3 +390,11 @@ test("real imported Top 250 movie can be favorited and removed through the live 
   await page.getByRole("button", { name: "移出收藏 ×" }).click();
   await expect(page.getByText("收藏夹还是空的")).toBeVisible();
 });
+test("shows TMDB attribution and source credits in the dedicated credits section", async ({ page }) => {
+  await page.goto("/credits");
+  await expect(page.getByRole("heading", { name: "关于与数据来源" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "The Movie Database (TMDB)" })).toBeVisible();
+  await expect(page.getByText("This product uses the TMDB API but is not endorsed or certified by TMDB.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Visit The Movie Database" })).toHaveAttribute("href", "https://www.themoviedb.org");
+});
+

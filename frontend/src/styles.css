@@ -234,3 +234,52 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
   .detail-actions > * { flex: 1 1 auto; }
   .site-footer { flex-direction: column; gap: 7px; padding: 18px; }
 }
+
+
+/* Online discovery and prominent horror / thriller collections */
+.tmdb-attribution { color: #7f8a83; font-size: 10px; line-height: 1.6; margin: 18px 0 0; }
+.search-hint { color: var(--muted); font-size: 11px; line-height: 1.7; margin: -12px 0 18px; }
+.search-panel select[multiple] { min-height: 92px; padding: 7px; }
+.search-panel select[multiple] option { padding: 5px 7px; border-radius: 4px; }
+.genre-spotlight { margin: 12px 0 48px; }
+.genre-spotlight .section-heading { margin: 32px 0 18px; }
+.genre-spotlight .section-heading p { color: var(--muted); font-size: 11px; margin: 8px 0 0; }
+.spotlight-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+.spotlight-panel { min-width: 0; border: 1px solid rgba(196,227,107,.17); border-radius: 11px; padding: 13px; background: linear-gradient(160deg, rgba(196,227,107,.055), rgba(24,29,32,.94) 45%); }
+.spotlight-panel h3 { margin: 0 0 10px; font-size: 13px; color: #e9eee7; }
+.spotlight-item { display: flex; gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); min-width: 0; }
+.spotlight-item img, .spotlight-placeholder { width: 42px; height: 62px; flex: 0 0 42px; object-fit: cover; border-radius: 4px; background: #293331; }
+.spotlight-placeholder { display: grid; place-items: center; color: var(--muted); font-size: 9px; }
+.spotlight-item-copy { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.spotlight-item-copy strong { font-size: 10px; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.spotlight-item-copy small { color: var(--muted); font-size: 9px; line-height: 1.4; }
+.spotlight-item:hover strong { color: var(--accent); }
+.spotlight-empty, .spotlight-fallback { color: var(--muted); font-size: 11px; padding: 12px 0; }
+@media (max-width: 1000px) {
+  .spotlight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .spotlight-grid { grid-template-columns: 1fr; }
+  .spotlight-panel { padding: 12px 14px; }
+}
+
+.spotlight-more { display: flex; justify-content: flex-end; align-items: center; gap: 5px; padding-top: 9px; margin-top: 5px; border-top: 1px solid var(--line); color: var(--accent); font-size: 10px; font-weight: 600; }
+.spotlight-more:hover { color: #fff; }
+
+.credits-panel { display: flex; align-items: center; gap: 18px; padding: 20px; margin: 14px 0; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.tmdb-logo-link { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 64px; height: 64px; }
+.tmdb-logo-link img { display: block; width: 56px; height: 56px; object-fit: contain; }
+.credits-copy { display: flex; flex-direction: column; gap: 7px; }
+.credits-copy h2 { margin: 0; font-size: 14px; }
+.credits-copy p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.credits-copy a { color: var(--accent); font-size: 10px; width: fit-content; }
+.site-footer a { color: var(--accent); font-size: 10px; }
+@media (max-width: 560px) { .credits-panel { align-items: flex-start; padding: 15px; } }
+
+.api-key-gate { max-width: 560px; margin: 22px 0; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.025); }
+.api-key-gate h2 { margin: 0 0 8px; font-size: 16px; }
+.api-key-gate p, .api-key-gate small { display: block; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.api-key-gate form { display: flex; gap: 8px; margin: 14px 0 8px; }
+.api-key-gate input { min-width: 0; flex: 1; }
+.api-key-gate small { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .api-key-gate form { flex-direction: column; } }

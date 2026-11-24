@@ -33,18 +33,13 @@ def _payload(slug, posters):
     }
 
 
-@pytest.mark.parametrize(
-    "slug",
-    [
-        "annual-2025-chinese-movies",
-        "annual-2025-international-movies",
-        "annual-2025-hidden-gems",
-    ],
-)
-def test_annual_movie_chart_schema_rejects_empty_posters(slug):
-    with pytest.raises(ValidationError, match="requires at least one poster"):
-        ChartSnapshotImport.model_validate(_payload(slug, []))
-
+def test_schema_allows_posterless_payload_for_collection_and_read_only_audits():
+    # Collection/preflight/audit stages may legitimately see missing poster data.
+    # The write service below is the enforcement boundary.
+    parsed = ChartSnapshotImport.model_validate(
+        _payload("annual-2025-chinese-movies", [])
+    )
+    assert parsed.movies[0].posters == []
 
 def test_annual_chart_schema_accepts_poster_and_nonrequired_chart_remains_optional():
     valid = ChartSnapshotImport.model_validate(

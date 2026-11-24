@@ -69,12 +69,22 @@ MovieHub 的独立 SQLite 数据库基础、主要后端 API、React 前端核�
 - [ ] 在隔离/预生产目录完成首次初始化、真实榜单导入、备份、恢复和容器重建演练。
 - [ ] 完成 NAS 部署检查清单和回滚方案评审。
 
-## 新增真实数据浏览器验收（进行中，2026-11-24）
+## 真实年度数据浏览器验收（已通过，2026-11-24）
 
-- [x] 在 Playwright E2E 中增加真实年度数据用户旅程：遍历四个 2025 年度榜单，核对真实条目数量，打开真实影片详情，再用真实标题执行搜索。
-- [x] 增加独立 GitHub Actions job：下载已留存的官方年度榜单 artifact，在 runner 临时目录初始化独立 MovieHub SQLite，导入四份真实快照，启动真实 FastAPI，再运行上述浏览器用例。
-- [ ] 等待 GitHub Actions 实际执行并修复可能出现的集成问题；只有真实数据浏览器用例通过后，才将此项标记完成。
-- [ ] 此流程仅使用 GitHub runner 的临时数据库，不连接 NAS、不读取 Scout、不创建生产数据库，也不改动 NPM 或 NAS 服务。
+- [x] Playwright 真实年度数据用户旅程：遍历四个 2025 年度榜单，核对 8/10/10/10 条目数，打开真实影片详情，再用真实标题执行搜索。
+- [x] 独立 GitHub Actions job 下载已留存的官方年度榜单 artifact，在 runner 临时目录初始化独立 MovieHub SQLite，导入四份真实快照，启动真实 FastAPI 并运行 Chromium 浏览器用例。
+- [x] GitHub Actions run [#45315898896](https://github.com/daxiguaya/MovieHub/actions/runs/45315898896)：real-annual-data-browser-e2e **success**，所有 14 个步骤成功。
+- [x] Backend 和 Frontend job 同次运行均 success；独立真实数据链路完成导入、API readiness、榜单页、影片详情和搜索验证。
+- [x] 修复测试隔离：真实年度浏览器用例现在仅在设置 `MOVIEHUB_REAL_ANNUAL_E2E=1` 的专用 CI job 执行；普通 fixture E2E 不再误跑依赖年度 artifact 的场景。
+- [ ] 普通 fixture E2E 在隔离修复提交后重新跑绿；确认后更新最终 CI 基线。
+- [x] 全流程仅使用 GitHub runner 临时数据库，不连接 NAS、不读取 Scout、不创建生产数据库，也不改动 NPM 或 NAS 服务。
+
+### 最新真实年度数据浏览器验收
+- [GitHub Actions run #45315898896](https://github.com/daxiguaya/MovieHub/actions/runs/45315898896)，提交 `e1c85ae`。
+- Backend：success；Frontend：success；real-annual-data-browser-e2e：success。
+- 真实数据 job 下载官方 artifact、创建临时 SQLite、导入 4 榜 38 条数据、启动 FastAPI，并通过四榜页面/真实详情/真实标题搜索的 Chromium 验收。
+- 同次运行的通用 `frontend-e2e` 曾失败，原因是它把只适用于真实年度 artifact 的场景也跑在仅含《星际穿越》fixture 的数据库上，导致预期 8 条但 fixture 数据库没有该榜单。这不是产品代码故障，而是测试范围隔离错误；已通过环境标志将该场景限定在专用 job，等待修复后的通用 E2E 复验。
+- 因此：真实年度数据浏览器链路已通过；普通 fixture E2E 的复验仍是待办，不能将整个 workflow 记为全绿。
 
 ## 当前 CI 验证基线
 

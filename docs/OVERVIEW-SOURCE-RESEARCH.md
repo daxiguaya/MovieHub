@@ -81,10 +81,17 @@ Run a dry-run against the 250 Top 250 rows plus the 38 annual rows, with no data
 
 Only after the report is reviewed should the importer write to an isolated disposable SQLite database. The write must fill only NULL/empty overviews, write field-level provenance in the same transaction, and pass integrity/foreign-key checks. Production/NAS deployment remains out of scope.
 
+## Implemented dry-run tooling
+
+- `backend/app/adapters/tmdb_overview.py`: read-only TMDB client. Resolution order is existing TMDB ID, IMDb external ID, then exact title+year. Every route cross-checks title/year; ambiguous or mismatched candidates are rejected. Requested locale is used for both search and detail requests. Requests are sequential and throttled, with a bounded 429 retry.
+- `backend/scripts/audit_tmdb_overview.py`: reads normalized JSON snapshots recursively (including the nested artifact layout), deduplicates by Douban ID, and emits status, match method, TMDB ID, locale, overview length/hash and source URL. It does not output synopsis text and never opens MovieHub SQLite.
+- `backend/tests/test_tmdb_overview.py` and `backend/tests/test_audit_tmdb_overview.py`: mocked API tests cover exact title/year, ambiguity, year mismatch, IMDb cross-check, known TMDB ID, locale, empty overview, nested artifact loading, report deduplication and no synopsis text in reports.
+- Manual workflow: [tmdb-overview-audit.yml](../.github/workflows/tmdb-overview-audit.yml). It downloads the retained first-launch artifact from run `45329522019`, runs zh-CN and zh-TW dry-runs, and uploads a report that contains no synopsis text. It requires the repository Actions secret `TMDB_API_READ_TOKEN`.
+
 ## Next work order
 
-1. Confirm the non-commercial/caching terms gate and obtain a TMDB API read token through the owner's account (never commit it; environment variable only).
-2. Implement and test a TMDB lookup/dry-run adapter with strict matching and Chinese-only acceptance.
-3. Measure real coverage and review ambiguous matches; add the additive provenance migration and attribution UI only after the source decision is cleared.
+1. Confirm the non-commercial and intended caching/display terms gate. Add `TMDB_API_READ_TOKEN` as a repository Actions secret (never commit it or paste it into chat).
+2. Run the manual workflow [TMDB overview coverage audit](../actions/workflows/tmdb-overview-audit.yml) using source run `45329522019` (artifact retained until 2026-12-08). Review exact matches, ambiguous/no-match counts, and zh-CN/zh-TW overview coverage.
+3. If the measured coverage and terms are acceptable, add the additive provenance migration for license/terms basis, language, attribution and modification marker, then implement the separate NULL-only importer and attribution UI.
 4. If TMDB cannot meet terms or measured coverage, use individually verified Wikimedia film articles as a fallback with CC BY-SA compliance; keep unknown synopsis fields empty.
 5. Then resume real-data pagination, multi-date snapshot selection/comparison, filters and edge-state E2E.

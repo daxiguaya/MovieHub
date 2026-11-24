@@ -299,3 +299,6 @@ The PR changes only read-only matching and parsing. No synopsis text is persiste
 - [ ] TMDB synopsis persistence remains on legal hold pending review of official terms, cache/retention, attribution, logo and display requirements.
 
 **Current delivery estimate: approximately 88%.** This is a development estimate, not a deployment percentage. The preflight script is implemented and CI-verified, but no NAS deployment or production database exists.
+
+
+TMDB attribution and persistent-overview retention findings are tracked separately in [TMDB-API-COMPLIANCE.md](TMDB-API-COMPLIANCE.md). The current official FAQ confirms non-commercial-use and attribution/logo/notice requirements, but does not settle persistent synopsis caching duration; overview persistence remains disabled pending review of the full accepted Terms of Use and clarification where needed.

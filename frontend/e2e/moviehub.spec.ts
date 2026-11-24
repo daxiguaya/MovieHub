@@ -223,3 +223,28 @@ test("real 2025 annual snapshots render through the live API and support detail/
   await page.getByRole("button", { name: /搜索电影/ }).click();
   await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
 });
+
+test("real Top 250 first-launch snapshot renders through the live API and supports detail/search navigation", async ({ page }) => {
+  test.skip(
+    process.env.MOVIEHUB_REAL_ANNUAL_E2E !== "1",
+    "requires the dedicated CI job with the combined first-launch dataset"
+  );
+
+  await page.unroute("**/api/**");
+  await page.goto("/");
+  await page.locator('a.chart-tile[href="/charts/top250"]').click();
+  await expect(page.getByRole("heading", { name: "豆瓣电影 Top 250" })).toBeVisible();
+  await expect(page.getByText("250 部作品", { exact: true })).toBeVisible();
+
+  const firstMovie = page.locator("a.movie-title").first();
+  await expect(firstMovie).toBeVisible();
+  const title = (await firstMovie.innerText()).trim();
+  expect(title.length).toBeGreaterThan(0);
+  await firstMovie.click();
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+
+  await page.goto("/search");
+  await page.getByPlaceholder("搜索中文片名或原名…").fill(title);
+  await page.getByRole("button", { name: /搜索电影/ }).click();
+  await expect(page.locator("a.movie-title", { hasText: title }).first()).toBeVisible();
+});

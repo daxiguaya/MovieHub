@@ -28,6 +28,19 @@ _inflight_lock = asyncio.Lock()
 _inflight: dict[str, asyncio.Task[dict[str, Any]]] = {}
 
 
+def _strip_unapproved_synopsis(value: Any) -> Any:
+    """Do not persist TMDB overview text until synopsis compliance is cleared."""
+    if isinstance(value, dict):
+        return {
+            key: _strip_unapproved_synopsis(item)
+            for key, item in value.items()
+            if key != "overview"
+        }
+    if isinstance(value, list):
+        return [_strip_unapproved_synopsis(item) for item in value]
+    return value
+
+
 class TMDBClient:
     def __init__(self) -> None:
         self.token = settings.tmdb_api_read_token
@@ -156,6 +169,7 @@ class TMDBClient:
 
         if isinstance(payload, list):
             payload = {"items": payload}
+        payload = _strip_unapproved_synopsis(payload)
         if not isinstance(payload, dict):
             self._failures += 1
             self._record_latency(started)

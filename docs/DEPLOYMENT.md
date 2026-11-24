@@ -83,3 +83,16 @@ The container runs as a non-root UID, drops Linux capabilities, uses a read-only
 - Before deployment, verify host directory permissions, Docker network name, backup/restore procedure, and API access policy.
 - The frontend container and same-origin routing are packaged but not deployed. Actual NPM locations, TLS, access controls, and API-key injection remain operator configuration steps.
 - Automated Douban chart acquisition and any Scout import schedule remain separate future work.
+
+
+## Read-only preflight
+
+Before building or starting either container on the NAS, run the repository's read-only host preflight from the project root:
+
+```sh
+python3 deploy/preflight.py
+```
+
+It checks the Compose v2 command/configuration, the private API-key placeholder, frontend runtime JSON, expected data/backup directories, the external NPM Docker network, likely NPM network members, and fixed MovieHub container-name conflicts. It never creates directories, changes ownership, initializes SQLite, starts/stops containers, changes Docker networks, or edits NPM.
+
+Treat mode-bit results as advisory on DSM because ACLs may grant or deny access independently. Confirm actual write access as UID/GID 10001 before deployment. The script cannot verify NPM's saved proxy-host configuration, TLS, access lists, or whether import endpoints are denied; those remain a separate manual review gate. A successful preflight is not deployment authorization.

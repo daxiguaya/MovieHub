@@ -174,6 +174,6 @@ This is API input hardening only. It does not claim real multi-date source snaps
 - [x] Update `deploy/.env.example` and deployment instructions so Scout is clearly optional.
 - [x] Expand CI Compose validation to check both no-Scout and explicit-Scout configurations.
 - [x] Strict cursor validation surfaced one older unit test that still expected malformed cursors to be silently ignored; update that test to assert the new HTTP/service contract.
-- [ ] Await the latest branch-head CI run after the regression-test correction.
+- [x] Branch CI [#45336510682](https://github.com/daxiguaya/MovieHub/actions/runs/45336510682) completed successfully after the cursor regression-test correction.
 
-The first cursor-hardening CI attempt found the stale expectation (264 passed, 1 failed, 4 skipped); this was a test-contract mismatch, not a runtime failure in the new API test. The legacy test has now been updated, including its missing pytest/error imports; the latest test commit is awaiting a new branch-head CI run. Overall estimate remains **83%**; no deployment or production data operation was performed.
+The first cursor-hardening CI attempt found an outdated test expectation (264 passed, 1 failed, 4 skipped); it was corrected. The successful follow-up CI completed with **265 backend tests passed, 4 skipped, 1 warning; 10 browser E2E passed, 4 opt-in real-data journeys skipped; frontend tests/build and both container builds passed**. Both Compose validation modes passed: Scout omitted and Scout explicitly configured read-only. Performance and real-data collection/import jobs were skipped in this fixture run and are not counted as passed. Overall estimate remains **83%**; no deployment or production data operation was performed.

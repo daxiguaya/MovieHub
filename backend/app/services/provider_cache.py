@@ -225,6 +225,30 @@ class ProviderResponseCache:
             )
             return cursor.rowcount > 0
 
+    def backup_daily(self, backup_dir: Path, keep_days: int = 7) -> Path:
+        """Create one consistent SQLite backup per day, retaining a short history."""
+        self._init()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%d", time.localtime())
+        destination = backup_dir / ("discovery-cache-" + stamp + ".sqlite3")
+        if not destination.exists():
+            source = self._connect()
+            target = sqlite3.connect(destination, timeout=10)
+            try:
+                source.backup(target)
+                target.execute("PRAGMA integrity_check").fetchone()
+            finally:
+                target.close()
+                source.close()
+        cutoff = time.time() - max(1, keep_days) * 86400
+        for candidate in backup_dir.glob("discovery-cache-????????.sqlite3"):
+            try:
+                if candidate.stat().st_mtime < cutoff:
+                    candidate.unlink()
+            except OSError:
+                logger.warning("Unable to prune old discovery cache backup: %s", candidate)
+        return destination
+
     def clear_expired(self) -> int:
         self._init()
         with self._lock, self._connect() as connection:

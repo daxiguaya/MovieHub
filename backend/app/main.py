@@ -29,6 +29,7 @@ from app.routers.discovery import router as discovery_router
 from app.routers.favorites import router as favorites_router
 from app.routers.movies import router as movies_router
 from app.services.poster_service import poster_cache_service
+from app.services.provider_cache import provider_response_cache
 
 setup_logging()
 
@@ -46,6 +47,7 @@ async def _poster_cache_cleanup_loop() -> None:
             await asyncio.to_thread(
                 poster_cache_service.clear_expired_cache
             )
+            await asyncio.to_thread(provider_response_cache.clear_expired)
         except Exception:
             logger.exception("Poster cache cleanup failed")
 
@@ -70,6 +72,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(
             poster_cache_service.clear_expired_cache
         )
+        await asyncio.to_thread(provider_response_cache.clear_expired)
     except Exception:
         logger.exception("Initial poster cache cleanup failed")
 

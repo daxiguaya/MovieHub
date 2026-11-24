@@ -390,3 +390,11 @@ test("real imported Top 250 movie can be favorited and removed through the live 
   await page.getByRole("button", { name: "移出收藏 ×" }).click();
   await expect(page.getByText("收藏夹还是空的")).toBeVisible();
 });
+test("shows TMDB attribution and source credits in the dedicated credits section", async ({ page }) => {
+  await page.goto("/credits");
+  await expect(page.getByRole("heading", { name: "关于与数据来源" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "The Movie Database (TMDB)" })).toBeVisible();
+  await expect(page.getByText("This product uses the TMDB API but is not endorsed or certified by TMDB.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Visit The Movie Database" })).toHaveAttribute("href", "https://www.themoviedb.org");
+});
+

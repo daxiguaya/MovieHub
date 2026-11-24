@@ -56,12 +56,52 @@ def prepare_scout_import(
     return report
 
 
+def resolve_report_output_path(path: str | Path) -> Path:
+    """Resolve a report destination without following a destination symlink."""
+    supplied = Path(path).expanduser()
+    if not supplied.name or supplied.name in {".", ".."}:
+        raise ValueError("Report output must name a file")
+    output_path = supplied.parent.resolve() / supplied.name
+    if output_path.is_symlink():
+        raise ValueError("Report output must not be a symbolic link")
+    return output_path
+
+
+def validate_report_output_path(
+    output_path: str | Path,
+    scout_db_path: str | Path,
+    snapshot_paths: list[str | Path],
+) -> Path:
+    """Reject output paths that could overwrite any read-only input."""
+    destination = resolve_report_output_path(output_path)
+    protected = {
+        Path(scout_db_path).expanduser().resolve(),
+        *(Path(item).expanduser().resolve() for item in snapshot_paths),
+    }
+    if destination in protected:
+        raise ValueError(
+            "Report output path must be different from the Scout database "
+            "and every chart snapshot input"
+        )
+    temporary = destination.with_name(destination.name + ".tmp")
+    if temporary.is_symlink():
+        raise ValueError("Report temporary path must not be a symbolic link")
+    if temporary.exists():
+        raise FileExistsError(f"Report temporary path already exists: {temporary}")
+    return destination
+
+
 def write_report(path: str | Path, report: dict[str, Any]) -> Path:
     """Atomically persist a private JSON report (owner read/write only)."""
-    output_path = Path(path).expanduser().resolve()
+    output_path = resolve_report_output_path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_name(output_path.name + ".tmp")
-    descriptor = os.open(temporary, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    # O_EXCL prevents following or truncating a pre-existing temporary path.
+    descriptor = os.open(
+        temporary,
+        os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+        0o600,
+    )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             json.dump(report, stream, ensure_ascii=False, indent=2)
@@ -89,8 +129,13 @@ def main() -> int:
     parser.add_argument("--force-full", action="store_true", help="Preview a forced full reprocessing run")
     args = parser.parse_args()
     try:
+        output_path = validate_report_output_path(
+            args.output,
+            args.scout_db,
+            args.input,
+        )
         report = prepare_scout_import(args.scout_db, args.input, force_full=args.force_full)
-        output_path = write_report(args.output, report)
+        output_path = write_report(output_path, report)
     except Exception as exc:
         print(f"Scout import readiness preparation failed: {exc}", file=sys.stderr)
         return 1

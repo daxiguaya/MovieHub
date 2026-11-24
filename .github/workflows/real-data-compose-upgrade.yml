@@ -118,7 +118,7 @@ jobs:
           connection = sqlite3.connect(db)
           try:
               assert connection.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 3
-              assert connection.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == ("Pre-upgrade sentinel",)
+              assert connection.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == "Pre-upgrade sentinel"
               assert connection.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='movie_metadata_provenance'").fetchone()[0] == 1
               assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
               assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -127,7 +127,7 @@ jobs:
               old = sqlite3.connect(backups[0])
               try:
                   assert old.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0] == 2
-                  assert old.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == ("Pre-upgrade sentinel",)
+                  assert old.execute("SELECT title FROM movies WHERE douban_id='9000000001'").fetchone()[0] == "Pre-upgrade sentinel"
               finally:
                   old.close()
           finally:

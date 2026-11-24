@@ -226,7 +226,7 @@ Current phase: Pre-deployment hardening — real annual-data import rehearsal co
 - [x] Upload the four normalized snapshots as a 14-day GitHub Actions artifact; keep generated data out of Git.
 - [x] Add a read-only Scout coverage audit for chart JSON: ID match rate, metadata field coverage and media-type mismatches, with synthetic SQLite regression tests.
 - [x] Download and independently review the four 2025 annual snapshots: 38/38 IDs unique across lists, ranks unique and ordered, expected 8/10/10/10 counts, and media types consistent; record the review without committing scraped JSON.
-- [ ] Run the audit against a separately staged Scout copy only after that source is explicitly made available; import only after the independent MovieHub database is initialized.
+- [ ] Continue first-release data enrichment and real-data product-flow acceptance. A Scout audit is optional and only applies if Scout is explicitly selected as an external metadata source.
 - [ ] Add 2026 annual chart definitions only after the official taxonomy and ranking data are published and verified.
 - [ ] Decide whether scheduled refresh is appropriate; no collector currently runs in the background.
 
@@ -549,7 +549,7 @@ Current phase: Pre-deployment hardening — real annual-data import rehearsal co
 
 ### P0 — data and migration acceptance before any production use
 - [ ] Create a consistent, isolated copy of an existing schema-v1 MovieHub database and run migration 002 against that copy; verify backup, integrity, foreign keys, schema version 2 and rollback behavior. Do not use the live NAS database as a test fixture.
-- [ ] Obtain a consistent read-only staged Scout SQLite copy (including required WAL state or an online-backup snapshot); run whole-catalogue identity/numeric audit, annual-chart coverage audit, preview and preview-to-import reconciliation. Review blockers and metadata coverage before authorizing any import.
+- [ ] If Scout is selected later, obtain a consistent read-only staged SQLite snapshot and run the documented audit/preview workflow. This is optional and is not a prerequisite for MovieHub database initialization, current development or the first isolated annual-chart import.
 - [ ] Collect/review all four official 2025 annual chart snapshots, run the four-file dry-run, then import only into a fresh isolated MovieHub database first. Confirm the resulting chart counts/ranks and no partial writes.
 
 ### P1 — first-release product completeness
@@ -563,7 +563,7 @@ Current phase: Pre-deployment hardening — real annual-data import rehearsal co
 - [ ] Execute a backup/restore rehearsal against an isolated test database and confirm rollback recovery.
 - [ ] Prepare a deployment checklist and rollback plan; only after review and explicit approval create the production MovieHub database, configure NPM and deploy. No production deployment, database import, NPM change or service restart is authorized by this checklist.
 
-**Progress accounting:** the 75% estimate counts implementation and automated validation as substantially complete, but does not count real Scout data validation, live annual data import, NPM verification or production rollout as complete. Annual-chart collection and performance benchmark Actions jobs were skipped in the latest CI and remain separately unverified.
+**Progress accounting:** the 75% estimate counts implementation and automated validation as substantially complete. The 2025 annual chart artifact has now been imported and verified in a disposable CI database (run #45312215353). Scout full-catalogue validation remains optional unless Scout is selected as an external source. NPM verification, target-environment rehearsal and production rollout remain incomplete. Opt-in annual collection/performance jobs are only considered run when their dedicated jobs execute; skipped jobs are not passes.
 
 
 ## On-demand validation requested (2026-11-24)
@@ -662,7 +662,7 @@ The same run collected all four official 2025 annual charts and all four normali
 
 **What this proves:** the real collected 2025 annual data can traverse the current four-file validation and atomic batch-import path and persist correctly in an isolated SQLite database. It does **not** validate the Scout catalogue, NAS I/O/performance, or production deployment. The 38-row annual artifact remains metadata-sparse (year/actors/genres/regions/posters/overview/rating_count and IMDb/TMDB IDs are absent).
 
-**Next blocker:** the actual Scout SQLite source path was not identified in the earlier NAS scan. A consistent read-only staged copy is still required for whole-catalog audit, chart-coverage reconciliation and Scout-to-MovieHub preview/import rehearsal. No NAS connection, Scout source write, production MovieHub database operation, NPM change or service restart occurred. Overall first-release estimate remains about 75%; the real annual-data import milestone is complete, but it is a small dataset and does not close the Scout acceptance gate.
+**Current next work:** enrich and review first-release content, validate the real-data user journey, complete visual QA, and rehearse deployment/backup/restore in an isolated environment. Scout source discovery and audit are optional future integration tasks, not current project blockers. No NAS connection, Scout source write, production MovieHub database operation, NPM change or service restart occurred. Overall first-release estimate remains about 75%.
 
 - [x] Full branch-head CI run [#45312215353](https://github.com/daxiguaya/MovieHub/actions/runs/45312215353) completed: backend **247 passed, 4 skipped, 1 warning**; frontend **5 passed**, type-check/build and image build passed; Playwright E2E **4/4 passed**; real annual-data import rehearsal **passed**.
 - [ ] Annual-chart-collection and performance-benchmarks jobs were skipped in this push-triggered run; the imported artifact was the previously retained real collector output, not a new collection.

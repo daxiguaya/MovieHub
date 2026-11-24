@@ -15,6 +15,7 @@ class MovieBase(BaseModel):
 
     id: int
     douban_id: str | None = None
+    tmdb_id: str | None = None
     title: str
     original_title: str | None = None
     year: int | None = None

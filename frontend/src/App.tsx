@@ -467,7 +467,7 @@ function ChartPage() {
 function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [keyword, setKeyword] = useState(searchParams.get("search") ?? "");
-  const [type, setType] = useState(searchParams.get("type") ?? "all");
+  const [type, setType] = useState<"all" | "movie" | "tv">((searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all");
   const [minRating, setMinRating] = useState(searchParams.get("min_rating") ?? "");
   const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "100");
   const [minYear, setMinYear] = useState(searchParams.get("min_year") ?? "");
@@ -651,7 +651,7 @@ function SearchPage() {
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
       <p className="search-hint">关键词模式搜索全网目录；清空关键词后，类型、地区、年份和评分筛选会使用 TMDB Discover。每次只加载当前页。</p>
-      <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
+      <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
       {onlineResults.length > 0 ? (

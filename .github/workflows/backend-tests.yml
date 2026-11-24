@@ -602,12 +602,22 @@ jobs:
         run: |
           docker compose -p moviehub-ci-smoke exec -T moviehub python - <<'PY'
           import json
-          from urllib.error import HTTPError
+          import time
+          from urllib.error import HTTPError, URLError
           from urllib.request import urlopen
 
-          with urlopen("http://127.0.0.1:8000/api/health", timeout=5) as response:
-              assert response.status == 200
-              assert json.load(response)["status"] == "healthy"
+          for attempt in range(60):
+              try:
+                  with urlopen("http://127.0.0.1:8000/api/health", timeout=3) as response:
+                      assert response.status == 200
+                      assert json.load(response)["status"] == "healthy"
+                  break
+              except (HTTPError, URLError, TimeoutError):
+                  if attempt == 59:
+                      raise
+                  time.sleep(1)
+          else:
+              raise AssertionError("API liveness endpoint did not become available")
 
           try:
               urlopen("http://127.0.0.1:8000/api/ready", timeout=5)

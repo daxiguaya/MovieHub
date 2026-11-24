@@ -645,7 +645,8 @@ function SearchPage() {
   }
 
   const localOnly = results.filter((movie) => !onlineResults.some((item) =>
-    movie.title.trim().toLowerCase() === item.title.trim().toLowerCase() && movie.year === item.year
+    (movie.tmdb_id === String(item.provider_id) && movie.type === item.media_type) ||
+    (movie.title.trim().toLowerCase() === item.title.trim().toLowerCase() && movie.year === item.year)
   ));
 
   return (

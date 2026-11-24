@@ -90,6 +90,11 @@ def test_cache_evicts_least_recently_used_rows_at_hard_limit(tmp_path, monkeypat
         key = cache.make_key("tmdb", "/search", {"q": str(index)})
         keys.append(key)
         cache.set(key, "tmdb", "/search", {"results": [{"id": index}]}, 3600)
+        with cache._connection() as connection:
+            connection.execute(
+                "UPDATE provider_response_cache SET accessed_at=? WHERE cache_key=?",
+                (1000 + index, key),
+            )
     assert cache.stats()["entries"] == 5
     assert cache.get(keys[0]) is None
     assert cache.get(keys[-1]) is not None

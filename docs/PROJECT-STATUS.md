@@ -208,6 +208,9 @@ The merge promotes the current implementation to the repository's default branch
 - [x] Restart the API and verify the original value is served again; verify the pre-restore rollback copy contains the changed value.
 - [x] Verify backend/frontend container health checks and cleanup of the isolated Compose project.
 - [x] Compose lifecycle job passed in CI [#45343969389](https://github.com/daxiguaya/MovieHub/actions/runs/45343969389); backend and frontend build/test jobs passed. Browser E2E was still running at the time of this status update.
-- [x] Optimize CI browser installation to use Playwright's headless Chromium shell for the headless E2E suite; validation run [#45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) is queued.
+- [x] Optimize CI browser installation to use Playwright's headless Chromium shell for the headless E2E suite; validation [#45344225088](https://github.com/daxiguaya/MovieHub/actions/runs/45344225088) passed with 10 browser E2E tests and 4 skipped.
 
 This remains isolated CI verification. No NAS, NPM, Scout source database, or production data was accessed. Overall progress remains **83%** pending real overview coverage/licensing, genuine multi-date source history, and eventual production deployment.
+
+
+The documentation/main-head CI [#45344314269](https://github.com/daxiguaya/MovieHub/actions/runs/45344314269) also passed all required jobs: backend 267 passed / 4 skipped, browser E2E 10 passed / 4 skipped, frontend tests/type-check/build, both image builds, and full isolated Compose backup/restore rehearsal. Optional external-source collection and performance jobs remained skipped by design.

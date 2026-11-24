@@ -2,12 +2,13 @@
 
 from datetime import datetime
 
+import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, Chart, ChartItem, ChartSnapshot, Movie
-from app.services.chart_service import ChartService
+from app.services.chart_service import ChartCursorError, ChartService
 
 
 def _database():
@@ -140,9 +141,6 @@ def test_invalid_cursor_is_rejected_and_missing_snapshot_is_empty():
             service.get_chart_movies(
                 db, "test-chart", cursor="not-a-valid-cursor", limit=1
             )
-        assert invalid_cursor is not None
-        assert [item.rank for item in invalid_cursor.items] == [1]
-
         missing_snapshot = service.get_chart_movies(
             db, "test-chart", snapshot_date="2020-01-01"
         )

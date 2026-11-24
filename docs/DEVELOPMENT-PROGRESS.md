@@ -1,10 +1,10 @@
 # MovieHub Development Progress
 
-Branch: `phase4/database-foundation`
+Branch: `main`
 Last updated: 2026-11-24
-Current phase: Pre-deployment hardening — synopsis-source research completed; TMDB dry-run and real-data pagination/history/filter acceptance next
+Current phase: Pre-deployment hardening — localized TMDB director identity fix under real-data audit; deployment rehearsal and NAS rollout remain pending
 
-> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 83% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
+> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 87% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
 
 
 ## Phase 4 — independent database foundation

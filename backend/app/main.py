@@ -39,19 +39,18 @@ POSTER_CACHE_CLEANUP_INTERVAL = 24 * 60 * 60
 
 
 async def _poster_cache_cleanup_loop() -> None:
-    """Periodically remove expired poster cache files."""
+    """Periodically remove expired cache entries and back up discovery data."""
     while True:
         await asyncio.sleep(POSTER_CACHE_CLEANUP_INTERVAL)
-
         try:
-            await asyncio.to_thread(
-                poster_cache_service.clear_expired_cache
-            )
+            await asyncio.to_thread(poster_cache_service.clear_expired_cache)
             await asyncio.to_thread(provider_response_cache.clear_expired)
-        await asyncio.to_thread(provider_response_cache.backup_daily, settings.backup_dir / "discovery")
-            await asyncio.to_thread(provider_response_cache.backup_daily, settings.backup_dir / "discovery")
+            await asyncio.to_thread(
+                provider_response_cache.backup_daily,
+                settings.backup_dir / "discovery",
+            )
         except Exception:
-            logger.exception("Poster cache cleanup failed")
+            logger.exception("MovieHub cache maintenance failed")
 
 
 @asynccontextmanager
@@ -71,12 +70,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Using database at %s", db_path)
 
     try:
-        await asyncio.to_thread(
-            poster_cache_service.clear_expired_cache
-        )
+        await asyncio.to_thread(poster_cache_service.clear_expired_cache)
         await asyncio.to_thread(provider_response_cache.clear_expired)
+        await asyncio.to_thread(
+            provider_response_cache.backup_daily,
+            settings.backup_dir / "discovery",
+        )
     except Exception:
-        logger.exception("Initial poster cache cleanup failed")
+        logger.exception("Initial cache maintenance failed")
 
     cleanup_task = asyncio.create_task(
         _poster_cache_cleanup_loop()

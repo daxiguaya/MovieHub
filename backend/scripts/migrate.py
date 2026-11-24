@@ -39,8 +39,8 @@ from app.database import Base
 
 logger = logging.getLogger("moviehub.migrate")
 
-MIGRATION_VERSION = 2
-MIGRATION_FILENAME = "002_durable_import_batch_receipts.sql"
+MIGRATION_VERSION = 3
+MIGRATION_FILENAME = "003_movie_metadata_provenance.sql"
 
 REQUIRED_MOVIE_COLUMNS = {
     "id",
@@ -73,6 +73,7 @@ REQUIRED_TABLES = {
     "favorites",
     "schema_migrations",
     "import_batch_receipts",
+    "movie_metadata_provenance",
 }
 
 
@@ -496,7 +497,7 @@ def _execute_migration_locked(
         raise RuntimeError(
             "MovieHub database has not been initialized. Run "
             "'python -m scripts.init_db' first; this migration only upgrades "
-            "schema version 1 to version 2 and never initializes or modifies Scout."
+            "schema version 2 to version 3 and never initializes or modifies Scout."
         )
     logger.info("Target schema version: %s", MIGRATION_VERSION)
 
@@ -512,10 +513,10 @@ def _execute_migration_locked(
         logger.info("Existing MovieHub schema passed validation")
         return current_version
 
-    if current_version != 1:
+    if current_version != 2:
         raise RuntimeError(
             f"Unsupported starting schema version: {current_version}. "
-            "This migration requires schema version 1."
+            "This migration requires schema version 2."
         )
 
     if check_only:

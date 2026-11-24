@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / ".env"
 COMPOSE_FILE = ROOT / "docker-compose.yml"
-EXPECTED_NETWORK = "chatgpt-browser_default"
+EXPECTED_NETWORK = "nginx-proxy-manager_default"
 EXPECTED_CONTAINERS = {"moviehub-backend", "moviehub-web"}
 
 
@@ -138,7 +138,7 @@ def main() -> int:
 
     for key, default in (
         ("MOVIEHUB_DATA_PATH", "/volume1/docker/moviehub/data"),
-        ("MOVIEHUB_BACKUP_PATH", "/volume1/backup/moviehub"),
+        ("MOVIEHUB_BACKUP_PATH", "/volume1/docker/moviehub/backup"),
     ):
         path = Path(env.get(key, default)).expanduser()
         if not path.is_dir():

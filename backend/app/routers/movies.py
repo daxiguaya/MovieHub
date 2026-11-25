@@ -299,7 +299,17 @@ async def _get_linked_tmdb_metadata(
         if not source_directors.intersection(tmdb_directors):
             return None
     cast = credits.get("cast") if isinstance(credits.get("cast"), list) else []
+    # A title/year candidate is suitable for UI deduplication only when the
+    # local record also supplied a director that independently agrees. Do not
+    # expose an inferred provider identity from title/year alone.
+    verified_identity = bool(tmdb_id and tmdb_id.isdigit()) or bool(
+        imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id)
+    )
+    if not verified_identity and source_directors:
+        verified_identity = True
+
     return {
+        "provider_id": int(resolved_id) if verified_identity and resolved_id else None,
         "overview": payload.get("overview") or None,
         "year": resolved_year,
         "rating": payload.get("vote_average"),

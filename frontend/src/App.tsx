@@ -646,6 +646,7 @@ function SearchPage() {
   const [onlineTotal, setOnlineTotal] = useState(0);
   const [onlinePage, setOnlinePage] = useState(1);
   const [onlinePages, setOnlinePages] = useState(0);
+  const [resolvedLocalTmdbIds, setResolvedLocalTmdbIds] = useState<Record<number, string>>({});
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -792,6 +793,43 @@ function SearchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  useEffect(() => {
+    let active = true;
+    const normalize = (value: string | null | undefined) =>
+      (value ?? "").normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+    const candidates = results.filter((movie) => {
+      if (movie.tmdb_id || movie.imdb_id || movie.year == null) return false;
+      const localTitles = [movie.title, movie.original_title].map(normalize).filter(Boolean);
+      return onlineResults.some((item) =>
+        item.media_type === movie.type &&
+        item.year === movie.year &&
+        localTitles.some((title) =>
+          [item.title, item.original_title].map(normalize).filter(Boolean).includes(title)
+        )
+      );
+    });
+    setResolvedLocalTmdbIds({});
+    if (!candidates.length) return () => { active = false; };
+    void Promise.all(candidates.map(async (movie) => {
+      try {
+        const detail = await api.movie(movie.id);
+        const providerId = detail.tmdb_metadata?.provider_id;
+        return typeof providerId === "number" && providerId > 0
+          ? [movie.id, String(providerId)] as const
+          : null;
+      } catch {
+        return null;
+      }
+    })).then((matches) => {
+      if (active) {
+        setResolvedLocalTmdbIds(Object.fromEntries(matches.filter(
+          (match): match is readonly [number, string] => match !== null
+        )));
+      }
+    });
+    return () => { active = false; };
+  }, [results, onlineResults]);
+
   function submit(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
@@ -875,13 +913,15 @@ function SearchPage() {
   const findLinkedLocalMovie = (item: DiscoveryItem) => results.find((movie) =>
     movie.type === item.media_type && (
       movie.tmdb_id === String(item.provider_id) ||
-      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id)
+      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id) ||
+      resolvedLocalTmdbIds[movie.id] === String(item.provider_id)
     )
   );
   const localOnly = results.filter((movie) => !onlineResults.some((item) =>
     movie.type === item.media_type && (
       movie.tmdb_id === String(item.provider_id) ||
-      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id)
+      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id) ||
+      resolvedLocalTmdbIds[movie.id] === String(item.provider_id)
     )
   ));
 

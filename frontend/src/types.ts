@@ -29,6 +29,7 @@ export interface Movie {
 
 export interface MovieDetail extends Movie {
   tmdb_metadata?: {
+    provider_id?: number | null;
     overview: string | null;
     year: number | null;
     rating: number | null;

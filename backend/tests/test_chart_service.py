@@ -56,6 +56,7 @@ def _seed_chart(db: Session) -> None:
                 id=movie_id,
                 douban_id=str(10000 + movie_id),
                 title=f"Movie {movie_id}",
+                overview="A synopsis for the chart card." if movie_id == 4 else None,
                 type="movie",
                 rating_count=0,
                 directors="[]",
@@ -91,6 +92,7 @@ def test_default_query_uses_latest_snapshot_and_paginates_by_rank():
         ]
         assert [item.rank for item in first_page.items] == [1, 2]
         assert first_page.items[0].snapshot_date == "2026-11-23"
+        assert first_page.items[0].overview == "A synopsis for the chart card."
         assert first_page.next_cursor == service._encode_cursor(2)
 
         second_page = service.get_chart_movies(

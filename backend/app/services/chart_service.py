@@ -245,6 +245,7 @@ class ChartService:
             items.append(
                 ChartMovieResponse(
                     **movie_data.model_dump(),
+                    overview=movie.overview,
                     rank=chart_item.rank,
                     source_rating=chart_item.source_rating,
                     snapshot_date=snapshot.snapshot_date,

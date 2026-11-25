@@ -25,6 +25,7 @@ export interface Movie {
   genres: string[];
   regions: string[];
   updated_at: number | null;
+  overview?: string | null;
 }
 
 export interface MovieDetail extends Movie {

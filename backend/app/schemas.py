@@ -118,6 +118,7 @@ class ChartSnapshotResponse(BaseModel):
 class ChartMovieResponse(MovieResponse):
     """Movie card as it appears inside a chart."""
 
+    overview: str | None = None
     rank: int
     source_rating: float | None = None
     snapshot_date: str

@@ -125,6 +125,131 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
+  it("applies the selected rating sort to TMDB discovery", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/discover?")) return {
+        provider: "tmdb", media_type: "movie", page: 1, total_pages: 1,
+        total_results: 0, items: [], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search"]}>
+        <App />
+      </MemoryRouter>
+    );
+    await userEvent.selectOptions(await screen.findByLabelText("排序方式"), "rating_desc");
+    await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
+    await waitFor(() => {
+      const discoverUrl = fetchMock.mock.calls.map(([input]) => String(input))
+        .find((url) => url.startsWith("/api/discovery/discover?"));
+      expect(discoverUrl).toContain("sort_by=vote_average.desc");
+    });
+  });
+
+  it("sorts keyword search results by rating and keeps missing ratings last", async () => {
+    installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 3,
+        items: [
+          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
+        ], attribution: "TMDB"
+      };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const { container } = render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试&sort=rating_desc"]}>
+        <App />
+      </MemoryRouter>
+    );
+    await screen.findAllByRole("link", { name: "高分" });
+    const cards = Array.from(container.querySelectorAll(".movie-grid .movie-card"));
+    expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
+      .toEqual(["高分", "低分", "无评分"]);
+  });
+
+  it("allows favoriting an online search result directly from its card", async () => {
+    window.localStorage.setItem("moviehubApiKey", "test-api-key");
+    const fetchMock = installFetchMock((url, init) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 1,
+        items: [{
+          provider: "tmdb", provider_id: 550, media_type: "movie", title: "搏击俱乐部",
+          original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000,
+          poster_path: null, backdrop_path: null, genre_ids: [], imdb_id: "tt0137523"
+        }], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      if (url.startsWith("/api/favorites/external/status/")) return { is_favorite: false };
+      if (url === "/api/favorites/external/movie/550" && init?.method === "PUT") return {
+        provider: "tmdb", media_type: "movie", provider_id: 550,
+        snapshot: { title: "搏击俱乐部", original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000, poster_path: null, backdrop_path: null, imdb_id: "tt0137523" },
+        note: "", created_at: 1, updated_at: 1
+      };
+      if (url.startsWith("/api/favorites/external/movie/550?") && init?.method === "DELETE") return {};
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const favoriteButton = await screen.findByRole("button", { name: "♡ 加入收藏" });
+    await userEvent.click(favoriteButton);
+    const savedButton = await screen.findByRole("button", { name: "♥ 已收藏" });
+    expect(savedButton).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/favorites/external/movie/550",
+      expect.objectContaining({ method: "PUT", headers: expect.objectContaining({ "X-API-Key": "test-api-key" }) })
+    );
+    await userEvent.click(savedButton);
+    expect(await screen.findByRole("button", { name: "♡ 加入收藏" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url, init]) =>
+      String(url).startsWith("/api/favorites/external/movie/550?") &&
+      init?.method === "DELETE" &&
+      new Headers(init.headers).get("X-API-Key") === "test-api-key" &&
+      new URLSearchParams(String(url).split("?")[1]).get("imdb_id") === "tt0137523"
+    )).toBe(true);
+  });
+
+  it("prompts for the API key without sending unauthorized favorite-status requests", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 1,
+        items: [{
+          provider: "tmdb", provider_id: 550, media_type: "movie", title: "搏击俱乐部",
+          original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000,
+          poster_path: null, backdrop_path: null, genre_ids: []
+        }], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("link", { name: "前往收藏页连接 API Key" })).toHaveAttribute("href", "/favorites");
+    expect(screen.getByRole("button", { name: "♡ 加入收藏" })).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/favorites/external/status/"))).toBe(false);
+  });
+
   it("restores URL-selected genre, region, type and year filters before async options load", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

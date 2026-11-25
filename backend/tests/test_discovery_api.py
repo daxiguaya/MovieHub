@@ -62,6 +62,24 @@ def test_discover_enforces_page_and_vote_threshold_defaults(monkeypatch):
         response = client.get("/api/discovery/discover", params={"page": 501})
     assert response.status_code == 422
 
+def test_discover_accepts_vote_count_sort(monkeypatch):
+    calls = []
+
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        calls.append((endpoint, params))
+        return {"page": 1, "total_pages": 1, "total_results": 0, "results": []}
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/discover", params={
+            "media_type": "movie", "sort_by": "vote_count.desc", "min_votes": 0
+        })
+
+    assert response.status_code == 200
+    assert calls[0][0] == "/discover/movie"
+    assert calls[0][1]["sort_by"] == "vote_count.desc"
+
+
 def test_detail_returns_transient_overview(monkeypatch):
     calls = []
 

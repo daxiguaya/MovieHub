@@ -179,14 +179,14 @@ def main() -> int:
                 overview = result.overview.strip()
                 digest = hashlib.sha256(overview.encode("utf-8")).hexdigest()
                 existing = db.execute(
-                    select(MovieMetadataProvenance.id).where(
+                    select(MovieMetadataProvenance).where(
                         MovieMetadataProvenance.movie_id == movie_id,
                         MovieMetadataProvenance.field_name == "overview",
                         MovieMetadataProvenance.source == "tmdb",
                         MovieMetadataProvenance.source_url == (result.source_url or ""),
                         MovieMetadataProvenance.value_sha256 == digest,
                     )
-                ).first()
+                ).scalars().first()
                 movie.overview = overview
                 if existing is None:
                     db.add(MovieMetadataProvenance(
@@ -197,6 +197,8 @@ def main() -> int:
                         observed_at=observed_at,
                         value_sha256=digest,
                     ))
+                else:
+                    existing.observed_at = observed_at
                 imported += 1
 
     report.update({

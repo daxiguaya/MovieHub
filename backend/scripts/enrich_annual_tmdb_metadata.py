@@ -12,10 +12,8 @@ import asyncio
 import hashlib
 import json
 import os
-import shutil
 import sqlite3
 import sys
-import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +24,8 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import (
-    Genre, Movie, MovieGenre, MovieMetadataProvenance, MovieRegion, Region,
-    SessionLocal, get_db_path,
+    Chart, ChartItem, ChartSnapshot, Genre, Movie, MovieGenre,
+    MovieMetadataProvenance, MovieRegion, Region, SessionLocal, get_db_path,
 )
 from app.metadata_constants import VALID_GENRES, VALID_REGIONS
 
@@ -163,11 +161,11 @@ def _extract(movie: Movie, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _load_targets() -> list[dict[str, Any]]:
-    from app.database import Chart
     with SessionLocal() as db:
         rows = db.execute(
-            select(Movie).join(Movie.chart_items).join(Movie.chart_items.property.mapper.class_.snapshot)
-            .join(Chart, Chart.list_id == Movie.chart_items.property.mapper.class_.snapshot.property.mapper.class_.list_id)
+            select(Movie).join(ChartItem, ChartItem.movie_id == Movie.id)
+            .join(ChartSnapshot, ChartSnapshot.id == ChartItem.snapshot_id)
+            .join(Chart, Chart.list_id == ChartSnapshot.list_id)
             .where(Chart.slug.in_(ANNUAL_SLUGS))
             .distinct().order_by(Movie.id)
         ).scalars().all()
@@ -177,138 +175,3 @@ def _load_targets() -> list[dict[str, Any]]:
             "actors": m.actors,
         } for m in rows if m.tmdb_id and str(m.tmdb_id).isdigit()]
 
-
-async def _collect(targets: list[dict[str, Any]], token: str, delay: float) -> tuple[dict[int, dict[str, Any]], Counter]:
-    results: dict[int, dict[str, Any]] = {}
-    counts: Counter = Counter()
-    async with httpx.AsyncClient(timeout=httpx.Timeout(12.0, connect=5.0), follow_redirects=False) as client:
-        for item in targets:
-            try:
-                payload = await _fetch_details(client, token, item["type"], str(item["tmdb_id"]))
-                # Rehydrate a lightweight Movie-like object for shared identity validation.
-                class MovieStub:
-                    pass
-                stub = MovieStub()
-                for key, value in item.items():
-                    setattr(stub, key, value)
-                results[item["id"]] = _extract(stub, payload)
-                counts["verified"] += 1
-            except httpx.HTTPStatusError as exc:
-                counts[f"http_{exc.response.status_code}"] += 1
-            except Exception as exc:
-                counts[type(exc).__name__ + ":" + str(exc)[:100]] += 1
-            await asyncio.sleep(delay)
-    return results, counts
-
-
-def _apply(results: dict[int, dict[str, Any]], apply: bool) -> dict[str, Any]:
-    changes = []
-    with SessionLocal() as db:
-        for movie_id, data in results.items():
-            movie = db.get(Movie, movie_id)
-            if movie is None:
-                continue
-            fields = {
-                "original_title": data["original_title"],
-                "year": data["year"],
-                "actors": json.dumps(data["actors"], ensure_ascii=False),
-            }
-            for field, value in fields.items():
-                if _blank(getattr(movie, field)) and not _blank(value):
-                    changes.append((movie_id, field, value, data["source_url"]))
-            if not movie.genres and data["genres"]:
-                changes.append((movie_id, "genres", data["genres"], data["source_url"]))
-            if not movie.regions and data["regions"]:
-                changes.append((movie_id, "regions", data["regions"], data["source_url"]))
-        if not apply or not changes:
-            return {"would_fill_fields": len(changes), "fields": dict(Counter(x[1] for x in changes)), "database_written": False}
-
-    database = Path(get_db_path()).resolve()
-    backup_dir = Path(os.environ.get("MOVIEHUB_BACKUP_DIR", "/backups"))
-    backup = _backup(database, backup_dir)
-    observed = datetime.now(timezone.utc).replace(tzinfo=None)
-    with SessionLocal() as db:
-        with db.begin():
-            genre_map = {g.name: g.id for g in db.execute(select(Genre)).scalars()}
-            region_map = {r.name: r.id for r in db.execute(select(Region)).scalars()}
-            for movie_id, field, value, source_url in changes:
-                movie = db.get(Movie, movie_id)
-                if movie is None:
-                    raise RuntimeError(f"Movie disappeared during apply: {movie_id}")
-                if field in {"original_title", "year", "actors"}:
-                    if not _blank(getattr(movie, field)):
-                        continue
-                    setattr(movie, field, value)
-                elif field == "genres":
-                    if movie.genres:
-                        continue
-                    for name in value:
-                        if name in genre_map:
-                            db.add(MovieGenre(movie_id=movie_id, genre_id=genre_map[name]))
-                elif field == "regions":
-                    if movie.regions:
-                        continue
-                    for name in value:
-                        if name in region_map:
-                            db.add(MovieRegion(movie_id=movie_id, region_id=region_map[name]))
-                digest = _hash(value)
-                exists = db.execute(select(MovieMetadataProvenance.id).where(
-                    MovieMetadataProvenance.movie_id == movie_id,
-                    MovieMetadataProvenance.field_name == field,
-                    MovieMetadataProvenance.source == "tmdb",
-                    MovieMetadataProvenance.source_url == source_url,
-                    MovieMetadataProvenance.value_sha256 == digest,
-                )).first()
-                if not exists:
-                    db.add(MovieMetadataProvenance(
-                        movie_id=movie_id, field_name=field, source="tmdb",
-                        source_url=source_url, observed_at=observed, value_sha256=digest,
-                    ))
-    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as conn:
-        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-        if integrity != "ok":
-            raise RuntimeError(f"Database integrity_check failed: {integrity}")
-    return {"updated_fields": len(changes), "fields": dict(Counter(x[1] for x in changes)),
-            "database_written": True, "backup": str(backup)}
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Enrich missing annual chart metadata using existing TMDB IDs.")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--apply", action="store_true")
-    parser.add_argument("--min-interval", type=float, default=0.35)
-    args = parser.parse_args()
-    if args.dry_run == args.apply:
-        parser.error("Choose exactly one of --dry-run or --apply")
-    if args.min_interval < 0.3:
-        parser.error("--min-interval must be >= 0.3 seconds")
-    token = settings.tmdb_api_read_token or os.environ.get("TMDB_API_READ_TOKEN", "")
-    if not token:
-        print(json.dumps({"success": False, "error": "TMDB_API_READ_TOKEN missing"}))
-        return 2
-    targets = _load_targets()
-    results, statuses = asyncio.run(_collect(targets, token, args.min_interval))
-    summary = {
-        "success": True, "mode": "apply" if args.apply else "dry_run",
-        "annual_movies": len(targets), "identity_verified": len(results),
-        "statuses": dict(statuses),
-        "candidate_fields": dict(Counter(
-            field for movie_id, data in results.items()
-            for field, value in {
-                "original_title": data["original_title"], "year": data["year"],
-                "actors": data["actors"], "genres": data["genres"], "regions": data["regions"],
-            }.items() if not _blank(value)
-        )),
-        "database_written": False,
-    }
-    if args.dry_run:
-        # Preview exact changes without writing; use current database values.
-        summary.update(_apply(results, False))
-    else:
-        summary.update(_apply(results, True))
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

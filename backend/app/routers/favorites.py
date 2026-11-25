@@ -1,6 +1,9 @@
 """Single-user favorites API, keyed by MovieHub's internal movie ID."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -144,5 +147,124 @@ def remove_favorite(
         except Exception:
             # Favorite deletion has already committed; a backup refresh failure
             # must not turn the successful user action into an API error.
+            pass
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ExternalFavoriteSnapshot(BaseModel):
+    title: str = Field(min_length=1, max_length=256)
+    original_title: str | None = Field(default=None, max_length=256)
+    year: int | None = Field(default=None, ge=1870, le=2100)
+    rating: float | None = Field(default=None, ge=0, le=10)
+    rating_count: int = Field(default=0, ge=0)
+    poster_path: str | None = Field(default=None, max_length=512)
+    backdrop_path: str | None = Field(default=None, max_length=512)
+    imdb_id: str | None = Field(default=None, max_length=32)
+
+
+class ExternalFavoritePayload(BaseModel):
+    snapshot: ExternalFavoriteSnapshot
+    note: str = Field(default="", max_length=1000)
+
+
+@router.get("/external")
+@limiter.limit("30/minute")
+def list_external_favorites(request: Request) -> list[dict]:
+    """List TMDB favorites through the same protected /favorites route family."""
+    return provider_response_cache.list_favorites()
+
+
+@router.get("/external/status/{media_type}/{provider_id}")
+@limiter.limit("60/minute")
+def external_favorite_status(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+    imdb_id: str | None = Query(None, max_length=32),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    if provider_id < 1:
+        raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
+    local_saved = db.query(Favorite).join(Movie).filter(
+        Movie.type == media_type,
+        identity_filter,
+    ).first() is not None
+    external_saved = provider_response_cache.has_favorite(media_type, provider_id)
+    return {"is_favorite": local_saved or external_saved}
+
+
+@router.put("/external/{media_type}/{provider_id}")
+@limiter.limit("30/minute")
+def save_external_favorite(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+    payload: ExternalFavoritePayload,
+    db: Session = Depends(get_db),
+) -> dict:
+    if provider_id < 1:
+        raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    snapshot = payload.snapshot.model_dump()
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if snapshot.get("imdb_id"):
+        identity_filter = identity_filter | (Movie.imdb_id == snapshot["imdb_id"])
+    linked_movie = db.query(Movie).filter(
+        Movie.type == media_type,
+        identity_filter,
+    ).first()
+    if linked_movie is not None and db.get(Favorite, linked_movie.id) is None:
+        db.add(Favorite(movie_id=linked_movie.id, note=payload.note))
+        db.commit()
+    saved = provider_response_cache.save_favorite(
+        media_type, provider_id, snapshot, payload.note
+    )
+    try:
+        provider_response_cache.backup_daily(
+            settings.backup_dir / "discovery", 7, True
+        )
+    except Exception:
+        pass
+    return saved
+
+
+@router.delete(
+    "/external/{media_type}/{provider_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+@limiter.limit("30/minute")
+def remove_external_favorite(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+    db: Session = Depends(get_db),
+) -> Response:
+    if provider_id < 1:
+        raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    removed_external = provider_response_cache.delete_favorite(
+        media_type, provider_id
+    )
+    imdb_id = request.query_params.get("imdb_id")
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id and len(imdb_id) <= 32:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
+    linked = db.query(Favorite).join(Movie).filter(
+        Movie.type == media_type,
+        identity_filter,
+    ).all()
+    for favorite in linked:
+        db.delete(favorite)
+    if linked:
+        db.commit()
+    if not removed_external and not linked:
+        raise HTTPException(status_code=404, detail="Favorite not found")
+    if removed_external:
+        try:
+            provider_response_cache.backup_daily(
+                settings.backup_dir / "discovery", 7, True
+            )
+        except Exception:
             pass
     return Response(status_code=status.HTTP_204_NO_CONTENT)

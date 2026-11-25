@@ -168,6 +168,38 @@ PY
     echo "[FAIL] Pre-migration database backup is missing: $ROLLBACK_DB_BACKUP" >&2
     return 1
   fi
+  # Online favorites and provider responses live in a separate SQLite cache DB.
+  # Restore it too; otherwise a failed rollout could lose favorites on rollback.
+  if [ -f "$ROLLBACK_DISCOVERY_DB_BACKUP" ]; then
+    python3 - "$ROLLBACK_DISCOVERY_DB_BACKUP" "$DATA_PATH/cache/discovery.sqlite3" <<'PY'
+import sqlite3
+import sys
+from pathlib import Path
+
+backup_path, database_path = Path(sys.argv[1]), Path(sys.argv[2])
+database_path.parent.mkdir(parents=True, exist_ok=True)
+for suffix in ("", "-wal", "-shm"):
+    candidate = Path(str(database_path) + suffix)
+    if candidate.exists():
+        candidate.unlink()
+source = sqlite3.connect("file:" + str(backup_path) + "?mode=ro", uri=True, timeout=60)
+target = sqlite3.connect(str(database_path), timeout=60)
+try:
+    source.backup(target)
+    target.commit()
+    integrity = target.execute("PRAGMA integrity_check").fetchone()
+    if not integrity or integrity[0] != "ok":
+        raise RuntimeError("Restored discovery cache failed integrity_check")
+finally:
+    target.close()
+    source.close()
+print("Restored pre-rollout discovery cache (including external favorites):", database_path)
+PY
+  else
+    # No cache DB existed before rollout; discard any one created by the failed version.
+    rm -f "$DATA_PATH/cache/discovery.sqlite3" "$DATA_PATH/cache/discovery.sqlite3-wal" "$DATA_PATH/cache/discovery.sqlite3-shm"
+    echo "No discovery cache existed before rollout; removed failed-version cache files."
+  fi
   docker tag "$ROLLBACK_BACKEND" moviehub-backend:local
   docker tag "$ROLLBACK_FRONTEND" moviehub-frontend:local
   docker compose up -d --no-deps moviehub moviehub-web || true
@@ -182,6 +214,7 @@ on_exit() {
 trap on_exit EXIT
 
 ROLLBACK_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/movies.sqlite3"
+ROLLBACK_DISCOVERY_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/discovery.sqlite3"
 ROLLBACK_NEEDED=1
 docker compose stop moviehub
 docker compose run --rm --no-deps -T --name "moviehub-schema-migrate-$STAMP" moviehub python -m scripts.migrate

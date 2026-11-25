@@ -81,6 +81,20 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         self.assertLess(rollback.index("source.backup(target)"), rollback.index('docker tag "$ROLLBACK_BACKEND"'))
         self.assertIn('docker compose up -d --no-deps moviehub moviehub-web', rollback)
 
+    def test_rollback_restores_discovery_cache_before_previous_images(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        rollback_start = script.index("rollback() {")
+        rollback_end = script.index("\non_exit() {", rollback_start)
+        rollback = script[rollback_start:rollback_end]
+        self.assertIn('ROLLBACK_DISCOVERY_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/discovery.sqlite3"', script)
+        self.assertIn("Restored pre-rollout discovery cache (including external favorites)", rollback)
+        self.assertIn('rm -f "$DATA_PATH/cache/discovery.sqlite3"', rollback)
+        self.assertLess(
+            rollback.index("Restored pre-rollout discovery cache (including external favorites)"),
+            rollback.index('docker tag "$ROLLBACK_BACKEND"'),
+        )
+
     def test_npm_uses_graceful_reload_not_container_restart(self):
         script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
         script = script_path.read_text(encoding="utf-8")

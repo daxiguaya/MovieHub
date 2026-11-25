@@ -84,7 +84,7 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   expect(local.get("min_year")).toBe("2020");
   expect(local.get("max_year")).toBe("2024");
   expect(local.get("genres")).toBe("剧情,科幻");
-  expect(local.get("regions")).toBe("中国大陆");
+  expect(local.get("regions")).toBe("中国大陆,日本");
 
   const online = new URL(discoverUrl);
   expect(online.searchParams.get("media_type")).toBe("movie");

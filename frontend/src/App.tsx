@@ -1013,7 +1013,12 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
       .then((data) => {
         if (!active) return;
         setMovie(data);
-        void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id)
+        void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id, {
+          title: data.title,
+          original_title: data.original_title,
+          year: data.year,
+          directors: data.credits.crew?.filter((person) => person.job === "Director").map((person) => person.name) ?? []
+        })
           .then((result) => { if (active) setIsFavorite(result.is_favorite); })
           .catch(() => undefined);
       })
@@ -1026,7 +1031,12 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
     if (!movie) return;
     setFavoriteError("");
     try {
-      if (isFavorite) await api.removeExternalFavorite(validType, id, movie.external_ids.imdb_id);
+      if (isFavorite) await api.removeExternalFavorite(validType, id, movie.external_ids.imdb_id, {
+        title: movie.title,
+        original_title: movie.original_title,
+        year: movie.year,
+        directors: movie.credits.crew?.filter((person) => person.job === "Director").map((person) => person.name) ?? []
+      });
       else await api.saveExternalFavorite(movie);
       setIsFavorite(!isFavorite);
     } catch (err) {

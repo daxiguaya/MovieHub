@@ -121,6 +121,8 @@ def test_local_chart_detail_uses_transient_tmdb_metadata_without_overwriting_dou
     calls = []
     async def fake_get_json(endpoint, params=None, ttl=900, include_overview=False):
         calls.append((endpoint, include_overview))
+        if endpoint == "/search/movie":
+            return {"results": [{"id": 42, "title": "Annual Fixture", "release_date": "2025-01-29"}]}
         return {
             "id": 42,
             "title": "Annual Fixture",
@@ -131,7 +133,10 @@ def test_local_chart_detail_uses_transient_tmdb_metadata_without_overwriting_dou
             "genres": [{"id": 16, "name": "动画"}],
             "production_countries": [{"iso_3166_1": "CN", "name": "中国大陆"}],
             "credits": {
-                "crew": [{"job": "Director", "name": "TMDB Director"}],
+                "crew": [
+                    {"job": "Director", "name": "TMDB Director"},
+                    {"job": "Director", "name": "Director from Douban"},
+                ],
                 "cast": [{"name": "TMDB Actor"}],
             },
             "runtime": 110,
@@ -152,7 +157,7 @@ def test_local_chart_detail_uses_transient_tmdb_metadata_without_overwriting_dou
         assert body["tmdb_metadata"]["genres"] == ["动画"]
         assert body["tmdb_metadata"]["regions"] == ["中国大陆"]
         assert body["directors"] == ["Director from Douban"]
-        assert body["tmdb_metadata"]["directors"] == ["TMDB Director"]
+        assert body["tmdb_metadata"]["directors"] == ["TMDB Director", "Director from Douban"]
         assert calls == [("/movie/42", True)]
         with TargetSession() as db:
             stored = db.get(Movie, movie_id)

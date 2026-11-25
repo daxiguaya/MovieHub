@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import socket
+import unicodedata
 from urllib.parse import urljoin, urlsplit
 from typing import Literal
 
@@ -87,7 +88,7 @@ def _get_movie_detail(movie: Movie) -> MovieDetailResponse:
         original_title=movie.original_title,
         year=movie.year,
         rating=movie.rating,
-        rating_count=movie.rating_count or 0,
+        rating_count=movie.rating_count,
         type=movie.type,
         genres=[
             association.genre_obj.name
@@ -118,12 +119,21 @@ def _get_movie_detail(movie: Movie) -> MovieDetailResponse:
     )
 
 
+def _normalize_identity_title(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").casefold()
+    return "".join(char for char in normalized if char.isalnum())
+
+
 async def _get_linked_tmdb_metadata(
     media_type: str,
     tmdb_id: str | None,
     imdb_id: str | None,
+    title: str | None = None,
+    original_title: str | None = None,
+    year: int | None = None,
+    directors: list[str] | None = None,
 ) -> dict | None:
-    """Fetch source-labelled metadata on demand; synopsis stays memory-only."""
+    """Fetch transient TMDB metadata using strict external-ID or title/year identity."""
     resolved_id = tmdb_id if tmdb_id and tmdb_id.isdigit() else None
     if not resolved_id and imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id):
         try:
@@ -141,30 +151,157 @@ async def _get_linked_tmdb_metadata(
         except Exception as exc:
             logger.info("TMDB identity lookup unavailable: %s", type(exc).__name__)
             return None
+    resolved_payload: dict | None = None
     if not resolved_id:
-        return None
+        source_titles = {
+            _normalize_identity_title(value)
+            for value in (title, original_title)
+            if _normalize_identity_title(value)
+        }
+        source_directors = {
+            _normalize_identity_title(value)
+            for value in (directors or [])
+            if _normalize_identity_title(value)
+        }
+        if not source_titles or (year is None and not source_directors):
+            return None
+        release_year_key = "primary_release_year" if media_type == "movie" else "first_air_date_year"
+        candidates_by_id: dict[int, dict] = {}
+        for query in dict.fromkeys(
+            value.strip() for value in (original_title, title) if value and value.strip()
+        ):
+            try:
+                search_payload = await tmdb_client.get_json(
+                    f"/search/{media_type}",
+                    {
+                        "query": query,
+                        **({release_year_key: year} if year is not None else {}),
+                        "language": "zh-CN",
+                        "include_adult": "false",
+                        "page": 1,
+                    },
+                    SEARCH_TTL,
+                )
+            except Exception as exc:
+                logger.info("TMDB title identity lookup unavailable: %s", type(exc).__name__)
+                return None
+            results = search_payload.get("results", [])
+            if not isinstance(results, list):
+                continue
+            for candidate in results:
+                if not isinstance(candidate, dict) or not isinstance(candidate.get("id"), int):
+                    continue
+                date_value = candidate.get("release_date") or candidate.get("first_air_date") or ""
+                candidate_year = int(date_value[:4]) if isinstance(date_value, str) and date_value[:4].isdigit() else None
+                candidate_titles = {
+                    _normalize_identity_title(candidate.get(key))
+                    for key in (("title", "original_title") if media_type == "movie" else ("name", "original_name"))
+                    if _normalize_identity_title(candidate.get(key))
+                }
+                if (year is None or candidate_year == year) and source_titles.intersection(candidate_titles):
+                    candidates_by_id[candidate["id"]] = candidate
+        if not candidates_by_id or len(candidates_by_id) > 12:
+            return None
 
-    try:
-        payload = await tmdb_client.get_json(
-            f"/{media_type}/{int(resolved_id)}",
-            {"language": "zh-CN", "append_to_response": "credits,external_ids"},
-            DETAIL_TTL,
-            include_overview=True,
-        )
-    except Exception as exc:
-        logger.info("TMDB detail enrichment unavailable: %s", type(exc).__name__)
-        return None
+        verified_candidates: list[tuple[int, dict]] = []
+        for candidate_id in candidates_by_id:
+            try:
+                candidate_detail = await tmdb_client.get_json(
+                    f"/{media_type}/{candidate_id}",
+                    {"language": "zh-CN", "append_to_response": "credits,external_ids"},
+                    DETAIL_TTL,
+                    include_overview=True,
+                )
+            except Exception as exc:
+                logger.info("TMDB candidate verification unavailable: %s", type(exc).__name__)
+                return None
+            if not isinstance(candidate_detail, dict) or candidate_detail.get("id") != candidate_id:
+                continue
+            candidate_date = candidate_detail.get("release_date") or candidate_detail.get("first_air_date") or ""
+            candidate_detail_year = int(candidate_date[:4]) if isinstance(candidate_date, str) and candidate_date[:4].isdigit() else None
+            detail_titles = {
+                _normalize_identity_title(candidate_detail.get(key))
+                for key in (("title", "original_title") if media_type == "movie" else ("name", "original_name"))
+                if _normalize_identity_title(candidate_detail.get(key))
+            }
+            if not source_titles.intersection(detail_titles):
+                continue
+            if year is not None and candidate_detail_year != year:
+                continue
+            detail_credits = candidate_detail.get("credits") if isinstance(candidate_detail.get("credits"), dict) else {}
+            detail_crew = detail_credits.get("crew") if isinstance(detail_credits.get("crew"), list) else []
+            detail_directors = {
+                _normalize_identity_title(person.get("name"))
+                for person in detail_crew
+                if isinstance(person, dict)
+                and (
+                    person.get("job") == "Director"
+                    or (media_type == "tv" and person.get("department") == "Directing")
+                )
+                and _normalize_identity_title(person.get("name"))
+            }
+            if source_directors and not source_directors.intersection(detail_directors):
+                continue
+            verified_candidates.append((candidate_id, candidate_detail))
+        if len(verified_candidates) != 1:
+            return None
+        resolved_id, resolved_payload = str(verified_candidates[0][0]), verified_candidates[0][1]
+
+    payload = resolved_payload
+    if payload is None:
+        try:
+            payload = await tmdb_client.get_json(
+                f"/{media_type}/{int(resolved_id)}",
+                {"language": "zh-CN", "append_to_response": "credits,external_ids"},
+                DETAIL_TTL,
+                include_overview=True,
+            )
+        except Exception as exc:
+            logger.info("TMDB detail enrichment unavailable: %s", type(exc).__name__)
+            return None
 
     if not isinstance(payload, dict) or payload.get("id") != int(resolved_id):
         return None
     release_date = payload.get("release_date") or payload.get("first_air_date") or ""
-    year = int(release_date[:4]) if isinstance(release_date, str) and release_date[:4].isdigit() else None
+    resolved_year = int(release_date[:4]) if isinstance(release_date, str) and release_date[:4].isdigit() else None
+    source_titles = {
+        _normalize_identity_title(value)
+        for value in (title, original_title)
+        if _normalize_identity_title(value)
+    }
+    if source_titles:
+        candidate_titles = {
+            _normalize_identity_title(payload.get(key))
+            for key in (("title", "original_title") if media_type == "movie" else ("name", "original_name"))
+            if _normalize_identity_title(payload.get(key))
+        }
+        if not source_titles.intersection(candidate_titles):
+            return None
+    if year is not None and resolved_year != year:
+        return None
     credits = payload.get("credits") if isinstance(payload.get("credits"), dict) else {}
     crew = credits.get("crew") if isinstance(credits.get("crew"), list) else []
+    source_directors = {
+        _normalize_identity_title(name) for name in (directors or [])
+        if _normalize_identity_title(name)
+    }
+    if source_directors:
+        tmdb_directors = {
+            _normalize_identity_title(person.get("name"))
+            for person in crew
+            if isinstance(person, dict)
+            and (
+                person.get("job") == "Director"
+                or (media_type == "tv" and person.get("department") == "Directing")
+            )
+            and _normalize_identity_title(person.get("name"))
+        }
+        if not source_directors.intersection(tmdb_directors):
+            return None
     cast = credits.get("cast") if isinstance(credits.get("cast"), list) else []
     return {
         "overview": payload.get("overview") or None,
-        "year": year,
+        "year": resolved_year,
         "rating": payload.get("vote_average"),
         "rating_count": int(payload.get("vote_count") or 0),
         "genres": [item.get("name") for item in payload.get("genres", []) if isinstance(item, dict) and item.get("name")],
@@ -275,7 +412,15 @@ async def get_movie_detail_by_internal_id(
     media_type, tmdb_id, imdb_id = movie.type, movie.tmdb_id, movie.imdb_id
     # Release the synchronous SQLite connection before any upstream await.
     db.close()
-    metadata = await _get_linked_tmdb_metadata(media_type, tmdb_id, imdb_id)
+    metadata = await _get_linked_tmdb_metadata(
+        media_type,
+        tmdb_id,
+        imdb_id,
+        title=movie.title,
+        original_title=movie.original_title,
+        year=movie.year,
+        directors=_parse_json_list(movie.directors),
+    )
     return detail.model_copy(update={"tmdb_metadata": metadata})
 
 

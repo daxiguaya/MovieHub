@@ -14,6 +14,7 @@ services:
       MOVIEHUB_BACKUP_DIR: /backups
       MOVIEHUB_IMPORT_DIR: /imports
       MOVIEHUB_API_KEY: ${MOVIEHUB_API_KEY:-}
+      MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE: ${MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE:-}
       TMDB_API_READ_TOKEN: ${TMDB_API_READ_TOKEN:-}
       MOVIEHUB_CORS_ORIGINS: ${MOVIEHUB_CORS_ORIGINS:-[]}
       MOVIEHUB_LOG_LEVEL: ${MOVIEHUB_LOG_LEVEL:-INFO}
@@ -56,8 +57,6 @@ services:
     init: true
     read_only: true
     user: "10001:10001"
-    volumes:
-      - ${MOVIEHUB_FRONTEND_CONFIG_PATH:-./deploy/frontend-config.json}:/usr/share/nginx/html/config.json:ro
     expose:
       - "8080"
     tmpfs:

@@ -98,17 +98,28 @@ export const api = {
     request<DiscoverySearchResponse>("/discovery/discover?" + params.toString()),
   discoveryDetail: (mediaType: "movie" | "tv", providerId: number) =>
     request<DiscoveryDetail>("/discovery/" + mediaType + "/" + providerId),
-  externalFavorites: () => request<ExternalFavorite[]>("/discovery/favorites"),
-  externalFavoriteStatus: (mediaType: "movie" | "tv", providerId: number, imdbId?: string | null) => {
+  externalFavorites: () => request<ExternalFavorite[]>("/favorites/external"),
+  externalFavoriteStatus: (
+    mediaType: "movie" | "tv",
+    providerId: number,
+    imdbId?: string | null,
+    identity?: { title: string; original_title: string | null; year: number | null; directors: string[] }
+  ) => {
     const params = new URLSearchParams();
     if (imdbId) params.set("imdb_id", imdbId);
+    if (identity) {
+      params.set("title", identity.title);
+      if (identity.original_title) params.set("original_title", identity.original_title);
+      if (identity.year != null) params.set("year", String(identity.year));
+      identity.directors.forEach((director) => params.append("directors", director));
+    }
     const query = params.toString();
     return request<{ is_favorite: boolean }>(
-      `/discovery/favorites/status/${mediaType}/${providerId}${query ? "?" + query : ""}`
+      `/favorites/external/status/${mediaType}/${providerId}${query ? "?" + query : ""}`
     );
   },
   saveExternalFavorite: (item: DiscoveryDetail | DiscoveryItem) =>
-    request<ExternalFavorite>("/discovery/favorites/" + item.media_type + "/" + item.provider_id, {
+    request<ExternalFavorite>("/favorites/external/" + item.media_type + "/" + item.provider_id, {
       method: "PUT",
       body: JSON.stringify({
         snapshot: {
@@ -119,15 +130,29 @@ export const api = {
           rating_count: item.rating_count,
           poster_path: item.poster_path,
           backdrop_path: item.backdrop_path,
-          imdb_id: "external_ids" in item ? item.external_ids.imdb_id ?? null : null
+          imdb_id: "external_ids" in item ? item.external_ids.imdb_id ?? null : null,
+          directors: "credits" in item
+            ? item.credits.crew?.filter((person) => person.job === "Director").map((person) => person.name) ?? []
+            : []
         }
       })
     }),
-  removeExternalFavorite: (mediaType: "movie" | "tv", providerId: number, imdbId?: string | null) => {
+  removeExternalFavorite: (
+    mediaType: "movie" | "tv",
+    providerId: number,
+    imdbId?: string | null,
+    identity?: { title: string; original_title: string | null; year: number | null; directors: string[] }
+  ) => {
     const params = new URLSearchParams();
     if (imdbId) params.set("imdb_id", imdbId);
+    if (identity) {
+      params.set("title", identity.title);
+      if (identity.original_title) params.set("original_title", identity.original_title);
+      if (identity.year != null) params.set("year", String(identity.year));
+      identity.directors.forEach((director) => params.append("directors", director));
+    }
     const query = params.toString();
-    return request<void>("/discovery/favorites/" + mediaType + "/" + providerId + (query ? "?" + query : ""), { method: "DELETE" });
+    return request<void>("/favorites/external/" + mediaType + "/" + providerId + (query ? "?" + query : ""), { method: "DELETE" });
   },
   addFavorite: (movieId: number, note = "") =>
     request<Favorite>(`/favorites/${movieId}`, {

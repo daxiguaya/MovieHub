@@ -43,7 +43,7 @@ afterEach(() => {
 describe("MovieHub frontend workflows", () => {
   it("loads chart collections and navigates to a dated chart page", async () => {
     const fetchMock = installFetchMock((url) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/charts") return [chart];
       if (url.includes("/api/charts/top250/snapshots")) return [];
       if (url === "/api/charts/top250") {
@@ -72,7 +72,7 @@ describe("MovieHub frontend workflows", () => {
 
   it("searches the online catalog and uses dynamic multi-select genre and region filters", async () => {
     const fetchMock = installFetchMock((url) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/discovery/regions") {
         return { provider: "tmdb", regions: [{ code: "US", name: "美国" }] };
       }
@@ -127,8 +127,8 @@ describe("MovieHub frontend workflows", () => {
 
   it("opens Xiaoya search in a new tab with the movie title URL-encoded", async () => {
     installFetchMock((url) => {
-      if (url === "/config.json") {
-        return { xiaoyaSearchBaseUrl: "https://xiaoya.example/search" };
+      if (url === "/api/config") {
+        return { xiaoyaSearchUrlTemplate: "https://xiaoya.example/search?box={query}&type=video&url=" };
       }
       if (url === "/api/movies/id/42") {
         return {
@@ -176,7 +176,7 @@ describe("MovieHub frontend workflows", () => {
 
   it("compares historical chart snapshots and renders rank movement", async () => {
     const fetchMock = installFetchMock((url) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/charts/top250/snapshots") {
         return [
           { snapshot_date: "2026-11-23", item_count: 2 },
@@ -243,7 +243,7 @@ describe("MovieHub frontend workflows", () => {
 
   it("clears a previous chart error when navigating to another chart", async () => {
     installFetchMock((url) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/charts/broken/snapshots") return [];
       if (url === "/api/charts/broken") throw new Error("榜单读取失败");
       if (url === "/api/charts/top250/snapshots") return [];
@@ -273,7 +273,7 @@ describe("MovieHub frontend workflows", () => {
     installFetchMock((url, init) => {
       const method = init?.method ?? "GET";
       requests.push({ url, method });
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/movies/id/42") {
         return {
           id: 42,
@@ -338,8 +338,8 @@ describe("MovieHub frontend workflows", () => {
 
   it("connects the protected favorites APIs with a tab-session API key", async () => {
     const fetchMock = installFetchMock((url, init) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
-      if (url === "/api/favorites" || url === "/api/discovery/favorites") {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url === "/api/favorites" || url === "/api/favorites/external") {
         const headers = new Headers(init?.headers);
         if (headers.get("X-API-Key") !== "local-test-key") {
           throw new Error("Invalid or missing API key");
@@ -373,11 +373,11 @@ describe("MovieHub frontend workflows", () => {
 
   it("shows TMDB fallback metadata on a local Douban chart detail without mixing ratings", async () => {
     installFetchMock((url) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "http://zwnas.notedream.com:5678/search" };
+      if (url === "/api/config") return { xiaoyaSearchBaseUrl: "http://zwnas.notedream.com:5678/search" };
       if (url === "/api/movies/id/42") return {
         id: 42, douban_id: "12345", tmdb_id: "900", imdb_id: "tt1234567",
         title: "年度影片", original_title: "Annual Film", year: null,
-        rating: 8.4, rating_count: 0, type: "movie", genres: [], regions: [],
+        rating: 8.4, rating_count: null, type: "movie", genres: [], regions: [],
         updated_at: null, directors: ["豆瓣导演"], actors: [], overview: null,
         douban_url: null, posters: [],
         tmdb_metadata: {
@@ -387,7 +387,7 @@ describe("MovieHub frontend workflows", () => {
           runtime: 110, poster_path: "/annual.jpg"
         }
       };
-      if (url.startsWith("/api/discovery/favorites/status/movie/900")) return { is_favorite: false };
+      if (url.startsWith("/api/favorites/external/status/movie/900")) return { is_favorite: false };
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -399,7 +399,7 @@ describe("MovieHub frontend workflows", () => {
 
     await screen.findByRole("heading", { name: "年度影片" });
     expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
-    expect(screen.getByText("豆瓣 · 0 人评价")).toBeInTheDocument();
+    expect(screen.getByText("豆瓣 · 暂无评价人数")).toBeInTheDocument();
     expect(screen.getByText(/TMDB · ★ 7.9 · 2,500 票/)).toBeInTheDocument();
     expect(screen.getByText("来自 TMDB 的临时简介")).toBeInTheDocument();
     expect(screen.getByText("豆瓣导演")).toBeInTheDocument();
@@ -409,7 +409,7 @@ describe("MovieHub frontend workflows", () => {
   it("recognizes a chart favorite when opening the corresponding TMDB detail", async () => {
     window.localStorage.setItem("moviehubApiKey", "cross-tab-key");
     const fetchMock = installFetchMock((url, init) => {
-      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/discovery/movie/900") return {
         provider: "tmdb", media_type: "movie", provider_id: 900,
         title: "Linked Film", original_title: "Linked Film", year: 2024,
@@ -419,7 +419,7 @@ describe("MovieHub frontend workflows", () => {
         number_of_episodes: null, credits: {}, external_ids: { imdb_id: "tt1234567" },
         attribution: "TMDB"
       };
-      if (url.startsWith("/api/discovery/favorites/status/movie/900")) {
+      if (url.startsWith("/api/favorites/external/status/movie/900")) {
         const headers = new Headers(init?.headers);
         expect(headers.get("X-API-Key")).toBe("cross-tab-key");
         return { is_favorite: true };

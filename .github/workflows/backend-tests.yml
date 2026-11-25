@@ -30,6 +30,7 @@ jobs:
       - name: Validate guarded Synology rollout script
         run: |
           sh -n deploy/rollout_online_discovery.sh
+          sh -n deploy/refresh_douban_popular.sh
           sh -n deploy/tests/test_fast_forward.sh
           sh deploy/tests/test_fast_forward.sh
       - name: Compile read-only deployment preflight
@@ -42,13 +43,11 @@ jobs:
         run: docker compose config --quiet
         env:
           MOVIEHUB_API_KEY: ci-placeholder-only
-          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
       - name: Validate Compose with an explicitly configured read-only Scout source
         run: docker compose config --quiet
         env:
           MOVIEHUB_IMPORT_PATH: /tmp/scout-import
           MOVIEHUB_API_KEY: ci-placeholder-only
-          MOVIEHUB_FRONTEND_CONFIG_PATH: ./deploy/frontend-config.json
       - name: Build backend container image
         run: docker build --tag moviehub-backend:ci ./backend
 
@@ -76,6 +75,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       MOVIEHUB_DATA_DIR: /tmp/moviehub-e2e
+      MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE: "https://xiaoya.example/search?box={query}&type=video&url="
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -594,7 +594,6 @@ jobs:
           echo "MOVIEHUB_DATA_PATH=$RUNNER_TEMP/moviehub-compose-smoke/data" >> "$GITHUB_ENV"
           echo "MOVIEHUB_BACKUP_PATH=$RUNNER_TEMP/moviehub-compose-smoke/backups" >> "$GITHUB_ENV"
           echo "MOVIEHUB_IMPORT_PATH=$GITHUB_WORKSPACE/deploy/empty-imports" >> "$GITHUB_ENV"
-          echo "MOVIEHUB_FRONTEND_CONFIG_PATH=$GITHUB_WORKSPACE/deploy/frontend-config.json" >> "$GITHUB_ENV"
           echo "MOVIEHUB_API_KEY=ci-only-compose-smoke-key" >> "$GITHUB_ENV"
       - name: Prepare disposable bind mounts and external proxy network
         run: |

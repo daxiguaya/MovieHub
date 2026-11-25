@@ -168,6 +168,12 @@ app.include_router(chart_import_router, prefix="/api")
 app.include_router(import_router, prefix="/api")
 
 
+@app.get("/api/config")
+def public_config() -> dict[str, str]:
+    """Expose only non-secret browser configuration."""
+    return {"xiaoyaSearchUrlTemplate": settings.xiaoya_search_url_template}
+
+
 @app.get("/api/health")
 def health_check() -> dict[str, str]:
     """Basic application liveness check."""

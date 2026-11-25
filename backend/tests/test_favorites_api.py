@@ -160,7 +160,7 @@ def test_online_favorite_links_existing_chart_movie_by_imdb_without_creating_cat
     try:
         with TestClient(main_module.app) as client:
             response = client.put(
-                "/api/discovery/favorites/movie/900",
+                "/api/favorites/external/movie/900",
                 headers={"X-API-Key": "favorites-test-key"},
                 json={"snapshot": {
                     "title": "Online Search Title",
@@ -234,9 +234,9 @@ def test_tmdb_favorite_status_and_removal_include_linked_chart_favorites(
     headers = {"X-API-Key": "favorites-test-key"}
     try:
         with TestClient(main_module.app) as client:
-            unauthorized = client.get("/api/discovery/favorites/status/movie/42")
+            unauthorized = client.get("/api/favorites/external/status/movie/42")
             linked = client.get(
-                "/api/discovery/favorites/status/movie/42",
+                "/api/favorites/external/status/movie/42",
                 params={"imdb_id": "tt1234567"},
                 headers=headers,
             )
@@ -245,7 +245,7 @@ def test_tmdb_favorite_status_and_removal_include_linked_chart_favorites(
                 headers=headers,
             )
             removed = client.delete(
-                "/api/discovery/favorites/movie/42",
+                "/api/favorites/external/movie/42",
                 params={"imdb_id": "tt1234567"},
                 headers=headers,
             )

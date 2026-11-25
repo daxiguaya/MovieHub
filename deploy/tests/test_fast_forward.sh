@@ -18,7 +18,7 @@ BASE=$(git rev-parse HEAD)
 git branch -M main
 
 git checkout -qb remote-main
-printf 'TMDB_API_READ_TOKEN: \${TMDB_API_READ_TOKEN:-}\n' > docker-compose.yml
+printf 'TMDB_API_READ_TOKEN: ${TMDB_API_READ_TOKEN:-}\n' > docker-compose.yml
 printf 'new backend\n' > backend.txt
 git add docker-compose.yml backend.txt
 git commit -qm 'remote main update'
@@ -27,7 +27,7 @@ git update-ref refs/remotes/origin/main "$TARGET"
 
 git checkout -q main
 # Simulate the NAS's unstaged local Compose change, now identical to origin/main.
-printf 'TMDB_API_READ_TOKEN: \${TMDB_API_READ_TOKEN:-}\n' > docker-compose.yml
+printf 'TMDB_API_READ_TOKEN: ${TMDB_API_READ_TOKEN:-}\n' > docker-compose.yml
 mkdir -p backup/keep-me
 printf 'preserve\n' > backup/keep-me/manifest.txt
 

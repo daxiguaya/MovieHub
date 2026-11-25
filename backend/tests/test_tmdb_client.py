@@ -66,7 +66,7 @@ def test_cancelling_one_waiter_does_not_cancel_shared_upstream(monkeypatch):
         async def no_cache(key, allow_stale=False):
             return None
 
-        async def fake_fetch(key, endpoint, params, ttl):
+        async def fake_fetch(key, endpoint, params, ttl, include_overview=False):
             nonlocal calls
             calls += 1
             started.set()

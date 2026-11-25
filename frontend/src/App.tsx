@@ -484,6 +484,7 @@ function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: n
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
         {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
         <div className="movie-rating"><span>★</span> 豆瓣 {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
+        {movie.overview && <p className="movie-overview">{movie.overview}</p>}
       </div>
     </article>
   );

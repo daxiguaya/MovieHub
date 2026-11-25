@@ -11,7 +11,7 @@ import {
   useParams,
   useSearchParams
 } from "react-router-dom";
-import { api, setMovieHubApiKey } from "./api";
+import { api, hasMovieHubApiKey, setMovieHubApiKey } from "./api";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
 import { appPath } from "./paths";
 import type {
@@ -500,6 +500,11 @@ function ExternalMovieCard({ item, localMovie, enableFavorite = false }: { item:
 
   useEffect(() => {
     if (!enableFavorite) return;
+    if (!hasMovieHubApiKey()) {
+      setFavoriteError("请先连接 API Key");
+      setFavoriteReady(true);
+      return;
+    }
     let active = true;
     api.externalFavoriteStatus(item.media_type, item.provider_id, item.imdb_id)
       .then((result) => {
@@ -548,7 +553,7 @@ function ExternalMovieCard({ item, localMovie, enableFavorite = false }: { item:
         <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
         {enableFavorite && (
           <div className="search-favorite-action">
-            <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy || !favoriteReady}>
+            <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy || !favoriteReady || !hasMovieHubApiKey()}>
               {favoriteBusy ? "处理中…" : isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}
             </button>
             {favoriteError && <div className="inline-error">{favoriteError === "请先连接 API Key" ? <><Link to="/favorites">前往收藏页连接 API Key</Link> 后即可收藏</> : favoriteError}</div>}

@@ -280,9 +280,6 @@ def save_external_favorite(
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
     snapshot = payload.snapshot.model_dump()
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if snapshot.get("imdb_id"):
-        identity_filter = identity_filter | (Movie.imdb_id == snapshot["imdb_id"])
     linked_movie = _linked_chart_movie(
         db,
         media_type,

@@ -1101,7 +1101,15 @@ function FavoritesPage() {
   async function removeLocal(movieId: number) {
     try {
       await api.removeFavorite(movieId);
+      const removed = favorites.find((item) => item.movie.id === movieId)?.movie;
       setFavorites((current) => current.filter((item) => item.movie.id !== movieId));
+      if (removed) {
+        setExternalFavorites((current) => current.filter((item) =>
+          item.media_type !== removed.type ||
+          (removed.tmdb_id !== String(item.provider_id) &&
+            !(removed.imdb_id && removed.imdb_id === item.snapshot.imdb_id))
+        ));
+      }
     } catch (err) {
       setError((err as Error).message);
     }

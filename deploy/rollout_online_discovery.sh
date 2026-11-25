@@ -133,13 +133,20 @@ git merge --ff-only origin/main
 echo "[4/6] Building only the MovieHub backend and frontend..."
 docker compose build moviehub moviehub-web
 
-echo "[5/6] Updating only the two MovieHub containers (NPM untouched)..."
+echo "[5/6] Updating only the two MovieHub containers (NPM container stays running)..."
+reload_npm_routes() {
+  docker inspect nginx-proxy-manager >/dev/null 2>&1 || { echo "[FAIL] nginx-proxy-manager container is unavailable" >&2; return 1; }
+  docker exec nginx-proxy-manager nginx -t
+  docker exec nginx-proxy-manager nginx -s reload
+}
 ROLLBACK_NEEDED=1
 rollback() {
   echo "[ROLLBACK] Restoring the previous backend and frontend images..." >&2
   docker tag "$ROLLBACK_BACKEND" moviehub-backend:local
   docker tag "$ROLLBACK_FRONTEND" moviehub-frontend:local
   docker compose up -d --no-deps moviehub moviehub-web || true
+  # Container IPs may have changed again during rollback; refresh Nginx workers too.
+  reload_npm_routes || echo "[WARN] NPM route reload failed after rollback; inspect NPM before retrying." >&2
 }
 on_exit() {
   status=$?
@@ -166,6 +173,11 @@ wait_healthy() {
 
 wait_healthy moviehub-backend
 wait_healthy moviehub-web
+
+# NPM caches static proxy_pass hostname resolution until its workers reload.
+# This is a graceful Nginx reload, not an NPM container restart.
+echo "[INFO] Refreshing NPM upstream DNS after MovieHub container recreation..."
+reload_npm_routes
 
 echo "[6/6] Running live API, cache, favorite-auth, and frontend smoke tests..."
 docker exec moviehub-backend python - <<'PY'
@@ -214,6 +226,11 @@ PY
 
 docker exec moviehub-web wget -q -O /dev/null http://127.0.0.1:8080/
 docker exec moviehub-web wget -q -O /dev/null http://moviehub:8000/api/health
+# Verify the public path through NPM after the graceful reload; no NPM restart occurs.
+PAGE_STATUS=$(docker exec nginx-proxy-manager sh -lc 'curl -kfsS --connect-timeout 5 --resolve zwnas.notedream.com:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://zwnas.notedream.com/moviehub/')
+API_STATUS=$(docker exec nginx-proxy-manager sh -lc 'curl -kfsS --connect-timeout 5 --resolve zwnas.notedream.com:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://zwnas.notedream.com/moviehub/api/ready')
+[ "$PAGE_STATUS" = "200" ] || { echo "[FAIL] NPM MovieHub page returned HTTP $PAGE_STATUS" >&2; exit 1; }
+[ "$API_STATUS" = "200" ] || { echo "[FAIL] NPM MovieHub readiness returned HTTP $API_STATUS" >&2; exit 1; }
 HEADERS=$(docker exec moviehub-web wget -S -O /dev/null http://127.0.0.1:8080/ 2>&1 || true)
 echo "$HEADERS" | grep -F "img-src 'self' data: https://image.tmdb.org https://www.themoviedb.org" >/dev/null || { echo "[FAIL] Frontend CSP does not include TMDB image hosts" >&2; exit 1; }
 
@@ -221,5 +238,5 @@ ROLLBACK_NEEDED=0
 trap - EXIT
 echo "[SUCCESS] MovieHub online discovery is deployed and passed live smoke tests."
 echo "Rollback image tags retained: $ROLLBACK_BACKEND and $ROLLBACK_FRONTEND"
-echo "Only moviehub-backend and moviehub-web were recreated. Nginx Proxy Manager was not restarted."
+echo "Only moviehub-backend and moviehub-web were recreated. NPM received a graceful Nginx reload; its container was not restarted."
 echo "SQLite backups retained under: $BACKUP_PATH/online-discovery-rollout-$STAMP"

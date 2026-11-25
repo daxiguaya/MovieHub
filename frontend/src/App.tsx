@@ -1138,7 +1138,7 @@ function FavoritesPage() {
               <div className="section-heading"><div><div className="eyebrow">ONLINE FAVORITES</div><h2>在线收藏</h2></div></div>
               <div className="movie-grid">
                 {externalFavorites.filter((item) => !favorites.some((favorite) =>
-                  favorite.movie.type === item.media_type && favorite.movie.tmdb_id === String(item.provider_id)
+                  favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
                 )).map((favorite) => {
                   const item: DiscoveryItem = {
                     provider: "tmdb",

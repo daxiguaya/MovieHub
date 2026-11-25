@@ -13,6 +13,14 @@ import type {
 } from "./types";
 import { appPath } from "./paths";
 
+export function hasMovieHubApiKey(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.localStorage.getItem("moviehubApiKey") ||
+    window.sessionStorage.getItem("moviehubApiKey")
+  );
+}
+
 export function setMovieHubApiKey(value: string) {
   if (typeof window === "undefined") return;
   if (value.trim()) window.localStorage.setItem("moviehubApiKey", value.trim());

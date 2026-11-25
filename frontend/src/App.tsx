@@ -694,7 +694,7 @@ function SearchPage() {
       if (params.get("min_year")) localParams.set("min_year", params.get("min_year")!);
       if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
       const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
-        selectedGenreIds.length && !genreOptions.length
+        selectedGenreIds.length
           ? api.discoveryGenres(requestedType === "tv" ? "tv" : "movie").then((data) => data.genres)
           : Promise.resolve(genreOptions),
         selectedRegionCodes.length && !regionOptions.length
@@ -814,7 +814,7 @@ function SearchPage() {
     setLoading(true);
     try {
       const [genres, regions] = await Promise.all([
-        genreIds.length && !genreOptions.length
+        genreIds.length
           ? api.discoveryGenres(state.get("type") === "tv" ? "tv" : "movie").then((data) => data.genres)
           : Promise.resolve(genreOptions),
         regionCodes.length && !regionOptions.length

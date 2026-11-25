@@ -186,14 +186,18 @@ async def get_favorite_status(
     request: Request,
     media_type: Literal["movie", "tv"],
     provider_id: int,
+    imdb_id: str | None = Query(None, max_length=32),
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     """Check one TMDB identity against both online and linked chart favorites."""
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
     local_saved = db.query(Favorite).join(Movie).filter(
         Movie.type == media_type,
-        Movie.tmdb_id == str(provider_id),
+        identity_filter,
     ).first() is not None
     external_saved = await asyncio.to_thread(
         provider_response_cache.has_favorite, media_type, provider_id
@@ -287,9 +291,13 @@ async def remove_external_favorite(
     removed_external = await asyncio.to_thread(
         provider_response_cache.delete_favorite, media_type, provider_id
     )
+    imdb_id = request.query_params.get("imdb_id")
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id and len(imdb_id) <= 32:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
     linked = db.query(Favorite).join(Movie).filter(
         Movie.type == media_type,
-        Movie.tmdb_id == str(provider_id),
+        identity_filter,
     ).all()
     for favorite in linked:
         db.delete(favorite)

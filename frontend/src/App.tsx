@@ -871,7 +871,7 @@ function SearchPage() {
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
-      {onlineResults.length > 0 ? (
+      {onlineResults.length > 0 || localOnly.length > 0 ? (
         <>
           <div className="movie-grid">
             {onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}
@@ -976,7 +976,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；豆瓣与 TMDB 评分分别展示。</p>}
           <div className="detail-actions">
-            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
+            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>
@@ -1061,7 +1061,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB · {movie.rating_count.toLocaleString()} 票</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
-            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchBaseUrl, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
+            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.external_ids.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.external_ids.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
           </div>

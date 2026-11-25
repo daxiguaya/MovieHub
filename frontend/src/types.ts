@@ -20,7 +20,7 @@ export interface Movie {
   original_title: string | null;
   year: number | null;
   rating: number | null;
-  rating_count: number;
+  rating_count: number | null;
   type: "movie" | "tv";
   genres: string[];
   regions: string[];
@@ -79,7 +79,7 @@ export interface Favorite {
 }
 
 export interface PublicConfig {
-  xiaoyaSearchBaseUrl: string;
+  xiaoyaSearchUrlTemplate: string;
 }
 
 export interface ChartRankChange {

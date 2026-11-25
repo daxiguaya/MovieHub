@@ -265,14 +265,29 @@ async def save_external_favorite(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     payload: ExternalFavoritePayload,
+    db: Session = Depends(get_db),
 ) -> dict:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    snapshot = payload.snapshot.model_dump()
+    # A user-initiated online favorite links to an existing chart movie by
+    # provider identity; it never creates a new Movie/catalogue row.
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if snapshot.get("imdb_id"):
+        identity_filter = identity_filter | (Movie.imdb_id == snapshot["imdb_id"])
+    linked_movie = db.query(Movie).filter(
+        Movie.type == media_type,
+        identity_filter,
+    ).first()
+    if linked_movie is not None and db.get(Favorite, linked_movie.id) is None:
+        db.add(Favorite(movie_id=linked_movie.id, note=payload.note))
+        db.commit()
+
     saved = await asyncio.to_thread(
         provider_response_cache.save_favorite,
         media_type,
         provider_id,
-        payload.snapshot.model_dump(),
+        snapshot,
         payload.note,
     )
     await _backup_favorites_after_write()

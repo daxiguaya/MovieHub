@@ -27,6 +27,8 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q app scripts tests
         working-directory: backend
+      - name: Validate guarded Synology rollout script
+        run: sh -n deploy/rollout_online_discovery.sh
       - name: Compile read-only deployment preflight
         run: python -m py_compile deploy/preflight.py
       - name: Run tests

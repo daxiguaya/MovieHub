@@ -31,6 +31,7 @@ jobs:
         run: |
           sh -n deploy/rollout_online_discovery.sh
           sh -n deploy/refresh_douban_popular.sh
+          sh -n deploy/refresh_douban_high_rated.sh
           sh -n deploy/tests/test_fast_forward.sh
           sh deploy/tests/test_fast_forward.sh
       - name: Compile read-only deployment preflight

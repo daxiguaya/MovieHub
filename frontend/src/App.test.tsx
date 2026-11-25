@@ -105,9 +105,11 @@ describe("MovieHub frontend workflows", () => {
     await userEvent.type(screen.getByLabelText("起始年份"), "2010");
     await userEvent.type(screen.getByLabelText("结束年份"), "2020");
     await screen.findByRole("option", { name: "科幻" });
-    await userEvent.selectOptions(screen.getByLabelText("类型（可多选）"), "878");
+    await userEvent.click(screen.getByText("类型（可多选）"));
+    await userEvent.click(screen.getByRole("checkbox", { name: "科幻" }));
     await screen.findByRole("option", { name: "美国" });
-    await userEvent.selectOptions(screen.getByLabelText("制作地区（可多选）"), "US");
+    await userEvent.click(screen.getByText("制作地区（可多选）"));
+    await userEvent.click(screen.getByRole("checkbox", { name: "美国" }));
     await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
 
     await waitFor(() => {

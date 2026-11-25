@@ -1032,7 +1032,7 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
+      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
       <div className="result-caption"><span>在线搜索结果 · {onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span><label className="result-sort">排序方式<select aria-label="排序方式" value={sortBy} onChange={(e) => changeSort(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}

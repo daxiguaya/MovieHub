@@ -169,8 +169,15 @@ describe("MovieHub frontend workflows", () => {
         <App />
       </MemoryRouter>
     );
-    const cards = await screen.findAllByRole("link", { name: /高分|低分|无评分/ });
-    expect(cards.map((node) => node.textContent)).toEqual(["高分", "低分", "无评分"]);
+    const { container } = render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试&sort=rating_desc"]}>
+        <App />
+      </MemoryRouter>
+    );
+    await screen.findByRole("link", { name: "高分" });
+    const cards = Array.from(container.querySelectorAll(".movie-grid .movie-card"));
+    expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
+      .toEqual(["高分", "低分", "无评分"]);
   });
 
   it("restores URL-selected genre, region, type and year filters before async options load", async () => {

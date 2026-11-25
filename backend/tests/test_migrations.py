@@ -322,7 +322,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     finally:
         conn.close()
 
-    assert execute_migration(db_path, MIGRATION) == 3
+    assert execute_migration(db_path, MIGRATION) == 4
 
     backup_path = next(tmp_path.glob("populated-v1.db.pre-migration-*.bak"))
     for candidate in (db_path, backup_path):
@@ -371,7 +371,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     try:
         assert migrated.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 3
+        ).fetchone()[0] == 4
         assert migrated.execute(
             "SELECT COUNT(*) FROM import_batch_receipts"
         ).fetchone()[0] == 0

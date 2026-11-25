@@ -55,3 +55,33 @@ class DirectoryPermissionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RolloutMigrationSafetyTests(unittest.TestCase):
+    def test_schema_migration_runs_after_backup_and_before_backend_restart(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        backup = script.index("source.backup(target)")
+        stop_backend = script.index("docker compose stop moviehub")
+        migrate = script.index("docker compose run --rm --no-deps moviehub python -m scripts.migrate")
+        start_backend = script.index("docker compose up -d --no-deps moviehub moviehub-web")
+        self.assertLess(backup, stop_backend)
+        self.assertLess(stop_backend, migrate)
+        self.assertLess(migrate, start_backend)
+
+    def test_rollback_restores_database_before_restarting_previous_images(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        rollback_start = script.index("rollback() {")
+        rollback_end = script.index("\non_exit() {", rollback_start)
+        rollback = script[rollback_start:rollback_end]
+        self.assertIn("source.backup(target)", rollback)
+        self.assertLess(rollback.index("source.backup(target)"), rollback.index('docker tag "$ROLLBACK_BACKEND"'))
+        self.assertIn('docker compose up -d --no-deps moviehub moviehub-web', rollback)
+
+    def test_npm_uses_graceful_reload_not_container_restart(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("nginx -s reload", script)
+        self.assertNotIn("docker restart nginx-proxy-manager", script)
+        self.assertNotIn("docker compose restart nginx-proxy-manager", script)

@@ -1033,7 +1033,7 @@ function SearchPage() {
             {[...onlineResults].sort((left, right) => {
               const compare = (x: number | null, y: number | null, direction: 1 | -1) => x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
               const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
-              return result || left.title.localeCompare(right.title, "zh-CN");
+              return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
             }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
             {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
           </div>

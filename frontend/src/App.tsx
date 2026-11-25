@@ -490,9 +490,47 @@ function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: n
 }
 
 
-function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMovie?: Movie }) {
+function ExternalMovieCard({ item, localMovie, enableFavorite = false }: { item: DiscoveryItem; localMovie?: Movie; enableFavorite?: boolean }) {
   const [failed, setFailed] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteReady, setFavoriteReady] = useState(false);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const poster = item.poster_path ? "https://image.tmdb.org/t/p/w342" + item.poster_path : "";
+
+  useEffect(() => {
+    if (!enableFavorite) return;
+    let active = true;
+    api.externalFavoriteStatus(item.media_type, item.provider_id, item.imdb_id)
+      .then((result) => {
+        if (active) {
+          setIsFavorite(result.is_favorite);
+          setFavoriteReady(true);
+        }
+      })
+      .catch((err: Error) => {
+        if (!active) return;
+        setFavoriteError(err.message.toLowerCase().includes("api key") ? "请先连接 API Key" : err.message);
+        setFavoriteReady(true);
+      });
+    return () => { active = false; };
+  }, [enableFavorite, item.media_type, item.provider_id, item.imdb_id]);
+
+  async function toggleFavorite() {
+    setFavoriteBusy(true);
+    setFavoriteError("");
+    try {
+      if (isFavorite) await api.removeExternalFavorite(item.media_type, item.provider_id, item.imdb_id);
+      else await api.saveExternalFavorite(item);
+      setIsFavorite(!isFavorite);
+    } catch (err) {
+      const message = (err as Error).message;
+      setFavoriteError(message.toLowerCase().includes("api key") ? "请先连接 API Key" : message);
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }
+
   return (
     <article className="movie-card">
       <Link className="movie-poster" to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
@@ -508,6 +546,14 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
         {localMovie && <div className="movie-subtitle">本地榜单收录 · 豆瓣 {localMovie.rating?.toFixed(1) ?? "暂无评分"}</div>}
         <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
+        {enableFavorite && (
+          <div className="search-favorite-action">
+            <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy || !favoriteReady}>
+              {favoriteBusy ? "处理中…" : isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}
+            </button>
+            {favoriteError && <div className="inline-error">{favoriteError === "请先连接 API Key" ? <><Link to="/favorites">前往收藏页连接 API Key</Link> 后即可收藏</> : favoriteError}</div>}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -1034,7 +1080,7 @@ function SearchPage() {
               const compare = (x: number | null, y: number | null, direction: 1 | -1) => x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
               const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
               return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
-            }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
+            }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} enableFavorite />)}
             {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
           </div>
           {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}

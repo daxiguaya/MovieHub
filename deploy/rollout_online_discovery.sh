@@ -225,6 +225,10 @@ for path in ("/api/health", "/api/ready"):
     assert status == 200, (path, status)
     print(path, "HTTP", status)
 
+status, config = get("/api/config")
+assert status == 200 and set(config) == {"xiaoyaSearchUrlTemplate"}, "Public runtime config API failed"
+print("/api/config HTTP 200; Xiaoya template configured:", bool(config["xiaoyaSearchUrlTemplate"]))
+
 status, regions = get("/api/discovery/regions")
 assert status == 200 and isinstance(regions.get("regions"), list), "TMDB regions API failed"
 print("/api/discovery/regions HTTP 200; regions:", len(regions["regions"]))
@@ -238,9 +242,9 @@ assert status == 200 and stats["entries"] <= 1500 and stats["bytes"] <= 32 * 102
 print("/api/discovery/cache-stats HTTP 200; entries:", stats["entries"], "bytes:", stats["bytes"])
 
 api_key = os.environ.get("MOVIEHUB_API_KEY", "")
-status, favorites = get("/api/discovery/favorites", {"X-API-Key": api_key})
-assert status == 200 and isinstance(favorites, list), "Authenticated external favorites API failed"
-print("/api/discovery/favorites HTTP 200; favorites:", len(favorites))
+status, favorites = get("/api/favorites/external", {"X-API-Key": api_key})
+assert status == 200 and isinstance(favorites, list), "Unified authenticated external favorites API failed"
+print("/api/favorites/external HTTP 200; favorites:", len(favorites))
 
 db_path = os.path.join(os.environ.get("MOVIEHUB_DATA_DIR", "/data"), "cache", "discovery.sqlite3")
 connection = sqlite3.connect(db_path)

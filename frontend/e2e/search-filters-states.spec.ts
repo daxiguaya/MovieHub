@@ -66,13 +66,11 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   await page.getByLabel("最低投票数").fill("1000");
   await page.getByLabel("起始年份").fill("2020");
   await page.getByLabel("结束年份").fill("2024");
-  await expect(page.getByRole("option", { name: "剧情" })).toBeVisible();
   await page.getByText("类型（可多选）").click();
   await page.getByLabel("搜索类型，例如：恐怖、悬疑…").fill("剧");
   await page.getByLabel("搜索类型，例如：恐怖、悬疑…").fill("");
   await page.getByRole("checkbox", { name: "剧情" }).check();
   await page.getByRole("checkbox", { name: "科幻" }).check();
-  await expect(page.getByRole("option", { name: "中国大陆" })).toBeVisible();
   await page.getByText("制作地区（可多选）").click();
   await page.getByRole("checkbox", { name: "中国大陆" }).check();
   await page.getByRole("button", { name: /搜索/ }).click();

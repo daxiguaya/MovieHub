@@ -247,6 +247,32 @@ class ProviderResponseCache:
                  "snapshot": json.loads(row[2]), "note": row[3], "created_at": row[4], "updated_at": row[5]}
                 for row in rows]
 
+    def delete_favorite_by_imdb(self, media_type: str, imdb_id: str) -> bool:
+        if not imdb_id or len(imdb_id) > 32:
+            return False
+        self._init()
+        with self._lock, self._connection() as connection:
+            rows = connection.execute(
+                """SELECT provider_id, snapshot_json FROM external_favorites
+                   WHERE provider=? AND media_type=?""",
+                ("tmdb", media_type),
+            ).fetchall()
+            matching_ids = []
+            for provider_id, snapshot_json in rows:
+                try:
+                    snapshot = json.loads(snapshot_json)
+                except (TypeError, json.JSONDecodeError):
+                    continue
+                if isinstance(snapshot, dict) and snapshot.get("imdb_id") == imdb_id:
+                    matching_ids.append(int(provider_id))
+            for provider_id in matching_ids:
+                connection.execute(
+                    """DELETE FROM external_favorites
+                       WHERE provider=? AND media_type=? AND provider_id=?""",
+                    ("tmdb", media_type, provider_id),
+                )
+        return bool(matching_ids)
+
     def delete_favorite(self, media_type: str, provider_id: int) -> bool:
         self._init()
         with self._lock, self._connection() as connection:

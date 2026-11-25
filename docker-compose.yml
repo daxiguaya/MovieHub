@@ -58,7 +58,6 @@ services:
     read_only: true
     user: "10001:10001"
     volumes:
-      - ${MOVIEHUB_FRONTEND_CONFIG_PATH:-./deploy/frontend-config.json}:/usr/share/nginx/html/config.json:ro
     expose:
       - "8080"
     tmpfs:

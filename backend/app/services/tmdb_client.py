@@ -29,7 +29,7 @@ _inflight: dict[str, asyncio.Task[dict[str, Any]]] = {}
 
 
 def _strip_unapproved_synopsis(value: Any) -> Any:
-    """Do not persist TMDB overview text until synopsis compliance is cleared."""
+    """Keep synopsis text out of the persistent response cache."""
     if isinstance(value, dict):
         return {
             key: _strip_unapproved_synopsis(item)
@@ -91,6 +91,28 @@ class TMDBClient:
         self._rate_limited = 0
         self._total_latency_ms = 0.0
         self._max_latency_ms = 0.0
+        # Synopsis is served from bounded process memory only, never persisted.
+        self._transient_overviews: dict[str, tuple[float, str]] = {}
+
+    def _remember_transient_overview(self, key: str, overview: str) -> None:
+        now = time.monotonic()
+        self._transient_overviews = {
+            cache_key: value for cache_key, value in self._transient_overviews.items()
+            if value[0] > now
+        }
+        if len(self._transient_overviews) >= 100:
+            oldest = min(self._transient_overviews, key=lambda item: self._transient_overviews[item][0])
+            self._transient_overviews.pop(oldest, None)
+        self._transient_overviews[key] = (now + 6 * 60 * 60, overview[:12000])
+
+    def _get_transient_overview(self, key: str) -> str | None:
+        value = self._transient_overviews.get(key)
+        if value is None:
+            return None
+        if value[0] <= time.monotonic():
+            self._transient_overviews.pop(key, None)
+            return None
+        return value[1]
 
     def _record_latency(self, started: float) -> None:
         elapsed = (time.perf_counter() - started) * 1000
@@ -121,21 +143,24 @@ class TMDBClient:
         endpoint: str,
         params: dict[str, Any] | None = None,
         ttl: int = SEARCH_TTL,
-        cache_overview: bool = False,
+        include_overview: bool = False,
     ) -> dict[str, Any]:
         clean_params = {k: v for k, v in (params or {}).items() if v is not None}
         key = provider_response_cache.make_key("tmdb", endpoint, clean_params)
         cached = await self._cache_get(key)
         if cached:
             payload, _ = cached
-            if not cache_overview or "overview" in payload:
+            if not include_overview:
                 return payload
+            transient_overview = self._get_transient_overview(key)
+            if transient_overview is not None:
+                return {**payload, "overview": transient_overview}
 
         async with _inflight_lock:
             task = _inflight.get(key)
             if task is None:
                 task = asyncio.create_task(
-                    self._fetch_and_cache(key, endpoint, clean_params, ttl, cache_overview)
+                    self._fetch_and_cache(key, endpoint, clean_params, ttl, include_overview)
                 )
                 _inflight[key] = task
                 task.add_done_callback(
@@ -161,7 +186,7 @@ class TMDBClient:
         endpoint: str,
         params: dict[str, Any],
         ttl: int,
-        cache_overview: bool = False,
+        include_overview: bool = False,
     ) -> dict[str, Any]:
         started = time.perf_counter()
         self._requests += 1
@@ -218,7 +243,9 @@ class TMDBClient:
             raise HTTPException(status_code=502, detail="TMDB returned an invalid response")
         if isinstance(payload.get("results"), list) and not payload["results"]:
             ttl = NEGATIVE_TTL
-        cache_payload = payload if cache_overview else _strip_unapproved_synopsis(payload)
+        if include_overview and isinstance(payload.get("overview"), str) and payload["overview"].strip():
+            self._remember_transient_overview(key, payload["overview"])
+        cache_payload = _strip_unapproved_synopsis(payload)
         await self._cache_set(key, endpoint, cache_payload, ttl)
         self._successes += 1
         self._record_latency(started)

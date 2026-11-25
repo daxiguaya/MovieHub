@@ -79,7 +79,7 @@ def main() -> int:
         "--max-items",
         type=int,
         default=MAX_ITEMS,
-        help=f"Maximum movies per chart (1-{MAX_ITEMS if MAX_ITEMS <= 500 else 500}; default {MAX_ITEMS})",
+        help=f"Maximum movies per chart (1-500; default {MAX_ITEMS})",
     )
     args = parser.parse_args()
 

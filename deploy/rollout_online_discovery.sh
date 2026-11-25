@@ -182,7 +182,7 @@ trap on_exit EXIT
 ROLLBACK_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/movies.sqlite3"
 ROLLBACK_NEEDED=1
 docker compose stop moviehub
-docker compose run --rm --no-deps moviehub python -m scripts.migrate
+docker compose run --rm --no-deps -T --name "moviehub-schema-migrate-$STAMP" moviehub python -m scripts.migrate
 docker compose up -d --no-deps moviehub moviehub-web
 
 wait_healthy() {

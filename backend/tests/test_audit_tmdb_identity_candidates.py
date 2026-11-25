@@ -14,7 +14,7 @@ def make_db(path):
             type TEXT NOT NULL, directors TEXT NOT NULL DEFAULT '[]'
         );
         INSERT INTO movies VALUES
-            (1, 'db1', NULL, NULL, '肖申克的救赎', 'The Shawshank Redemption', 1994, 'movie', '["弗兰克·德拉邦特"]'),
+            (1, 'db1', NULL, NULL, '肖申克的救赎', 'The Shawshank Redemption', 1994, 'movie', '["弗兰克·德拉邦特 Frank Darabont"]'),
             (2, 'db2', NULL, NULL, '未知电影', NULL, 2020, 'movie', '[]'),
             (3, 'db3', NULL, NULL, '没有结果', NULL, 2021, 'movie', '[]');
         """
@@ -46,7 +46,7 @@ class FakeLookup:
             return {"results": []}
         if endpoint == "/movie/278":
             return {"credits": {"crew": [
-                {"job": "Director", "name": "弗兰克·德拉邦特"}
+                {"job": "Director", "name": "弗兰克德拉邦特", "original_name": "Frank Darabont"}
             ]}}
         if endpoint == "/movie/999":
             return {"credits": {"crew": []}}

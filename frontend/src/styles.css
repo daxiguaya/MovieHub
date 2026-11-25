@@ -110,7 +110,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 select, input { color: #e8eee8; background: #202729; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; outline: none; }
 select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .select-wrap select { min-width: 170px; }
-.result-caption { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin: 24px 0 15px; }
+.result-caption { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 16px; color: var(--muted); font-size: 11px; margin: 24px 0 15px; }
 .result-caption span:first-child { color: #e1e8e1; font-weight: 700; }
 .result-sort { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); white-space: nowrap; }
 .result-sort select { min-width: 168px; height: 36px; padding: 0 9px; }

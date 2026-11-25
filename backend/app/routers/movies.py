@@ -151,13 +151,19 @@ async def _get_linked_tmdb_metadata(
         except Exception as exc:
             logger.info("TMDB identity lookup unavailable: %s", type(exc).__name__)
             return None
+    resolved_payload: dict | None = None
     if not resolved_id:
         source_titles = {
             _normalize_identity_title(value)
             for value in (title, original_title)
             if _normalize_identity_title(value)
         }
-        if not source_titles or year is None:
+        source_directors = {
+            _normalize_identity_title(value)
+            for value in (directors or [])
+            if _normalize_identity_title(value)
+        }
+        if not source_titles or (year is None and not source_directors):
             return None
         release_year_key = "primary_release_year" if media_type == "movie" else "first_air_date_year"
         candidates_by_id: dict[int, dict] = {}
@@ -169,7 +175,7 @@ async def _get_linked_tmdb_metadata(
                     f"/search/{media_type}",
                     {
                         "query": query,
-                        release_year_key: year,
+                        **({release_year_key: year} if year is not None else {}),
                         "language": "zh-CN",
                         "include_adult": "false",
                         "page": 1,
@@ -192,22 +198,67 @@ async def _get_linked_tmdb_metadata(
                     for key in (("title", "original_title") if media_type == "movie" else ("name", "original_name"))
                     if _normalize_identity_title(candidate.get(key))
                 }
-                if candidate_year == year and source_titles.intersection(candidate_titles):
+                if (year is None or candidate_year == year) and source_titles.intersection(candidate_titles):
                     candidates_by_id[candidate["id"]] = candidate
-        if len(candidates_by_id) != 1:
+        if not candidates_by_id or len(candidates_by_id) > 12:
             return None
-        resolved_id = str(next(iter(candidates_by_id)))
 
-    try:
-        payload = await tmdb_client.get_json(
-            f"/{media_type}/{int(resolved_id)}",
-            {"language": "zh-CN", "append_to_response": "credits,external_ids"},
-            DETAIL_TTL,
-            include_overview=True,
-        )
-    except Exception as exc:
-        logger.info("TMDB detail enrichment unavailable: %s", type(exc).__name__)
-        return None
+        verified_candidates: list[tuple[int, dict]] = []
+        for candidate_id in candidates_by_id:
+            try:
+                candidate_detail = await tmdb_client.get_json(
+                    f"/{media_type}/{candidate_id}",
+                    {"language": "zh-CN", "append_to_response": "credits,external_ids"},
+                    DETAIL_TTL,
+                    include_overview=True,
+                )
+            except Exception as exc:
+                logger.info("TMDB candidate verification unavailable: %s", type(exc).__name__)
+                return None
+            if not isinstance(candidate_detail, dict) or candidate_detail.get("id") != candidate_id:
+                continue
+            candidate_date = candidate_detail.get("release_date") or candidate_detail.get("first_air_date") or ""
+            candidate_detail_year = int(candidate_date[:4]) if isinstance(candidate_date, str) and candidate_date[:4].isdigit() else None
+            detail_titles = {
+                _normalize_identity_title(candidate_detail.get(key))
+                for key in (("title", "original_title") if media_type == "movie" else ("name", "original_name"))
+                if _normalize_identity_title(candidate_detail.get(key))
+            }
+            if not source_titles.intersection(detail_titles):
+                continue
+            if year is not None and candidate_detail_year != year:
+                continue
+            detail_credits = candidate_detail.get("credits") if isinstance(candidate_detail.get("credits"), dict) else {}
+            detail_crew = detail_credits.get("crew") if isinstance(detail_credits.get("crew"), list) else []
+            detail_directors = {
+                _normalize_identity_title(person.get("name"))
+                for person in detail_crew
+                if isinstance(person, dict)
+                and (
+                    person.get("job") == "Director"
+                    or (media_type == "tv" and person.get("department") == "Directing")
+                )
+                and _normalize_identity_title(person.get("name"))
+            }
+            if source_directors and not source_directors.intersection(detail_directors):
+                continue
+            verified_candidates.append((candidate_id, candidate_detail))
+        if len(verified_candidates) != 1:
+            return None
+        resolved_id, resolved_payload = str(verified_candidates[0][0]), verified_candidates[0][1]
+
+    payload = resolved_payload
+    if payload is None:
+        try:
+            payload = await tmdb_client.get_json(
+                f"/{media_type}/{int(resolved_id)}",
+                {"language": "zh-CN", "append_to_response": "credits,external_ids"},
+                DETAIL_TTL,
+                include_overview=True,
+            )
+        except Exception as exc:
+            logger.info("TMDB detail enrichment unavailable: %s", type(exc).__name__)
+            return None
 
     if not isinstance(payload, dict) or payload.get("id") != int(resolved_id):
         return None

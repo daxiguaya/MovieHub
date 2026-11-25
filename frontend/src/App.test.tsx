@@ -36,7 +36,7 @@ function installFetchMock(handler: (url: string, init?: RequestInit) => unknown)
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  window.sessionStorage.removeItem("moviehubApiKey");
+  window.localStorage.removeItem("moviehubApiKey");
 });
 
 describe("MovieHub frontend workflows", () => {
@@ -362,7 +362,7 @@ describe("MovieHub frontend workflows", () => {
     await userEvent.click(screen.getByRole("button", { name: "连接收藏" }));
 
     expect(await screen.findByText("收藏夹还是空的")).toBeInTheDocument();
-    expect(window.sessionStorage.getItem("moviehubApiKey")).toBe("local-test-key");
+    expect(window.localStorage.getItem("moviehubApiKey")).toBe("local-test-key");
     expect(fetchMock.mock.calls.some(([, init]) =>
       new Headers(init?.headers).get("X-API-Key") === "local-test-key"
     )).toBe(true);

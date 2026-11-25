@@ -21,7 +21,7 @@ CREATE TABLE movies (
     original_title VARCHAR(256),
     year INTEGER,
     rating FLOAT,
-    rating_count INTEGER NOT NULL DEFAULT 0,
+    rating_count INTEGER DEFAULT NULL,
     type VARCHAR(16) NOT NULL DEFAULT 'movie',
     directors TEXT NOT NULL DEFAULT '[]',
     actors TEXT NOT NULL DEFAULT '[]',
@@ -29,7 +29,7 @@ CREATE TABLE movies (
     douban_url VARCHAR(512),
     updated_at INTEGER,
     CONSTRAINT ck_movies_rating CHECK (rating IS NULL OR (rating >= 0 AND rating <= 10)),
-    CONSTRAINT ck_movies_rating_count CHECK (rating_count >= 0),
+    CONSTRAINT ck_movies_rating_count CHECK (rating_count IS NULL OR rating_count >= 0),
     CONSTRAINT ck_movies_type CHECK (type IN ('movie', 'tv'))
 );
 

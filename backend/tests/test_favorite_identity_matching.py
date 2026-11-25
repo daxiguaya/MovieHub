@@ -35,12 +35,12 @@ def test_online_favorite_uses_exact_title_year_and_director_to_link_chart_movie(
     monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
     monkeypatch.setattr(main_module.provider_response_cache, "backup_daily", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        favorites_provider_cache := __import__("app.routers.favorites", fromlist=["provider_response_cache"]).provider_response_cache,
+        favorites_router.provider_response_cache,
         "delete_favorite",
         lambda media_type, provider_id: False,
     )
     monkeypatch.setattr(
-        favorites_provider_cache,
+        favorites_router.provider_response_cache,
         "save_favorite",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("linked chart movies must not create duplicate external favorites")),
     )

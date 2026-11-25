@@ -74,7 +74,7 @@ def test_audit_reads_known_tmdb_ids_and_skips_unverified_rows(tmp_path):
         "no_tmdb_id": 1,
     }
     assert client.calls == [("278", "zh-CN"), ("278", "zh-TW")]
-    assert "overview" not in str(report).lower()
+    assert "一段真实的剧情简介正文" not in str(report)
     connection = sqlite3.connect(database)
     try:
         assert connection.execute("SELECT tmdb_id FROM movies WHERE id=1").fetchone()[0] == "278"

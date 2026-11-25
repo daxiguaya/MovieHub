@@ -10,6 +10,7 @@
 
 - PR [#21](https://github.com/daxiguaya/MovieHub/pull/21) 已合并到 `main`（合并提交 `63db97ad9d939ce74a3af4805c9d573f83338bfb`）。
 - PR [#20](https://github.com/daxiguaya/MovieHub/pull/20) 也已合并：MovieHub 容器更新后执行 NPM 配置校验并平滑 reload，以刷新上游 DNS；不会重启 NPM 容器。
+- 随后补强了生产 rollout：备份 SQLite 后先停止 MovieHub 后端，在新镜像的一次性容器中执行 schema v4 迁移，再启动 MovieHub 前后端；若迁移/启动失败，回滚数据库和旧镜像。NPM 仍只做平滑 reload，不重启容器。
 - 本轮 CI 已通过 Backend、Frontend/type-check、Compose smoke 和浏览器端到端测试。
 - 代码新增 schema v4：豆瓣评价人数允许为 `NULL`，迁移会将旧数据中作为缺失占位的 0 转为 NULL；新增在线收藏与榜单影片的严格身份关联；Top 250/年度详情按需通过 TMDB 严格匹配补充临时简介；小雅地址改由 `.env` 提供；搜索筛选状态修复；新增豆瓣实时热门手动刷新脚本。
 - **以上代码已合并，但尚未部署到 NAS。** NAS 数据库迁移、后端/前端镜像更新和生产验收仍是独立步骤；不得在 schema v4 迁移前直接替换生产后端。

@@ -302,3 +302,7 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .multi-filter-clear { margin-top: 8px; padding: 5px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; }
 .genre-match-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
 .genre-match-control select { min-width: 0; flex: 1; }
+
+.search-panel .multi-filter-option { display: flex; flex-direction: row; align-items: center; gap: 7px; }
+.search-panel .multi-filter-option input { width: 14px; height: 14px; min-width: 14px; flex: 0 0 14px; }
+.search-panel .genre-match-control { display: flex; flex-direction: row; align-items: center; }

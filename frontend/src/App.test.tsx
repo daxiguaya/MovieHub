@@ -173,6 +173,54 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
+  it("deduplicates search results only by stable IDs, not title and year", async () => {
+    installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/search?")) {
+        return {
+          provider: "tmdb", query: "同名电影", page: 1, total_pages: 1,
+          total_results: 1,
+          items: [{
+            provider: "tmdb", provider_id: 900, media_type: "movie",
+            title: "同名电影", original_title: "Same Title", year: 2020,
+            rating: 7.5, rating_count: 1200, poster_path: null,
+            backdrop_path: null, genre_ids: [], imdb_id: null
+          }],
+          attribution: "TMDB"
+        };
+      }
+      if (url.startsWith("/api/movies?")) {
+        return {
+          total: 2, next_cursor: null,
+          items: [
+            {
+              id: 1, douban_id: "10001", tmdb_id: "900", imdb_id: null,
+              title: "同名电影", original_title: "Same Title", year: 2020,
+              rating: 8.1, rating_count: 300, type: "movie", genres: [], regions: [], updated_at: null
+            },
+            {
+              id: 2, douban_id: "10002", tmdb_id: "901", imdb_id: null,
+              title: "同名电影", original_title: "Same Title", year: 2020,
+              rating: 7.9, rating_count: 200, type: "movie", genres: [], regions: [], updated_at: null
+            }
+          ]
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=同名电影"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("同名电影")).toHaveLength(2);
+      expect(screen.getAllByText("本地榜单收录")).toHaveLength(2);
+    });
+  });
+
   it("opens Xiaoya search in a new tab with the movie title URL-encoded", async () => {
     installFetchMock((url) => {
       if (url === "/api/config") {
@@ -421,7 +469,7 @@ describe("MovieHub frontend workflows", () => {
 
   it("shows TMDB fallback metadata on a local Douban chart detail without mixing ratings", async () => {
     installFetchMock((url) => {
-      if (url === "/api/config") return { xiaoyaSearchBaseUrl: "http://zwnas.notedream.com:5678/search" };
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "http://zwnas.notedream.com:5678/search?box={query}&type=video&url=" };
       if (url === "/api/movies/id/42") return {
         id: 42, douban_id: "12345", tmdb_id: "900", imdb_id: "tt1234567",
         title: "年度影片", original_title: "Annual Film", year: null,

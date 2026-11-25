@@ -982,6 +982,15 @@ function SearchPage() {
       resolvedLocalTmdbIds[movie.id] === String(item.provider_id)
     )
   ));
+  const sortedLocalOnly = [...localOnly].sort((left, right) => {
+    const compare = (x: number | null, y: number | null, direction: 1 | -1) =>
+      x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
+    const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1)
+      : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1)
+      : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1)
+      : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
+    return result || left.title.localeCompare(right.title, "zh-CN");
+  });
 
   return (
     <>
@@ -1014,7 +1023,7 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。</p>
+      <p className="search-hint">类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
@@ -1026,7 +1035,7 @@ function SearchPage() {
               const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
               return result || left.title.localeCompare(right.title, "zh-CN");
             }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
-            {localOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
+            {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
           </div>
           {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}
           {onlinePage < onlinePages && <button className="secondary-button load-more" onClick={loadMoreOnline} disabled={loading}>{loading ? "正在加载…" : "加载更多在线结果"}</button>}

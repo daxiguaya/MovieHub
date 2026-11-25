@@ -636,7 +636,6 @@ function SearchPage() {
   const [regionOptions, setRegionOptions] = useState<{ code: string; name: string }[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(searchParams.get("genre_ids")?.split(/[|,]/) ?? []);
   const [selectedRegions, setSelectedRegions] = useState<string[]>(searchParams.get("region_codes")?.split("|") ?? []);
-  const [genreMatch, setGenreMatch] = useState<"any" | "all">(searchParams.get("genre_match") === "all" ? "all" : "any");
   const [results, setResults] = useState<Movie[]>([]);
   const [onlineResults, setOnlineResults] = useState<DiscoveryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -666,6 +665,8 @@ function SearchPage() {
   async function runSearch(params: URLSearchParams, appendLocal = false, appendOnline = false) {
     const q = (params.get("search") ?? "").trim();
     const requestedPage = appendOnline ? onlinePage + 1 : 1;
+    // TMDB genre filters use comma for AND; normalize legacy pipe-separated URLs.
+    const genreIds = (params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean).join(",");
     const hasFilters = Boolean(
       params.get("genre_ids") || params.get("region_codes") || params.get("min_year") ||
       params.get("max_year") || params.get("min_rating") || params.get("min_rating_count")
@@ -702,7 +703,7 @@ function SearchPage() {
           min_votes: params.get("min_rating_count") || "100",
           sort_by: minRating ? "vote_average.desc" : "popularity.desc"
         });
-        if (selectedGenres.length) discoverParams.set("with_genres", selectedGenres.join(genreMatch === "all" ? "," : "|"));
+        if (genreIds) discoverParams.set("with_genres", genreIds);
         if (selectedRegions.length) discoverParams.set("region", selectedRegions.join("|"));
         if (minRating) discoverParams.set("min_rating", minRating);
         if (minYear) discoverParams.set("min_year", minYear);
@@ -764,9 +765,8 @@ function SearchPage() {
     if (minRatingCount) params.set("min_rating_count", minRatingCount);
     if (minYear) params.set("min_year", minYear);
     if (maxYear) params.set("max_year", maxYear);
-    if (selectedGenres.length) params.set("genre_ids", selectedGenres.join(genreMatch === "all" ? "," : "|"));
+    if (selectedGenres.length) params.set("genre_ids", selectedGenres.join(","));
     if (selectedRegions.length) params.set("region_codes", selectedRegions.join("|"));
-    if (selectedGenres.length && genreMatch === "all") params.set("genre_match", "all");
     setSearchParams(params);
     void runSearch(params);
   }
@@ -803,7 +803,7 @@ function SearchPage() {
           page: String(nextPage),
           min_votes: searchParams.get("min_rating_count") || "100",
           sort_by: minRating ? "vote_average.desc" : "popularity.desc",
-          ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")! } : {}),
+          ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")!.split(/[|,]/).filter(Boolean).join(",") } : {}),
           ...(searchParams.get("region_codes") ? { region: searchParams.get("region_codes")! } : {}),
           ...(searchParams.get("min_rating") ? { min_rating: searchParams.get("min_rating")! } : {}),
           ...(searchParams.get("min_year") ? { min_year: searchParams.get("min_year")! } : {}),
@@ -840,18 +840,10 @@ function SearchPage() {
             onChange={setSelectedGenres}
             searchPlaceholder="搜索类型，例如：恐怖、悬疑…"
           />
-          {selectedGenres.length > 1 && (
-            <label className="genre-match-control">类型匹配
-              <select value={genreMatch} onChange={(event) => setGenreMatch(event.target.value as "any" | "all")}>
-                <option value="any">任一类型（OR）</option>
-                <option value="all">同时包含全部类型（AND）</option>
-              </select>
-            </label>
-          )}
         </div>
         <div className="search-filter">
           <MultiSelectFilter
-            label="制作地区（可多选）"
+            label="制作国家/地区（可多选）"
             options={regionOptions.map((region) => ({ value: region.code, label: region.name }))}
             value={selectedRegions}
             onChange={setSelectedRegions}
@@ -860,7 +852,7 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">类型和地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型默认匹配任意一个；也可切换为同时包含全部类型。关键词搜索按片名匹配，组合筛选请清空关键词后使用。</p>
+      <p className="search-hint">类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。</p>
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}

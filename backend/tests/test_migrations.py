@@ -276,6 +276,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
             )
             """
         )
+        conn.execute("INSERT INTO movies (id, douban_id, title, rating_count) VALUES (42, 'zero-votes', '年度榜缺失人数', 0)")
         conn.execute("INSERT INTO genres(id, name) VALUES (7, '剧情')")
         conn.execute("INSERT INTO regions(id, name) VALUES (8, '美国')")
         conn.execute(
@@ -375,5 +376,8 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
         assert migrated.execute(
             "SELECT COUNT(*) FROM import_batch_receipts"
         ).fetchone()[0] == 0
+        assert migrated.execute(
+            "SELECT rating_count FROM movies WHERE id=42"
+        ).fetchone()[0] is None
     finally:
         migrated.close()

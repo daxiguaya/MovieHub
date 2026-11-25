@@ -883,7 +883,15 @@ function SearchPage() {
     return () => { active = false; };
   }, [results, onlineResults]);
 
-  function changeSort(nextSort: string) {\n    setSortBy(nextSort);\n    const params = new URLSearchParams(searchParams);\n    if (nextSort === "relevance") params.delete("sort");\n    else params.set("sort", nextSort);\n    setSearchParams(params);\n  }\n\n  function submit(event: FormEvent) {
+  function changeSort(nextSort: string) {
+    setSortBy(nextSort);
+    const params = new URLSearchParams(searchParams);
+    if (nextSort === "relevance") params.delete("sort");
+    else params.set("sort", nextSort);
+    setSearchParams(params);
+  }
+
+  function submit(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
     if (keyword.trim()) params.set("search", keyword.trim());

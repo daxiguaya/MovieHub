@@ -16,11 +16,24 @@ import { appPath } from "./paths";
 export function setMovieHubApiKey(value: string) {
   if (typeof window === "undefined") return;
   if (value.trim()) window.localStorage.setItem("moviehubApiKey", value.trim());
-  else window.localStorage.removeItem("moviehubApiKey");
+  else {
+    window.localStorage.removeItem("moviehubApiKey");
+    window.sessionStorage.removeItem("moviehubApiKey");
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const apiKey = typeof window !== "undefined" ? window.localStorage.getItem("moviehubApiKey") : null;
+  let apiKey: string | null = null;
+  if (typeof window !== "undefined") {
+    apiKey = window.localStorage.getItem("moviehubApiKey");
+    if (!apiKey) {
+      apiKey = window.sessionStorage.getItem("moviehubApiKey");
+      if (apiKey) {
+        window.localStorage.setItem("moviehubApiKey", apiKey);
+        window.sessionStorage.removeItem("moviehubApiKey");
+      }
+    }
+  }
   const response = await fetch(appPath(`api${path}`), {
     ...init,
     headers: {

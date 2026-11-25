@@ -58,6 +58,17 @@ def test_cache_stats_and_expiry_cleanup(tmp_path):
 
 
 
+def test_has_favorite_checks_only_the_requested_provider_identity(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    cache.save_favorite("movie", 550, {"title": "Fight Club"})
+    cache.save_favorite("tv", 123, {"title": "Test Series"})
+
+    assert cache.has_favorite("movie", 550)
+    assert cache.has_favorite("tv", 123)
+    assert not cache.has_favorite("movie", 123)
+    assert not cache.has_favorite("tv", 550)
+
+
 def test_external_favorites_survive_cache_eviction(tmp_path):
     cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
     saved = cache.save_favorite(

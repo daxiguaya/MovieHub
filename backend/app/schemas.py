@@ -43,6 +43,7 @@ class MovieDetailResponse(MovieResponse):
     overview: str | None = None
     douban_url: str | None = None
     posters: list[str] = Field(default_factory=list)
+    tmdb_metadata: dict | None = None
 
 
 class MoviesListResponse(BaseModel):

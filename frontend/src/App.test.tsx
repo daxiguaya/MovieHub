@@ -231,7 +231,7 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByText("在线搜索结果");
+    await screen.findByLabelText("排序方式");
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map(([input]) => String(input));
       const localUrl = urls.find((url) => url.startsWith("/api/movies?"));

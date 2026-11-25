@@ -1,3 +1,16 @@
+"""Strict cross-provider favorite identity tests."""
+
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
+
+import app.database as database
+import app.main as main_module
+from app.config import settings
+from app.routers import favorites as favorites_router
+from scripts.init_db import initialize
+
 
 def test_online_favorite_uses_exact_title_year_and_director_to_link_chart_movie(
     tmp_path,

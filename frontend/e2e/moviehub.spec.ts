@@ -183,7 +183,7 @@ test("shows prominent horror and thriller lists and loads their pages on demand"
   await page.getByRole("link", { name: "查看完整榜单" }).first().click();
 
   await expect(page.getByRole("heading", { name: "恐怖片高分榜" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "恐怖榜单首屏作品" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "恐怖榜单首屏作品" }).first()).toBeVisible();
   expect(requestedPages).not.toContain("2");
 
   await page.getByRole("button", { name: "加载下一页" }).click();

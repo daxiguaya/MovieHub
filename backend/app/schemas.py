@@ -16,6 +16,7 @@ class MovieBase(BaseModel):
     id: int
     douban_id: str | None = None
     tmdb_id: str | None = None
+    imdb_id: str | None = None
     title: str
     original_title: str | None = None
     year: int | None = None
@@ -37,7 +38,6 @@ class MovieResponse(MovieBase):
 class MovieDetailResponse(MovieResponse):
     """Detailed movie response."""
 
-    imdb_id: str | None = None
     directors: list[str] = Field(default_factory=list)
     actors: list[str] = Field(default_factory=list)
     overview: str | None = None

@@ -67,9 +67,14 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   await page.getByLabel("起始年份").fill("2020");
   await page.getByLabel("结束年份").fill("2024");
   await expect(page.getByRole("option", { name: "剧情" })).toBeVisible();
-  await page.getByLabel("类型（可多选）").selectOption(["18", "878"]);
+  await page.getByText("类型（可多选）").click();
+  await page.getByLabel("搜索类型，例如：恐怖、悬疑…").fill("剧");
+  await page.getByLabel("搜索类型，例如：恐怖、悬疑…").fill("");
+  await page.getByRole("checkbox", { name: "剧情" }).check();
+  await page.getByRole("checkbox", { name: "科幻" }).check();
   await expect(page.getByRole("option", { name: "中国大陆" })).toBeVisible();
-  await page.getByLabel("制作地区（可多选）").selectOption("CN");
+  await page.getByText("制作地区（可多选）").click();
+  await page.getByRole("checkbox", { name: "中国大陆" }).check();
   await page.getByRole("button", { name: /搜索/ }).click();
 
   await expect(page.getByRole("link", { name: "在线匹配影片" })).toBeVisible();
@@ -95,6 +100,10 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   expect(pageUrl.searchParams.get("type")).toBe("movie");
   expect(pageUrl.searchParams.get("genre_ids")).toBe("18|878");
   expect(pageUrl.searchParams.get("region_codes")).toBe("CN");
+
+  await page.getByLabel("类型匹配").selectOption("all");
+  await page.getByRole("button", { name: /搜索/ }).click();
+  await expect.poll(() => new URL(discoverUrl).searchParams.get("with_genres")).toBe("18,878");
 });
 
 test("shows a useful empty state when online and local discovery return no matches", async ({ page }) => {

@@ -168,7 +168,7 @@ async def _get_linked_tmdb_metadata(
         "rating": payload.get("vote_average"),
         "rating_count": int(payload.get("vote_count") or 0),
         "genres": [item.get("name") for item in payload.get("genres", []) if isinstance(item, dict) and item.get("name")],
-        "regions": [item.get("name") for item in payload.get("production_countries", []) if isinstance(item, dict) and item.get("name")],
+        "regions": [item.get("name") for item in payload.get("production_countries", []) if isinstance(item, dict) and item.get("name")] or (payload.get("origin_country", []) if isinstance(payload.get("origin_country"), list) else []),
         "directors": [person.get("name") for person in crew if isinstance(person, dict) and person.get("job") == "Director" and person.get("name")],
         "actors": [person.get("name") for person in cast[:12] if isinstance(person, dict) and person.get("name")],
         "runtime": payload.get("runtime"),

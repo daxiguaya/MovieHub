@@ -125,6 +125,54 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
+  it("restores URL-selected genre, region, type and year filters before async options load", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url === "/api/discovery/regions") {
+        return { provider: "tmdb", regions: [{ code: "JP", name: "日本" }] };
+      }
+      if (url.includes("/api/discovery/genres")) {
+        return { provider: "tmdb", media_type: "tv", genres: [{ id: 16, name: "动画" }] };
+      }
+      if (url.startsWith("/api/discovery/discover?")) {
+        return {
+          provider: "tmdb", media_type: "tv", page: 1, total_pages: 1,
+          total_results: 0, items: [], attribution: "TMDB"
+        };
+      }
+      if (url.startsWith("/api/movies?")) {
+        return { items: [], next_cursor: null, total: 0 };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        initialEntries={["/search?type=tv&genre_ids=16&region_codes=JP&min_year=2010&max_year=2020"]}
+      >
+        <App />
+      </MemoryRouter>
+    );
+
+    await screen.findByText("在线搜索结果");
+    await waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([input]) => String(input));
+      const localUrl = urls.find((url) => url.startsWith("/api/movies?"));
+      const onlineUrl = urls.find((url) => url.startsWith("/api/discovery/discover?"));
+      expect(localUrl).toBeTruthy();
+      const local = new URLSearchParams(localUrl!.split("?")[1]);
+      expect(local.get("type")).toBe("tv");
+      expect(local.get("min_year")).toBe("2010");
+      expect(local.get("max_year")).toBe("2020");
+      expect(local.get("genres")).toBe("动画");
+      expect(local.get("regions")).toBe("日本");
+      expect(onlineUrl).toContain("media_type=tv");
+      expect(onlineUrl).toContain("with_genres=16");
+      expect(onlineUrl).toContain("region=JP");
+    });
+  });
+
   it("opens Xiaoya search in a new tab with the movie title URL-encoded", async () => {
     installFetchMock((url) => {
       if (url === "/api/config") {

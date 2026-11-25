@@ -446,6 +446,35 @@ describe("MovieHub frontend workflows", () => {
     expect(openSpy.mock.calls[0][1]).toBe("_blank");
   });
 
+  it("renders the stored synopsis on chart movie cards", async () => {
+    installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url === "/api/charts/top250/snapshots") return [];
+      if (url === "/api/charts/top250") {
+        return {
+          chart, total: 1, next_cursor: null,
+          items: [{
+            id: 42, douban_id: "1292052", tmdb_id: "550", imdb_id: "tt0137523",
+            title: "搏击俱乐部", original_title: "Fight Club", year: 1999,
+            rating: 8.8, rating_count: 200000, type: "movie", genres: [], regions: [],
+            updated_at: null, rank: 1, source_rating: 8.8, snapshot_date: "2026-11-25",
+            overview: "一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。"
+          }]
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/charts/top250"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("搏击俱乐部")).toBeInTheDocument();
+    expect(screen.getByText("一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。")).toBeInTheDocument();
+  });
+
   it("compares historical chart snapshots and renders rank movement", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

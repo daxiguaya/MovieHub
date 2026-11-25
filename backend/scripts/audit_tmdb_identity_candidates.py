@@ -29,6 +29,24 @@ def normalize(value: str | None) -> str:
     return "".join(char for char in value if char.isalnum())
 
 
+def director_name_keys(value: str | None) -> set[str]:
+    """Return exact script-specific and Latin-name keys for multilingual credits."""
+    if not value:
+        return set()
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    keys: set[str] = set()
+    cjk = "".join(
+        char for char in normalized
+        if "\\u3400" <= char <= "\\u9fff" or "\\uf900" <= char <= "\\ufaff"
+    )
+    if key := normalize(cjk):
+        keys.add("cjk:" + key)
+    latin_parts = re.findall(r"[a-z0-9]+", normalized)
+    if latin_parts:
+        keys.add("latin:" + "".join(latin_parts))
+    return keys
+
+
 def parse_names(value: str | None) -> list[str]:
     if not value:
         return []
@@ -140,7 +158,7 @@ def audit_candidates(
                 normalize(value) for value in (movie["title"], movie["original_title"])
                 if normalize(value)
             }
-            source_directors = {normalize(value) for value in movie["directors"] if normalize(value)}
+            source_directors = set().union(*(director_name_keys(value) for value in movie["directors"]))
             candidate_pool: dict[int, dict[str, Any]] = {}
             queries = list(dict.fromkeys(
                 value.strip() for value in (movie["title"], movie["original_title"])
@@ -202,15 +220,25 @@ def audit_candidates(
                     continue
                 credits = detail.get("credits") if isinstance(detail.get("credits"), dict) else {}
                 crew = credits.get("crew") if isinstance(credits.get("crew"), list) else []
-                tmdb_directors = {
-                    normalize(person.get("name")) for person in crew
-                    if isinstance(person, dict)
-                    and (person.get("job") == "Director" or (media_type == "tv" and person.get("department") == "Directing"))
-                    and normalize(person.get("name"))
-                }
+                tmdb_directors: set[str] = set()
+                tmdb_director_labels: set[str] = set()
+                for person in crew:
+                    if not isinstance(person, dict):
+                        continue
+                    if not (
+                        person.get("job") == "Director"
+                        or (media_type == "tv" and person.get("department") == "Directing")
+                    ):
+                        continue
+                    for field in ("name", "original_name"):
+                        value = person.get(field)
+                        if isinstance(value, str) and value.strip():
+                            tmdb_directors.update(director_name_keys(value))
+                            if field == "name":
+                                tmdb_director_labels.add(value.strip())
                 if source_directors and source_directors.intersection(tmdb_directors):
                     evidence.append("director_exact")
-                    verified.append({**candidate, "directors": sorted(tmdb_directors), "evidence": evidence})
+                    verified.append({**candidate, "directors": sorted(tmdb_director_labels), "evidence": evidence})
                 elif source_directors:
                     evidence.append("director_conflict_or_unavailable")
                     review_candidates.append({**candidate, "directors": sorted(tmdb_directors), "evidence": evidence})

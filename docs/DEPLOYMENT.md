@@ -1,12 +1,12 @@
 # Frontend and backend container deployment
 
-Compose now defines two application containers: a static React frontend and the FastAPI backend. Both are internal-only and have no published NAS/LAN host ports. This is a packaging baseline, not approval to deploy. It does not initialize a database, import Scout data, or change NPM.
+Compose now defines two application containers: a static React frontend and the FastAPI backend. Both are internal-only and have no published NAS/LAN host ports. This guide includes the original bootstrap procedure and the current runtime layout. For an existing production NAS instance, do not rerun the initial database initializer; use the reviewed rollout/import scripts and their preflight/backup safeguards. This document does not authorize NPM changes or service restarts.
 
 ## Runtime layout
 
 - API container: `moviehub-backend`, port 8000 on its Docker networks.
 - Frontend container: `moviehub-web`, port 8080 on the NPM Docker network; serves the React/Vite build and client-side routes.
-- Frontend runtime config: `MOVIEHUB_FRONTEND_CONFIG_PATH` mounted as `/usr/share/nginx/html/config.json`; set `xiaoyaSearchBaseUrl` there. Keep it a public URL only, never a secret.
+- Frontend runtime config: `MOVIEHUB_FRONTEND_CONFIG_PATH` mounted as `/usr/share/nginx/html/config.json`; the `.env` variable `MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE` (with `{query}` placeholder). The backend exposes it through `/api/config` as `xiaoyaSearchUrlTemplate`; it is public navigation configuration, never a secret.
 - MovieHub-owned writable data: host path `MOVIEHUB_DATA_PATH` mounted at `/data`.
 - Dedicated backup destination: host path `MOVIEHUB_BACKUP_PATH` mounted at `/backups`.
   - SQLite database: `/data/db/movies.db`.

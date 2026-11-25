@@ -173,6 +173,57 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
+  it("deduplicates a local Douban result after a verified transient TMDB identity match", async () => {
+    installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) {
+        return {
+          provider: "tmdb", query: "肖申克的救赎", page: 1, total_pages: 1,
+          total_results: 1,
+          items: [{
+            provider: "tmdb", provider_id: 278, media_type: "movie",
+            title: "肖申克的救赎", original_title: "The Shawshank Redemption", year: 1994,
+            rating: 8.7, rating_count: 30000, poster_path: null,
+            backdrop_path: null, genre_ids: [], imdb_id: null
+          }],
+          attribution: "TMDB"
+        };
+      }
+      if (url.startsWith("/api/movies?")) {
+        return {
+          total: 1, next_cursor: null,
+          items: [{
+            id: 1, douban_id: "1292052", tmdb_id: null, imdb_id: null,
+            title: "肖申克的救赎", original_title: "The Shawshank Redemption", year: 1994,
+            rating: 9.7, rating_count: 3367654, type: "movie", genres: [], regions: [], updated_at: null
+          }]
+        };
+      }
+      if (url === "/api/movies/id/1") {
+        return {
+          id: 1, douban_id: "1292052", tmdb_id: null, imdb_id: null,
+          title: "肖申克的救赎", original_title: "The Shawshank Redemption", year: 1994,
+          rating: 9.7, rating_count: 3367654, type: "movie", genres: [], regions: [],
+          directors: ["Frank Darabont"], actors: [], overview: null, douban_url: null, posters: [],
+          tmdb_metadata: { provider_id: 278, overview: null, year: 1994, rating: 8.7, rating_count: 30000, genres: [], regions: [], directors: [], actors: [], runtime: 142, poster_path: null }
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=肖申克的救赎"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("肖申克的救赎")).toHaveLength(1);
+      expect(screen.getByText(/本地榜单收录 · 豆瓣 9.7/)).toBeInTheDocument();
+    });
+  });
+
   it("deduplicates search results only by stable IDs, not title and year", async () => {
     installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

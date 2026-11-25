@@ -62,11 +62,12 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
         script = script_path.read_text(encoding="utf-8")
         backup = script.index("source.backup(target)")
-        main_flow = script[script.index('ROLLBACK_DB_BACKUP="$BACKUP_PATH'):]
+        main_flow_start = script.index('ROLLBACK_DB_BACKUP="$BACKUP_PATH')
+        main_flow = script[main_flow_start:]
         stop_backend = main_flow.index("docker compose stop moviehub")
         migrate = main_flow.index("docker compose run --rm --no-deps -T --name \"moviehub-schema-migrate-$STAMP\" moviehub python -m scripts.migrate")
         start_backend = main_flow.index("docker compose up -d --no-deps moviehub moviehub-web")
-        self.assertLess(backup, stop_backend)
+        self.assertLess(backup, main_flow_start)
         self.assertLess(stop_backend, migrate)
         self.assertLess(migrate, start_backend)
 

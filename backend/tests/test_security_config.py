@@ -2,8 +2,8 @@
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import Settings
-from app.main import app
+from app.config import Settings, settings
+from app.main import app, public_config
 
 
 def test_cors_origins_are_explicitly_configurable_from_environment(monkeypatch):
@@ -17,6 +17,13 @@ def test_cors_origins_are_explicitly_configurable_from_environment(monkeypatch):
         "https://moviehub.example.com",
         "https://admin.example.com",
     ]
+
+
+def test_public_config_exposes_xiaoya_template_without_secrets(monkeypatch):
+    template = "http://xiaoya.example/search?box={query}&type=video&url="
+    monkeypatch.setattr(settings, "xiaoya_search_url_template", template)
+
+    assert public_config() == {"xiaoyaSearchUrlTemplate": template}
 
 
 def test_app_disables_wildcard_credentialed_cors_by_default():

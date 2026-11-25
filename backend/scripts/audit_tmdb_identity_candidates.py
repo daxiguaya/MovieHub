@@ -218,7 +218,7 @@ def audit_candidates(
                     evidence.append("source_director_missing")
                     review_candidates.append({**candidate, "directors": sorted(tmdb_directors), "evidence": evidence})
 
-            if len(verified) == 1 and not errors:
+            if len(verified) == 1 and not review_candidates and not errors:
                 status = "verified_candidate"
             elif verified or review_candidates:
                 status = "needs_review"

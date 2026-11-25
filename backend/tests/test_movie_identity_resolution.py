@@ -51,7 +51,7 @@ def test_title_and_year_without_director_does_not_expose_tmdb_identity(monkeypat
         raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
 
     monkeypatch.setattr(tmdb_client, "get_json", fake_get_json)
-    result = await _get_linked_tmdb_metadata(
+    result = asyncio.run(_get_linked_tmdb_metadata(
         "movie", None, None, title="肖申克的救赎",
         original_title="The Shawshank Redemption", year=1994,
         directors=[],

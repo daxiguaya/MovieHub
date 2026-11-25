@@ -10,7 +10,7 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "003_movie_metadata_provenance.sql"
+    / "004_nullable_douban_vote_count.sql"
 )
 
 
@@ -53,11 +53,11 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_version_three_migration_upgrades_v2_and_is_idempotent(tmp_path):
+def test_version_four_migration_upgrades_v2_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
     _create_v2_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 3
+    assert execute_migration(db_path, MIGRATION) == 4
     assert execute_migration(db_path, MIGRATION) == 3
 
     conn = sqlite3.connect(str(db_path))
@@ -254,7 +254,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
 
 
 
-def test_v2_migration_preserves_existing_catalogue_and_user_data(tmp_path):
+def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     """A populated v2 database must retain every user-facing relation on v3."""
     db_path = tmp_path / "populated-v1.db"
     _create_v2_database(db_path)

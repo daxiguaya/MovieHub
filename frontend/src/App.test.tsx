@@ -125,6 +125,54 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
+  it("applies the selected rating sort to TMDB discovery", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/discover?")) return {
+        provider: "tmdb", media_type: "movie", page: 1, total_pages: 1,
+        total_results: 0, items: [], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search"]}>
+        <App />
+      </MemoryRouter>
+    );
+    await userEvent.selectOptions(await screen.findByLabelText("排序方式"), "rating_desc");
+    await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
+    await waitFor(() => {
+      const discoverUrl = fetchMock.mock.calls.map(([input]) => String(input))
+        .find((url) => url.startsWith("/api/discovery/discover?"));
+      expect(discoverUrl).toContain("sort_by=vote_average.desc");
+    });
+  });
+
+  it("sorts keyword search results by rating and keeps missing ratings last", async () => {
+    installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 3,
+        items: [
+          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
+        ], attribution: "TMDB"
+      };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试&sort=rating_desc"]}>
+        <App />
+      </MemoryRouter>
+    );
+    const cards = await screen.findAllByRole("link", { name: /高分|低分|无评分/ });
+    expect(cards.map((node) => node.textContent)).toEqual(["高分", "低分", "无评分"]);
+  });
+
   it("restores URL-selected genre, region, type and year filters before async options load", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

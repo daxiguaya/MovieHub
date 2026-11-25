@@ -22,6 +22,7 @@ def _response(favorite: Favorite) -> FavoriteResponse:
     movie_response = MovieResponse(
         id=movie.id,
         douban_id=movie.douban_id,
+        tmdb_id=movie.tmdb_id,
         title=movie.title,
         original_title=movie.original_title,
         year=movie.year,

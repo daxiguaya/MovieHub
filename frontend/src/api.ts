@@ -98,17 +98,17 @@ export const api = {
     request<DiscoverySearchResponse>("/discovery/discover?" + params.toString()),
   discoveryDetail: (mediaType: "movie" | "tv", providerId: number) =>
     request<DiscoveryDetail>("/discovery/" + mediaType + "/" + providerId),
-  externalFavorites: () => request<ExternalFavorite[]>("/discovery/favorites"),
+  externalFavorites: () => request<ExternalFavorite[]>("/favorites/external"),
   externalFavoriteStatus: (mediaType: "movie" | "tv", providerId: number, imdbId?: string | null) => {
     const params = new URLSearchParams();
     if (imdbId) params.set("imdb_id", imdbId);
     const query = params.toString();
     return request<{ is_favorite: boolean }>(
-      `/discovery/favorites/status/${mediaType}/${providerId}${query ? "?" + query : ""}`
+      `/favorites/external/status/${mediaType}/${providerId}${query ? "?" + query : ""}`
     );
   },
   saveExternalFavorite: (item: DiscoveryDetail | DiscoveryItem) =>
-    request<ExternalFavorite>("/discovery/favorites/" + item.media_type + "/" + item.provider_id, {
+    request<ExternalFavorite>("/favorites/external/" + item.media_type + "/" + item.provider_id, {
       method: "PUT",
       body: JSON.stringify({
         snapshot: {
@@ -127,7 +127,7 @@ export const api = {
     const params = new URLSearchParams();
     if (imdbId) params.set("imdb_id", imdbId);
     const query = params.toString();
-    return request<void>("/discovery/favorites/" + mediaType + "/" + providerId + (query ? "?" + query : ""), { method: "DELETE" });
+    return request<void>("/favorites/external/" + mediaType + "/" + providerId + (query ? "?" + query : ""), { method: "DELETE" });
   },
   addFavorite: (movieId: number, note = "") =>
     request<Favorite>(`/favorites/${movieId}`, {

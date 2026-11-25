@@ -81,7 +81,7 @@ def test_local_chart_movie_does_not_accept_ambiguous_tmdb_candidates(monkeypatch
     ))
 
     assert result is None
-    assert calls == ["/search/movie", "/search/movie"]
+    assert calls == ["/search/movie", "/search/movie", "/movie/278", "/movie/999"]
 
 
 def test_local_chart_movie_rejects_tmdb_director_mismatch(monkeypatch):

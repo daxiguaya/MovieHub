@@ -47,6 +47,7 @@ def test_online_favorite_uses_exact_title_year_and_director_to_link_chart_movie(
     monkeypatch.setattr(main_module.poster_cache_service, "clear_expired_cache", lambda: None)
     monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
     monkeypatch.setattr(main_module.provider_response_cache, "backup_daily", lambda *args, **kwargs: None)
+    monkeypatch.setattr(favorites_router.provider_response_cache, "has_favorite", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         favorites_router.provider_response_cache,
         "delete_favorite",

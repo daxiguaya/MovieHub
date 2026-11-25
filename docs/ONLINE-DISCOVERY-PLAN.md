@@ -70,6 +70,7 @@ MovieHub is an online-first movie and TV discovery experience. Search covers the
 - A dedicated About/Credits page includes a TMDB-hosted logo asset and the required notice, following TMDB's official FAQ: https://developer.themoviedb.org/docs/faq. The selected logo variant still needs final confirmation against the current approved asset list.
 - The cache stats endpoint reports entries, serialized bytes, database bytes, WAL bytes, hits, misses, stale hits, writes, TMDB upstream attempts, successes, failures, 429s, and average/maximum latency.
 - TMDB `overview` is recursively stripped from provider responses before caching; synopsis text remains absent from local storage until compliance is cleared.
+- Online detail pages may display the requested TMDB overview; it is retained only in a bounded in-memory cache (maximum 100 entries, six-hour TTL) and is never written to SQLite.
 - No production deployment or service restart has been performed by this work.
 
 ## Remaining before production rollout

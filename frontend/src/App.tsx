@@ -989,7 +989,7 @@ function SearchPage() {
       : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1)
       : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1)
       : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
-    return result || left.title.localeCompare(right.title, "zh-CN");
+    return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
   });
 
   return (

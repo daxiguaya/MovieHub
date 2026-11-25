@@ -913,18 +913,21 @@ function MoviePage({ config }: { config: PublicConfig }) {
     }
     setLoading(true);
     api.movie(id)
-      .then((data) => { if (active) setMovie(data); })
+      .then((data) => {
+        if (!active) return;
+        setMovie(data);
+        if (data.tmdb_id) {
+          void api.externalFavoriteStatus(data.type, Number(data.tmdb_id), data.imdb_id)
+            .then((result) => { if (active) setIsFavorite(result.is_favorite); })
+            .catch(() => undefined);
+        } else {
+          void api.favorites()
+            .then((items) => { if (active) setIsFavorite(items.some((item) => item.movie.id === id)); })
+            .catch(() => undefined);
+        }
+      })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
-    api.movie(id).then((data) => {
-      if (!active || !data.tmdb_id) return;
-      void api.externalFavoriteStatus(data.type, Number(data.tmdb_id), data.imdb_id)
-        .then((status) => { if (active && status.is_favorite) setIsFavorite(true); })
-        .catch(() => undefined);
-    }).catch(() => undefined);
-    api.favorites()
-      .then((items) => { if (active) setIsFavorite(items.some((item) => item.movie.id === id)); })
-      .catch(() => { /* Favorites require the configured API key; detail data remains available. */ });
     return () => { active = false; };
   }, [id]);
 
@@ -968,8 +971,8 @@ function MoviePage({ config }: { config: PublicConfig }) {
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {(movie.overview || movie.tmdb_metadata?.overview) && <section className="detail-section"><h3>剧情简介{!movie.overview && movie.tmdb_metadata?.overview ? " · TMDB" : ""}</h3><p>{movie.overview || movie.tmdb_metadata?.overview}</p></section>}
-          {(movie.directors.length || movie.tmdb_metadata?.directors.length) > 0 && <section className="detail-section"><h3>导演</h3><p>{(movie.directors.length ? movie.directors : movie.tmdb_metadata?.directors ?? []).join(" / ")}</p></section>}
-          {(movie.actors.length || movie.tmdb_metadata?.actors.length) > 0 && <section className="detail-section"><h3>主演</h3><p>{(movie.actors.length ? movie.actors : movie.tmdb_metadata?.actors ?? []).join(" / ")}</p></section>}
+          {(movie.directors.length || movie.tmdb_metadata?.directors.length || 0) > 0 && <section className="detail-section"><h3>导演</h3><p>{(movie.directors.length ? movie.directors : movie.tmdb_metadata?.directors ?? []).join(" / ")}</p></section>}
+          {(movie.actors.length || movie.tmdb_metadata?.actors.length || 0) > 0 && <section className="detail-section"><h3>主演</h3><p>{(movie.actors.length ? movie.actors : movie.tmdb_metadata?.actors ?? []).join(" / ")}</p></section>}
         </div>
       </section>
     </>
@@ -995,15 +998,15 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
     }
     setLoading(true);
     api.discoveryDetail(validType, id)
-      .then((data) => { if (active) setMovie(data); })
+      .then((data) => {
+        if (!active) return;
+        setMovie(data);
+        void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id)
+          .then((result) => { if (active) setIsFavorite(result.is_favorite); })
+          .catch(() => undefined);
+      })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
-    api.discoveryDetail(validType, id).then((data) => {
-      if (!active) return;
-      void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id)
-        .then((result) => { if (active) setIsFavorite(result.is_favorite); })
-        .catch(() => undefined);
-    }).catch(() => undefined);
     return () => { active = false; };
   }, [id, mediaType, validType]);
 

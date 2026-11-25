@@ -49,31 +49,31 @@ docker compose exec moviehub python -m scripts.import_chart \
 
 If robots.txt disallows the path, Douban returns 403/429, a redirect occurs, or page markup/ranks are incomplete, collection stops without producing a partial snapshot. Do not work around those restrictions. The collector has no scheduler and is not run automatically.
 
-## Collect popular and high-rated snapshots
+## Collect popular and high-rated snapshots atomically
 
-A second one-shot collector uses Douban's web-application `/j/search_subjects` JSON endpoint for the `热门` and `豆瓣高分` tags. This is an undocumented web endpoint, not an official public API; its response and availability can change.
+The one-shot batch command refreshes both Douban tagged charts together. It collects both snapshots before creating a verified backup, then imports both through one all-or-nothing database transaction. If either collection is disallowed or fails, neither chart is written and no backup is created.
 
-Collect up to 100 popular movies:
-
-```sh
-docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
-  --chart popular \
-  --date 2026-11-23 \
-  --output /tmp/moviehub-popular-2026-11-23.json
-```
-
-Collect up to 100 high-rated movies:
+From the Synology production directory, run:
 
 ```sh
-docker compose exec moviehub python -m scripts.collect_douban_tagged_chart \
-  --chart high-rated \
-  --date 2026-11-23 \
-  --output /tmp/moviehub-high-rated-2026-11-23.json
+sh deploy/refresh_douban_tagged_charts.sh
 ```
 
-The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages and honors any longer robots.txt crawl-delay. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. The endpoint provides only list-level fields (ID, title, rating and cover); run the read-only Scout metadata import as needed to enrich year, rating count, genres, regions and details.
+An explicit snapshot date can be supplied:
 
-Then use the same `import_chart --dry-run` and import commands above. Annual charts use the official one-shot collector documented in [ANNUAL-CHART-COLLECTOR.md](ANNUAL-CHART-COLLECTOR.md).
+```sh
+sh deploy/refresh_douban_tagged_charts.sh 2026-11-25
+```
+
+The wrapper runs the backend command without restarting containers:
+
+```sh
+docker compose exec -T moviehub python -m scripts.refresh_douban_tagged_charts --date 2026-11-25 --max-items 100
+```
+
+The collector checks `robots.txt`, uses no cookies, proxy rotation, redirects or retries, and waits at least two seconds between pages while honoring any longer robots.txt crawl-delay. It stops on access denial, rate limiting, invalid JSON or duplicate IDs. This undocumented web-application endpoint is not an official public API; its response and availability can change. The endpoint provides list-level fields (ID, title, rating and cover), not full movie details.
+
+The previous per-chart shell wrappers are retained for compatibility, but should not be used for routine refreshes: use the batch wrapper above so the two charts cannot become inconsistent.
 
 
 ## Import 2025 annual charts

@@ -283,3 +283,22 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .api-key-gate input { min-width: 0; flex: 1; }
 .api-key-gate small { overflow-wrap: anywhere; }
 @media (max-width: 560px) { .api-key-gate form { flex-direction: column; } }
+
+
+/* Accessible checkbox-based multi-select filters */
+.search-filter { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.multi-filter { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #1b2224; color: #edf0ec; }
+.multi-filter > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 0 11px; cursor: pointer; list-style: none; font-size: 11px; }
+.multi-filter > summary::-webkit-details-marker { display: none; }
+.multi-filter-count { color: var(--accent); white-space: nowrap; font-size: 10px; }
+.multi-filter-panel { padding: 10px; border-top: 1px solid var(--line); }
+.multi-filter-panel > input { width: 100%; min-width: 0; margin-bottom: 8px; }
+.multi-filter-options { max-height: 190px; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; padding-right: 4px; }
+.multi-filter-option { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 6px 4px; border-radius: 5px; color: #cbd3cd; font-size: 11px; cursor: pointer; }
+.multi-filter-option:hover { background: rgba(255,255,255,.05); }
+.multi-filter-option input { width: 14px; height: 14px; flex: 0 0 14px; accent-color: var(--accent); }
+.multi-filter-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-filter-empty { grid-column: 1 / -1; color: var(--muted); font-size: 10px; }
+.multi-filter-clear { margin-top: 8px; padding: 5px 0; border: 0; background: transparent; color: var(--accent); font-size: 10px; }
+.genre-match-control { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
+.genre-match-control select { min-width: 0; flex: 1; }

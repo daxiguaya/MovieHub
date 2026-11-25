@@ -21,7 +21,7 @@ class MovieBase(BaseModel):
     original_title: str | None = None
     year: int | None = None
     rating: float | None = None
-    rating_count: int = 0
+    rating_count: int | None = None
     type: MovieType
     genres: list[str] = Field(default_factory=list)
     regions: list[str] = Field(default_factory=list)

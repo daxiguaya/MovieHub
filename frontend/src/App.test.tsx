@@ -97,7 +97,7 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByText("在线搜索结果");
+    await screen.findByLabelText("排序方式");
     await userEvent.type(
       screen.getByPlaceholderText("输入片名，例如：异形、蝙蝠侠…"),
       "星际穿越"
@@ -125,7 +125,7 @@ describe("MovieHub frontend workflows", () => {
     });
   });
 
-  it("applies the selected rating sort to TMDB discovery", async () => {
+  it("applies the selected rating sort to TMDB discovery immediately", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
@@ -142,7 +142,6 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
     await userEvent.selectOptions(await screen.findByLabelText("排序方式"), "rating_desc");
-    await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
     await waitFor(() => {
       const discoverUrl = fetchMock.mock.calls.map(([input]) => String(input))
         .find((url) => url.startsWith("/api/discovery/discover?"));
@@ -175,9 +174,8 @@ describe("MovieHub frontend workflows", () => {
       .toEqual(["高分", "低分", "无评分"]);
   });
 
-  it("allows favoriting an online search result directly from its card", async () => {
-    window.localStorage.setItem("moviehubApiKey", "test-api-key");
-    const fetchMock = installFetchMock((url, init) => {
+  it("does not expose favorite actions on online search result cards", async () => {
+    const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
       if (url.startsWith("/api/discovery/search?")) return {
@@ -189,13 +187,6 @@ describe("MovieHub frontend workflows", () => {
         }], attribution: "TMDB"
       };
       if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
-      if (url.startsWith("/api/favorites/external/status/")) return { is_favorite: false };
-      if (url === "/api/favorites/external/movie/550" && init?.method === "PUT") return {
-        provider: "tmdb", media_type: "movie", provider_id: 550,
-        snapshot: { title: "搏击俱乐部", original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000, poster_path: null, backdrop_path: null, imdb_id: "tt0137523" },
-        note: "", created_at: 1, updated_at: 1
-      };
-      if (url.startsWith("/api/favorites/external/movie/550?") && init?.method === "DELETE") return {};
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -205,48 +196,8 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    const favoriteButton = await screen.findByRole("button", { name: "♡ 加入收藏" });
-    await userEvent.click(favoriteButton);
-    const savedButton = await screen.findByRole("button", { name: "♥ 已收藏" });
-    expect(savedButton).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/favorites/external/movie/550",
-      expect.objectContaining({ method: "PUT", headers: expect.objectContaining({ "X-API-Key": "test-api-key" }) })
-    );
-    await userEvent.click(savedButton);
-    expect(await screen.findByRole("button", { name: "♡ 加入收藏" })).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([url, init]) =>
-      String(url).startsWith("/api/favorites/external/movie/550?") &&
-      init?.method === "DELETE" &&
-      new Headers(init.headers).get("X-API-Key") === "test-api-key" &&
-      new URLSearchParams(String(url).split("?")[1]).get("imdb_id") === "tt0137523"
-    )).toBe(true);
-  });
-
-  it("prompts for the API key without sending unauthorized favorite-status requests", async () => {
-    const fetchMock = installFetchMock((url) => {
-      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
-      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
-      if (url.startsWith("/api/discovery/search?")) return {
-        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 1,
-        items: [{
-          provider: "tmdb", provider_id: 550, media_type: "movie", title: "搏击俱乐部",
-          original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000,
-          poster_path: null, backdrop_path: null, genre_ids: []
-        }], attribution: "TMDB"
-      };
-      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
-      throw new Error(`Unexpected request: ${url}`);
-    });
-
-    render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试"]}>
-        <App />
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByRole("link", { name: "前往收藏页连接 API Key" })).toHaveAttribute("href", "/favorites");
-    expect(screen.getByRole("button", { name: "♡ 加入收藏" })).toBeDisabled();
+    expect(await screen.findByRole("link", { name: "搏击俱乐部" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /加入收藏|已收藏/ })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/favorites/external/status/"))).toBe(false);
   });
 
@@ -280,7 +231,7 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByText("在线搜索结果");
+    await screen.findByLabelText("排序方式");
     await waitFor(() => {
       const urls = fetchMock.mock.calls.map(([input]) => String(input));
       const localUrl = urls.find((url) => url.startsWith("/api/movies?"));

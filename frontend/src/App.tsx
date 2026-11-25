@@ -11,7 +11,7 @@ import {
   useParams,
   useSearchParams
 } from "react-router-dom";
-import { api, hasMovieHubApiKey, setMovieHubApiKey } from "./api";
+import { api, setMovieHubApiKey } from "./api";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
 import { appPath } from "./paths";
 import type {
@@ -491,51 +491,9 @@ function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: n
 }
 
 
-function ExternalMovieCard({ item, localMovie, enableFavorite = false }: { item: DiscoveryItem; localMovie?: Movie; enableFavorite?: boolean }) {
+function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMovie?: Movie }) {
   const [failed, setFailed] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteReady, setFavoriteReady] = useState(false);
-  const [favoriteBusy, setFavoriteBusy] = useState(false);
-  const [favoriteError, setFavoriteError] = useState("");
   const poster = item.poster_path ? "https://image.tmdb.org/t/p/w342" + item.poster_path : "";
-
-  useEffect(() => {
-    if (!enableFavorite) return;
-    if (!hasMovieHubApiKey()) {
-      setFavoriteError("请先连接 API Key");
-      setFavoriteReady(true);
-      return;
-    }
-    let active = true;
-    api.externalFavoriteStatus(item.media_type, item.provider_id, item.imdb_id)
-      .then((result) => {
-        if (active) {
-          setIsFavorite(result.is_favorite);
-          setFavoriteReady(true);
-        }
-      })
-      .catch((err: Error) => {
-        if (!active) return;
-        setFavoriteError(err.message.toLowerCase().includes("api key") ? "请先连接 API Key" : err.message);
-        setFavoriteReady(true);
-      });
-    return () => { active = false; };
-  }, [enableFavorite, item.media_type, item.provider_id, item.imdb_id]);
-
-  async function toggleFavorite() {
-    setFavoriteBusy(true);
-    setFavoriteError("");
-    try {
-      if (isFavorite) await api.removeExternalFavorite(item.media_type, item.provider_id, item.imdb_id);
-      else await api.saveExternalFavorite(item);
-      setIsFavorite(!isFavorite);
-    } catch (err) {
-      const message = (err as Error).message;
-      setFavoriteError(message.toLowerCase().includes("api key") ? "请先连接 API Key" : message);
-    } finally {
-      setFavoriteBusy(false);
-    }
-  }
 
   return (
     <article className="movie-card">
@@ -552,19 +510,10 @@ function ExternalMovieCard({ item, localMovie, enableFavorite = false }: { item:
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
         {localMovie && <div className="movie-subtitle">本地榜单收录 · 豆瓣 {localMovie.rating?.toFixed(1) ?? "暂无评分"}</div>}
         <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
-        {enableFavorite && (
-          <div className="search-favorite-action">
-            <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy || !favoriteReady || !hasMovieHubApiKey()}>
-              {favoriteBusy ? "处理中…" : isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}
-            </button>
-            {favoriteError && <div className="inline-error">{favoriteError === "请先连接 API Key" ? <><Link to="/favorites">前往收藏页连接 API Key</Link> 后即可收藏</> : favoriteError}</div>}
-          </div>
-        )}
       </div>
     </article>
   );
 }
-
 function ChartPage() {
   const { slug = "" } = useParams();
   const retiredDoubanChart = slug === "popular" || slug === "high-rated";
@@ -934,6 +883,14 @@ function SearchPage() {
     return () => { active = false; };
   }, [results, onlineResults]);
 
+  function changeSort(nextSort: string) {
+    setSortBy(nextSort);
+    const params = new URLSearchParams(searchParams);
+    if (nextSort === "relevance") params.delete("sort");
+    else params.set("sort", nextSort);
+    setSearchParams(params);
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
     const params = new URLSearchParams();
@@ -1052,7 +1009,6 @@ function SearchPage() {
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
-        <label>排序方式<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
         <div className="search-filter">
@@ -1075,8 +1031,8 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
-      <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
+      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
+      <div className="result-caption"><span>在线搜索结果 · {onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span><label className="result-sort">排序方式<select aria-label="排序方式" value={sortBy} onChange={(e) => changeSort(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
       {onlineResults.length > 0 || localOnly.length > 0 ? (
@@ -1086,7 +1042,7 @@ function SearchPage() {
               const compare = (x: number | null, y: number | null, direction: 1 | -1) => x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
               const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
               return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
-            }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} enableFavorite />)}
+            }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
             {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
           </div>
           {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}

@@ -213,6 +213,33 @@ describe("MovieHub frontend workflows", () => {
     );
   });
 
+  it("prompts for the API key without sending unauthorized favorite-status requests", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 1,
+        items: [{
+          provider: "tmdb", provider_id: 550, media_type: "movie", title: "搏击俱乐部",
+          original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000,
+          poster_path: null, backdrop_path: null, genre_ids: []
+        }], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("link", { name: "前往收藏页连接 API Key" })).toHaveAttribute("href", "/favorites");
+    expect(screen.getByRole("button", { name: "♡ 加入收藏" })).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/favorites/external/status/"))).toBe(false);
+  });
+
   it("restores URL-selected genre, region, type and year filters before async options load", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

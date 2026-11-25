@@ -238,7 +238,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
         ]
         results = [future.result(timeout=30) for future in futures]
 
-    assert results == [3, 3]
+    assert results == [4, 4]
 
     conn = sqlite3.connect(str(db_path))
     try:

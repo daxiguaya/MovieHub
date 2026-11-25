@@ -6,8 +6,10 @@ import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.config import settings
+from app.database import Favorite, Movie, get_db
 from app.limiter import limiter
 from app.dependencies.auth import verify_api_key
 from app.services.provider_cache import provider_response_cache
@@ -38,6 +40,7 @@ class FavoriteSnapshot(BaseModel):
     rating_count: int = Field(default=0, ge=0)
     poster_path: str | None = Field(default=None, max_length=512)
     backdrop_path: str | None = Field(default=None, max_length=512)
+    imdb_id: str | None = Field(default=None, max_length=32)
 
 
 class ExternalFavoritePayload(BaseModel):
@@ -177,6 +180,27 @@ async def discover_online(
     }
 
 
+@router.get("/favorites/status/{media_type}/{provider_id}", dependencies=[Depends(verify_api_key)])
+@limiter.limit("60/minute")
+async def get_favorite_status(
+    request: Request,
+    media_type: Literal["movie", "tv"],
+    provider_id: int,
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    """Check one TMDB identity against both online and linked chart favorites."""
+    if provider_id < 1:
+        raise HTTPException(status_code=422, detail="Invalid TMDB ID")
+    local_saved = db.query(Favorite).join(Movie).filter(
+        Movie.type == media_type,
+        Movie.tmdb_id == str(provider_id),
+    ).first() is not None
+    external_saved = await asyncio.to_thread(
+        provider_response_cache.has_favorite, media_type, provider_id
+    )
+    return {"is_favorite": local_saved or external_saved}
+
+
 @router.get("/{media_type}/{provider_id}")
 @limiter.limit("30/minute")
 async def get_online_detail(
@@ -258,11 +282,21 @@ async def remove_external_favorite(
     request: Request,
     media_type: Literal["movie", "tv"],
     provider_id: int,
+    db: Session = Depends(get_db),
 ) -> Response:
-    removed = await asyncio.to_thread(
+    removed_external = await asyncio.to_thread(
         provider_response_cache.delete_favorite, media_type, provider_id
     )
-    if not removed:
+    linked = db.query(Favorite).join(Movie).filter(
+        Movie.type == media_type,
+        Movie.tmdb_id == str(provider_id),
+    ).all()
+    for favorite in linked:
+        db.delete(favorite)
+    if linked:
+        db.commit()
+    if not removed_external and not linked:
         raise HTTPException(status_code=404, detail="Favorite not found")
-    await _backup_favorites_after_write()
+    if removed_external:
+        await _backup_favorites_after_write()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

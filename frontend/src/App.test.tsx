@@ -164,11 +164,6 @@ describe("MovieHub frontend workflows", () => {
       };
       throw new Error(`Unexpected request: ${url}`);
     });
-    render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试&sort=rating_desc"]}>
-        <App />
-      </MemoryRouter>
-    );
     const { container } = render(
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试&sort=rating_desc"]}>
         <App />

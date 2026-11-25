@@ -113,7 +113,7 @@ def _extract(movie: Movie, payload: dict[str, Any]) -> dict[str, Any]:
     source_title = _normalise(movie.title)
     source_original = _normalise(movie.original_title or "")
     if not ({source_title, source_original} - {""}) & provider_titles:
-        raise ValueError("TMDB title identity mismatch")
+        raise ValueError(f"TMDB title identity mismatch: stored={movie.title!r}, stored_original={movie.original_title!r}, provider={sorted(provider_titles)!r}")
 
     release = payload.get("release_date") if media_type == "movie" else payload.get("first_air_date")
     year = int(release[:4]) if isinstance(release, str) and len(release) >= 4 and release[:4].isdigit() else None
@@ -131,7 +131,7 @@ def _extract(movie: Movie, payload: dict[str, Any]) -> dict[str, Any]:
     existing_directors = {_normalise(x) for x in json.loads(movie.directors or "[]") if isinstance(x, str)}
     provider_directors = {_normalise(x) for x in directors}
     if existing_directors and provider_directors and not existing_directors.intersection(provider_directors):
-        raise ValueError("TMDB director identity mismatch")
+        raise ValueError(f"TMDB director identity mismatch: stored={sorted(existing_directors)!r}, provider={sorted(provider_directors)!r}")
 
     actors = []
     for person in cast[:20]:

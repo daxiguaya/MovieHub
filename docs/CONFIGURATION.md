@@ -8,6 +8,7 @@ MovieHub reads configuration from environment variables with the `MOVIEHUB_` pre
 | `MOVIEHUB_BACKUP_DIR` | `/backups` | Dedicated backup destination inside the container |
 | `MOVIEHUB_IMPORT_DIR` | `/imports` | Directory from which Scout source databases may be imported |
 | `MOVIEHUB_API_KEY` | empty | Required for protected import, chart-import and favorites write/read APIs |
+| `MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE` | empty | Public Xiaoya search URL template; `{query}` is URL-encoded by the frontend |
 | `MOVIEHUB_CORS_ORIGINS` | `[]` | Explicit JSON array of allowed cross-origin frontend origins |
 | `MOVIEHUB_LOG_LEVEL` | `INFO` | Console logging level |
 | `MOVIEHUB_RATE_LIMIT_IMPORT` | `5/minute` | Rate limit for protected import APIs |

@@ -453,7 +453,7 @@ function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: n
 }
 
 
-function ExternalMovieCard({ item }: { item: DiscoveryItem }) {
+function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMovie?: Movie }) {
   const [failed, setFailed] = useState(false);
   const poster = item.poster_path ? "https://image.tmdb.org/t/p/w342" + item.poster_path : "";
   return (
@@ -469,6 +469,7 @@ function ExternalMovieCard({ item }: { item: DiscoveryItem }) {
       <div className="movie-card-info">
         <Link to={"/tmdb/" + item.media_type + "/" + item.provider_id} className="movie-title">{item.title}</Link>
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
+        {localMovie && <div className="movie-subtitle">本地榜单收录 · 豆瓣 {localMovie.rating?.toFixed(1) ?? "暂无评分"}</div>}
         <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
       </div>
     </article>
@@ -667,9 +668,15 @@ function SearchPage() {
 
   async function runSearch(params: URLSearchParams, appendLocal = false, appendOnline = false) {
     const q = (params.get("search") ?? "").trim();
+    const requestedType = (params.get("type") as "all" | "movie" | "tv" | null) ?? "all";
+    const requestedMinRating = params.get("min_rating") ?? "";
+    const requestedMinYear = params.get("min_year") ?? "";
+    const requestedMaxYear = params.get("max_year") ?? "";
+    const selectedGenreIds = (params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean);
+    const selectedRegionCodes = (params.get("region_codes") ?? "").split("|").filter(Boolean);
     const requestedPage = appendOnline ? onlinePage + 1 : 1;
     // TMDB genre filters use comma for AND; normalize legacy pipe-separated URLs.
-    const genreIds = (params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean).join(",");
+    const genreIds = selectedGenreIds.join(",");
     const hasFilters = Boolean(
       params.get("genre_ids") || params.get("region_codes") || params.get("min_year") ||
       params.get("max_year") || params.get("min_rating") || params.get("min_rating_count")
@@ -681,16 +688,14 @@ function SearchPage() {
     try {
       const localParams = new URLSearchParams();
       if (q) localParams.set("search", q);
-      if (type !== "all") localParams.set("type", type);
+      if (requestedType !== "all") localParams.set("type", requestedType);
       if (params.get("min_rating")) localParams.set("min_rating", params.get("min_rating")!);
       if (params.get("min_rating_count")) localParams.set("min_rating_count", params.get("min_rating_count")!);
       if (params.get("min_year")) localParams.set("min_year", params.get("min_year")!);
       if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
-      const selectedGenreIds = (params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean);
-      const selectedRegionCodes = (params.get("region_codes") ?? "").split("|").filter(Boolean);
       const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
-        selectedGenreIds.length && !genreOptions.length
-          ? api.discoveryGenres(type === "tv" ? "tv" : "movie").then((data) => data.genres)
+        selectedGenreIds.length
+          ? api.discoveryGenres(requestedType === "tv" ? "tv" : "movie").then((data) => data.genres)
           : Promise.resolve(genreOptions),
         selectedRegionCodes.length && !regionOptions.length
           ? api.discoveryRegions().then((data) => data.regions)
@@ -710,19 +715,19 @@ function SearchPage() {
 
       let onlinePromise: Promise<import("./types").DiscoverySearchResponse> | null = null;
       if (q.length >= 2) {
-        onlinePromise = api.discoverySearch(q, type === "all" ? "all" : type, requestedPage);
+        onlinePromise = api.discoverySearch(q, requestedType, requestedPage);
       } else if (hasFilters) {
         const discoverParams = new URLSearchParams({
-          media_type: type === "tv" ? "tv" : "movie",
+          media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(requestedPage),
           min_votes: params.get("min_rating_count") || "100",
-          sort_by: minRating ? "vote_average.desc" : "popularity.desc"
+          sort_by: requestedMinRating ? "vote_average.desc" : "popularity.desc"
         });
         if (genreIds) discoverParams.set("with_genres", genreIds);
-        if (selectedRegions.length) discoverParams.set("region", selectedRegions.join("|"));
-        if (minRating) discoverParams.set("min_rating", minRating);
-        if (minYear) discoverParams.set("min_year", minYear);
-        if (maxYear) discoverParams.set("max_year", maxYear);
+        if (selectedRegionCodes.length) discoverParams.set("region", selectedRegionCodes.join("|"));
+        if (requestedMinRating) discoverParams.set("min_rating", requestedMinRating);
+        if (requestedMinYear) discoverParams.set("min_year", requestedMinYear);
+        if (requestedMaxYear) discoverParams.set("max_year", requestedMaxYear);
         onlinePromise = api.discoveryDiscover(discoverParams);
       }
 
@@ -766,10 +771,26 @@ function SearchPage() {
   }
 
   useEffect(() => {
-    if (searchParams.toString()) void runSearch(new URLSearchParams(searchParams));
-    // Initial query state is restored from the URL.
+    const params = new URLSearchParams(searchParams);
+    setKeyword(params.get("search") ?? "");
+    setType((params.get("type") as "all" | "movie" | "tv" | null) ?? "all");
+    setMinRating(params.get("min_rating") ?? "");
+    setMinRatingCount(params.get("min_rating_count") ?? "100");
+    setMinYear(params.get("min_year") ?? "");
+    setMaxYear(params.get("max_year") ?? "");
+    setSelectedGenres((params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean));
+    setSelectedRegions((params.get("region_codes") ?? "").split("|").filter(Boolean));
+    if (params.toString()) void runSearch(params);
+    else {
+      setResults([]);
+      setOnlineResults([]);
+      setTotal(0);
+      setOnlineTotal(0);
+      setHasSearched(false);
+    }
+    // URL is the single source of truth for search state, including browser back/forward.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -783,44 +804,62 @@ function SearchPage() {
     if (selectedGenres.length) params.set("genre_ids", selectedGenres.join(","));
     if (selectedRegions.length) params.set("region_codes", selectedRegions.join("|"));
     setSearchParams(params);
-    void runSearch(params);
   }
 
-  function loadMoreLocal() {
-    if (!nextCursor) return;
-    const params = new URLSearchParams();
-    const q = (searchParams.get("search") ?? "").trim();
-    if (q) params.set("search", q);
-    if (type !== "all") params.set("type", type);
-    if (searchParams.get("min_rating")) params.set("min_rating", searchParams.get("min_rating")!);
-    if (searchParams.get("min_rating_count")) params.set("min_rating_count", searchParams.get("min_rating_count")!);
-    if (searchParams.get("min_year")) params.set("min_year", searchParams.get("min_year")!);
-    if (searchParams.get("max_year")) params.set("max_year", searchParams.get("max_year")!);
-    const genreNames = selectedGenres.map((id) => genreOptions.find((item) => String(item.id) === id)?.name).filter(Boolean);
-    const regionNames = selectedRegions.map((code) => regionOptions.find((item) => item.code === code)?.name).filter(Boolean);
-    if (genreNames.length) params.set("genres", genreNames.join(","));
-    if (regionNames.length) params.set("regions", regionNames.join(","));
-    params.set("cursor", nextCursor);
-    void api.movies(params).then((data) => {
+  async function loadMoreLocal() {
+    if (!nextCursor || loading) return;
+    const state = new URLSearchParams(searchParams);
+    const genreIds = (state.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean);
+    const regionCodes = (state.get("region_codes") ?? "").split("|").filter(Boolean);
+    setLoading(true);
+    try {
+      const [genres, regions] = await Promise.all([
+        genreIds.length
+          ? api.discoveryGenres(state.get("type") === "tv" ? "tv" : "movie").then((data) => data.genres)
+          : Promise.resolve(genreOptions),
+        regionCodes.length && !regionOptions.length
+          ? api.discoveryRegions().then((data) => data.regions)
+          : Promise.resolve(regionOptions)
+      ]);
+      const params = new URLSearchParams();
+      if (state.get("search")) params.set("search", state.get("search")!);
+      if (state.get("type") && state.get("type") !== "all") params.set("type", state.get("type")!);
+      for (const key of ["min_rating", "min_rating_count", "min_year", "max_year"]) {
+        if (state.get(key)) params.set(key, state.get(key)!);
+      }
+      const genreNames = genreIds.map((id) => genres.find((item) => String(item.id) === id)?.name).filter(Boolean);
+      const regionNames = regionCodes.map((code) => regions.find((item) => item.code === code)?.name).filter(Boolean);
+      if (genreNames.length) params.set("genres", genreNames.join(","));
+      if (regionNames.length) params.set("regions", regionNames.join(","));
+      params.set("cursor", nextCursor);
+      const data = await api.movies(params);
+      setGenreOptions(genres);
+      setRegionOptions(regions);
       setResults((current) => current.concat(data.items));
       setNextCursor(data.next_cursor);
-    }).catch((err: Error) => setError(err.message));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function loadMoreOnline() {
     if (onlinePage >= onlinePages || loading) return;
     const nextPage = onlinePage + 1;
     const q = (searchParams.get("search") ?? "").trim();
+    const requestedType = (searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all";
+    const requestedMinRating = searchParams.get("min_rating") ?? "";
     const request = q.length >= 2
-      ? api.discoverySearch(q, type === "all" ? "all" : type, nextPage)
+      ? api.discoverySearch(q, requestedType, nextPage)
       : api.discoveryDiscover(new URLSearchParams({
-          media_type: type === "tv" ? "tv" : "movie",
+          media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(nextPage),
           min_votes: searchParams.get("min_rating_count") || "100",
-          sort_by: minRating ? "vote_average.desc" : "popularity.desc",
+          sort_by: requestedMinRating ? "vote_average.desc" : "popularity.desc",
           ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")!.split(/[|,]/).filter(Boolean).join(",") } : {}),
           ...(searchParams.get("region_codes") ? { region: searchParams.get("region_codes")! } : {}),
-          ...(searchParams.get("min_rating") ? { min_rating: searchParams.get("min_rating")! } : {}),
+          ...(requestedMinRating ? { min_rating: requestedMinRating } : {}),
           ...(searchParams.get("min_year") ? { min_year: searchParams.get("min_year")! } : {}),
           ...(searchParams.get("max_year") ? { max_year: searchParams.get("max_year")! } : {})
         }));
@@ -832,9 +871,18 @@ function SearchPage() {
     }).catch((err: Error) => setOnlineError(err.message)).finally(() => setLoading(false));
   }
 
+  // Only stable provider IDs establish identity; same title/year alone can be different films.
+  const findLinkedLocalMovie = (item: DiscoveryItem) => results.find((movie) =>
+    movie.type === item.media_type && (
+      movie.tmdb_id === String(item.provider_id) ||
+      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id)
+    )
+  );
   const localOnly = results.filter((movie) => !onlineResults.some((item) =>
-    (movie.tmdb_id === String(item.provider_id) && movie.type === item.media_type) ||
-    (movie.title.trim().toLowerCase() === item.title.trim().toLowerCase() && movie.year === item.year)
+    movie.type === item.media_type && (
+      movie.tmdb_id === String(item.provider_id) ||
+      Boolean(item.imdb_id && movie.imdb_id && movie.imdb_id === item.imdb_id)
+    )
   ));
 
   return (
@@ -874,7 +922,7 @@ function SearchPage() {
       {onlineResults.length > 0 || localOnly.length > 0 ? (
         <>
           <div className="movie-grid">
-            {onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}
+            {onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
             {localOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
           </div>
           {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}

@@ -26,14 +26,14 @@
 - 生产 rollout 和 `.env` 小雅配置检查的后续修订已通过最新主分支 CI（提交 `e02adb8d2261bc8b3a199355e304b83f915c0f02`）：Backend、Frontend、Compose smoke、Browser E2E 全部通过。
 - 本轮 CI 已通过 Backend、Frontend/type-check、Compose smoke 和浏览器端到端测试。
 - 代码新增 schema v4：豆瓣评价人数允许为 `NULL`，迁移会将旧数据中作为缺失占位的 0 转为 NULL；新增在线收藏与榜单影片的严格身份关联；Top 250/年度详情按需通过 TMDB 严格匹配补充临时简介；小雅地址改由 `.env` 提供；搜索筛选状态修复；新增豆瓣实时热门手动刷新脚本。
-- **以上代码已合并，但尚未完成 NAS 二次 rollout。** NAS 基础实例已部署；生产库上次确认仍为 schema v3。必须通过 `deploy/rollout_online_discovery.sh --check` 预检，再经人工确认执行 `--deploy`，完成备份、schema v4 迁移、镜像更新和实时验收；不得跳过迁移直接替换后端。
+- **历史记录说明：** 本段 rollout 说明对应早期开发阶段，已被本文件顶部 2026-11-25 生产状态校正取代。当前 NAS 已完成 schema v4 rollout，不要按此历史段落重复执行迁移。
 - 豆瓣热门/高分采集仍是手动、受 robots.txt 约束的操作；若来源拒绝访问，脚本停止，不绕过限制。新增热门脚本不代表已经成功采集或导入数据。
 
 ## 一句话结论
 
 MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采集/导入链路、容器与备份恢复工具。首发真实数据为 5 个快照、288 条榜单项、288 个唯一影片；已在 GitHub Actions 临时数据库完成导入，并通过桌面、390px 移动端及真实收藏链路浏览器验收。
 
-**NAS MovieHub 实例已部署并通过基础连通性、健康检查、NPM 路由和数据库备份恢复验收。** 但 NAS 正式数据库目前只有 7 个内置榜单定义，尚未导入 5 个真实快照 / 288 条榜单项；GitHub Actions 的真实数据验收仍属于隔离环境，不等于生产数据已经导入。
+**历史部署说明：** 隔离 CI 的 5 个快照 / 288 条榜单项不能证明生产库已有相同覆盖率。当前生产库已完成 schema v4 和 238 条 TMDB 简介导入；榜单快照数量仍须以生产库审计为准。
 
 ## 重要边界
 
@@ -115,7 +115,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 - [x] 完成来源许可/稳定性/匹配方案研究及只读 TMDB adapter、CLI、mocked backend tests；详见 [OVERVIEW-SOURCE-RESEARCH.md](OVERVIEW-SOURCE-RESEARCH.md)。
 - [x] 已配置只读 token 并完成 Top 250 的 500 条 zh-CN/zh-TW 真实 API 审计，简介可用覆盖率 470/500（94%）。
 - [x] 已完成 TMDB 简介导入方案审查与 NULL-only 导入；生产数据库写入 238 条并完成来源哈希验收。
-- [x] schema v3 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与真实数据持久化检查。
+- [x] schema v4 provenance migration、导入追踪逻辑和回归测试已通过 Backend CI 与生产数据持久化检查。
 - [x] 真实数据收藏/取消收藏：通过 Playwright 经可信代理注入密钥，验证 live API 与临时 SQLite 的写入、列表读取、删除。
 - [ ] 真实多日期历史快照选择、排名比较、分页和异常状态流程验收。
 - [ ] 完成前端真实数据视觉 QA 和异常状态检查。
@@ -159,7 +159,7 @@ MovieHub 已有独立 SQLite 数据库、核心 API、React 前端、榜单采�
 | 容器、备份恢复和运维文档 | 已实现；真实 288 条榜单项导入、schema v2→v3、双容器 API、备份恢复/回滚均在隔离 CI 通过 |
 | NAS/NPM 实际联调与基础部署 | 已完成；TMDB 简介已导入，榜单快照覆盖率待核对 |
 
-**整体进度估算维持约 90%。** 本轮新增两项真实验收：TMDB Top 250 的 500 条简繁体语言记录只读审计，470 条可用（94%）；以及 5 个真实快照/288 条榜单项在 schema v2→v3 升级后的双容器导入、API、备份恢复和回滚闭环。TMDB 简介已通过受控导入写入生产库 238 条，并完成 provenance 与 SHA-256 一致性验收。下一步优先完成 TMDB 条款审查，再决定是否增加 NULL-only overview importer 与 attribution UI；同时补齐真实多日期历史、Scout 只读导入演练和前端边界 QA。最新真实数据导入/升级 CI [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) 与主 CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) 均通过。
+**整体进度估算维持约 90%。** 本轮新增两项真实验收：TMDB Top 250 的 500 条简繁体语言记录只读审计，470 条可用（94%）；以及 5 个真实快照/288 条榜单项在 schema v2→v3 升级后的双容器导入、API、备份恢复和回滚闭环。TMDB 简介已通过受控导入写入生产库 238 条，并完成 provenance 与 SHA-256 一致性验收。下一步聚焦生产搜索/收藏/小雅验收、真实多日期历史、前端边界 QA 与必要的运维文档整理；Scout 只读导入仍是可选项。最新真实数据导入/升级 CI [#45350740671](https://github.com/daxiguaya/MovieHub/actions/runs/45350740671) 与主 CI [#45350740713](https://github.com/daxiguaya/MovieHub/actions/runs/45350740713) 均通过。
 
 ## 2026-11-24 — Pagination, history, search-filter acceptance expansion
 

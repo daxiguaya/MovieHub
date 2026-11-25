@@ -175,3 +175,174 @@ def _load_targets() -> list[dict[str, Any]]:
             "actors": m.actors,
         } for m in rows if m.tmdb_id and str(m.tmdb_id).isdigit()]
 
+
+
+def _target_object(target: dict[str, Any]):
+    from types import SimpleNamespace
+    return SimpleNamespace(**target)
+
+
+async def _collect(targets: list[dict[str, Any]], token: str) -> tuple[list[dict[str, Any]], Counter, list[dict[str, Any]]]:
+    counts: Counter = Counter()
+    accepted: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    limits = httpx.Limits(max_connections=6, max_keepalive_connections=4)
+    timeout = httpx.Timeout(25.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
+        semaphore = asyncio.Semaphore(4)
+
+        async def one(target: dict[str, Any]) -> None:
+            media_type = target["type"]
+            tmdb_id = str(target["tmdb_id"])
+            if media_type not in {"movie", "tv"}:
+                errors.append({"id": target["id"], "tmdb_id": tmdb_id, "reason": "unsupported media type"})
+                counts["rejected"] += 1
+                return
+            async with semaphore:
+                try:
+                    payload = await _fetch_details(client, token, media_type, tmdb_id)
+                    extracted = _extract(_target_object(target), payload)
+                    accepted.append({"target": target, "metadata": extracted})
+                    counts["identity_verified"] += 1
+                except (httpx.HTTPError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+                    errors.append({"id": target["id"], "tmdb_id": tmdb_id, "reason": str(exc)[:240]})
+                    counts["rejected"] += 1
+
+        await asyncio.gather(*(one(target) for target in targets))
+    accepted.sort(key=lambda item: item["target"]["id"])
+    return accepted, counts, errors
+
+
+def _current_association_names(db, model, relation_model, foreign_key: str, movie_id: int) -> set[str]:
+    stmt = (
+        select(model.name)
+        .join(relation_model, getattr(relation_model, f"{model.__tablename__[:-1]}_id") == model.id)
+        .where(relation_model.movie_id == movie_id)
+    )
+    return set(db.execute(stmt).scalars().all())
+
+
+def _apply_records(records: list[dict[str, Any]], apply: bool) -> dict[str, Any]:
+    field_counts: Counter = Counter()
+    changed: list[dict[str, Any]] = []
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    with SessionLocal() as db:
+        for record in records:
+            target = record["target"]
+            metadata = record["metadata"]
+            movie = db.get(Movie, target["id"])
+            if movie is None:
+                field_counts["movie_missing"] += 1
+                continue
+            values = {
+                "original_title": metadata["original_title"],
+                "year": metadata["year"],
+                "actors": metadata["actors"],
+            }
+            for field, value in values.items():
+                if value is None or not _blank(getattr(movie, field)):
+                    continue
+                field_counts[field] += 1
+                changed.append({"movie_id": movie.id, "field": field, "value": value, "source_url": metadata["source_url"]})
+                if apply:
+                    stored = json.dumps(value, ensure_ascii=False, separators=(",", ":")) if field == "actors" else value
+                    setattr(movie, field, stored)
+                    db.add(MovieMetadataProvenance(
+                        movie_id=movie.id, field_name=field, source="tmdb",
+                        source_url=metadata["source_url"], observed_at=now,
+                        value_sha256=_hash(value),
+                    ))
+
+            existing_genres = {assoc.genre_obj.name for assoc in movie.genres if assoc.genre_obj}
+            if not existing_genres and metadata["genres"]:
+                field_counts["genres"] += 1
+                changed.append({"movie_id": movie.id, "field": "genres", "value": metadata["genres"], "source_url": metadata["source_url"]})
+                if apply:
+                    for name in metadata["genres"]:
+                        genre = db.execute(select(Genre).where(Genre.name == name)).scalar_one_or_none()
+                        if genre is None:
+                            genre = Genre(name=name)
+                            db.add(genre)
+                            db.flush()
+                        db.add(MovieGenre(movie_id=movie.id, genre_id=genre.id))
+                    db.add(MovieMetadataProvenance(
+                        movie_id=movie.id, field_name="genres", source="tmdb",
+                        source_url=metadata["source_url"], observed_at=now,
+                        value_sha256=_hash(metadata["genres"]),
+                    ))
+
+            existing_regions = {assoc.region_obj.name for assoc in movie.regions if assoc.region_obj}
+            if not existing_regions and metadata["regions"]:
+                field_counts["regions"] += 1
+                changed.append({"movie_id": movie.id, "field": "regions", "value": metadata["regions"], "source_url": metadata["source_url"]})
+                if apply:
+                    for name in metadata["regions"]:
+                        region = db.execute(select(Region).where(Region.name == name)).scalar_one_or_none()
+                        if region is None:
+                            region = Region(name=name)
+                            db.add(region)
+                            db.flush()
+                        db.add(MovieRegion(movie_id=movie.id, region_id=region.id))
+                    db.add(MovieMetadataProvenance(
+                        movie_id=movie.id, field_name="regions", source="tmdb",
+                        source_url=metadata["source_url"], observed_at=now,
+                        value_sha256=_hash(metadata["regions"]),
+                    ))
+        if apply:
+            db.commit()
+        else:
+            db.rollback()
+
+    return {"field_counts": dict(sorted(field_counts.items())), "changes": changed}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Identity-checked annual chart TMDB metadata enrichment")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true", help="Read-only preview (default)")
+    mode.add_argument("--apply", action="store_true", help="Write verified missing metadata")
+    args = parser.parse_args()
+    apply = bool(args.apply)
+
+    token = settings.tmdb_api_read_token or os.getenv("TMDB_API_READ_TOKEN", "")
+    if not token:
+        print(json.dumps({"success": False, "error": "TMDB_API_READ_TOKEN is not configured"}, ensure_ascii=False))
+        return 2
+
+    targets = _load_targets()
+    if not targets:
+        print(json.dumps({"success": False, "error": "No annual chart records with numeric TMDB IDs found"}, ensure_ascii=False))
+        return 2
+
+    print(f"年度榜单目标记录：{len(targets)}")
+    accepted, identity_counts, errors = asyncio.run(_collect(targets, token))
+    preview = _apply_records(accepted, apply=False)
+    backup_path = None
+    if apply and preview["changes"]:
+        db_path = Path(get_db_path())
+        backup_path = _backup(db_path, db_path.parent.parent / "backups")
+        # Recalculate and commit against current DB state after the backup.
+        result = _apply_records(accepted, apply=True)
+    else:
+        result = preview
+
+    report = {
+        "success": True,
+        "mode": "apply" if apply else "dry-run",
+        "target_records": len(targets),
+        "identity_verified": len(accepted),
+        "identity_rejected": identity_counts["rejected"],
+        "identity_checks": dict(identity_counts),
+        "field_counts": result["field_counts"],
+        "planned_or_applied_changes": len(result["changes"]),
+        "database_written": bool(apply and result["changes"]),
+        "backup": str(backup_path) if backup_path else None,
+        "errors": errors,
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if not errors else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

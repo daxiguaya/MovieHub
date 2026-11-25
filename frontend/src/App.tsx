@@ -660,7 +660,7 @@ function SearchPage() {
 
   useEffect(() => {
     let active = true;
-    api.discoveryGenres(requestedType === "tv" ? "tv" : "movie")
+    api.discoveryGenres(type === "tv" ? "tv" : "movie")
       .then((data) => { if (active) setGenreOptions(data.genres); })
       .catch(() => { if (active) setGenreOptions([]); });
     return () => { active = false; };
@@ -695,7 +695,7 @@ function SearchPage() {
       if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
       const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
         selectedGenreIds.length && !genreOptions.length
-          ? api.discoveryGenres(type === "tv" ? "tv" : "movie").then((data) => data.genres)
+          ? api.discoveryGenres(requestedType === "tv" ? "tv" : "movie").then((data) => data.genres)
           : Promise.resolve(genreOptions),
         selectedRegionCodes.length && !regionOptions.length
           ? api.discoveryRegions().then((data) => data.regions)
@@ -804,7 +804,6 @@ function SearchPage() {
     if (selectedGenres.length) params.set("genre_ids", selectedGenres.join(","));
     if (selectedRegions.length) params.set("region_codes", selectedRegions.join("|"));
     setSearchParams(params);
-    void runSearch(params);
   }
 
   async function loadMoreLocal() {

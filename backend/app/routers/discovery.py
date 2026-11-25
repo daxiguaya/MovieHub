@@ -147,7 +147,7 @@ async def discover_online(
     min_rating: float | None = Query(None, ge=0, le=10),
     min_votes: int = Query(100, ge=0, le=10000000),
     max_votes: int | None = Query(None, ge=0, le=10000000),
-    sort_by: Literal["popularity.desc", "vote_average.desc", "primary_release_date.desc", "vote_count.desc"] = Query("popularity.desc"),
+    sort_by: Literal["popularity.desc", "vote_average.desc", "vote_average.asc", "primary_release_date.desc", "first_air_date.desc", "vote_count.desc"] = Query("popularity.desc"),
     language: str = Query("zh-CN", min_length=2, max_length=12),
 ) -> dict:
     params = {

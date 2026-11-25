@@ -26,6 +26,8 @@ def _migrated_database(path: Path) -> None:
         conn.executescript(followup.read_text(encoding="utf-8"))
         provenance = MIGRATION.with_name("003_movie_metadata_provenance.sql")
         conn.executescript(provenance.read_text(encoding="utf-8"))
+        nullable_votes = MIGRATION.with_name("004_nullable_douban_vote_count.sql")
+        conn.executescript(nullable_votes.read_text(encoding="utf-8"))
     finally:
         conn.close()
 
@@ -50,7 +52,7 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         with engine.connect() as conn:
             assert conn.exec_driver_sql(
                 "SELECT MAX(version) FROM schema_migrations"
-            ).scalar_one() == 3
+            ).scalar_one() == 4
     finally:
         engine.dispose()
 
@@ -65,7 +67,7 @@ def test_movie_check_constraints_are_declared_once(tmp_path):
             "SELECT sql FROM sqlite_master "
             "WHERE type='table' AND name='movies'"
         ).fetchone()[0]
-        assert movie_sql.count("CHECK (rating_count >= 0)") == 1
+        assert movie_sql.count("CHECK (rating_count IS NULL OR rating_count >= 0)") == 1
         assert movie_sql.count("CHECK (type IN ('movie', 'tv'))") == 1
     finally:
         conn.close()

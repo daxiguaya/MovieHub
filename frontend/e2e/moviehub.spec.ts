@@ -51,21 +51,19 @@ const movie = {
 async function installApiFixtures(page) {
   let favorite = false;
 
-  await page.route("**/config.json", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        xiaoyaSearchBaseUrl: "https://xiaoya.example/search"
-      })
-    })
-  );
-
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
     const method = request.method();
 
+    if (path === "/api/config" && method === "GET") {
+      return route.fulfill({
+        json: {
+          xiaoyaSearchUrlTemplate: "https://xiaoya.example/search?box={query}&type=video&url="
+        }
+      });
+    }
     if (path === "/api/discovery/regions" && method === "GET") {
       return route.fulfill({ json: { provider: "tmdb", regions: [{ code: "US", name: "美国" }] } });
     }

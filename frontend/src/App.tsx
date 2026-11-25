@@ -888,7 +888,7 @@ function DetailBackButton() {
     <button
       className="secondary-button detail-back-button"
       type="button"
-      onClick={() => navigate(location.key === "default" ? "/search" : -1)}
+      onClick={() => { if (location.key === "default") navigate("/search"); else navigate(-1); }}
     >
       <span aria-hidden="true">←</span> 返回上一页
     </button>

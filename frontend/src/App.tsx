@@ -28,7 +28,7 @@ import type {
 
 function App() {
   const [publicConfig, setPublicConfig] = useState<PublicConfig>({
-    xiaoyaSearchBaseUrl: ""
+    xiaoyaSearchUrlTemplate: ""
   });
 
   useEffect(() => {
@@ -438,14 +438,15 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
-function MovieCard({ movie, rank }: { movie: Movie; rank?: number }) {
+function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: number; localMatch?: boolean }) {
   return (
     <article className="movie-card">
       <MoviePoster movie={movie} rank={rank} />
       <div className="movie-card-info">
         <Link to={`/movies/${movie.id}`} className="movie-title">{movie.title}</Link>
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
-        <div className="movie-rating"><span>★</span> 豆瓣 {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count.toLocaleString()})</small></div>
+        {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
+        <div className="movie-rating"><span>★</span> 豆瓣 {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
       </div>
     </article>
   );
@@ -685,8 +686,20 @@ function SearchPage() {
       if (params.get("min_rating_count")) localParams.set("min_rating_count", params.get("min_rating_count")!);
       if (params.get("min_year")) localParams.set("min_year", params.get("min_year")!);
       if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
-      const genreNames = selectedGenres.map((id) => genreOptions.find((item) => String(item.id) === id)?.name).filter(Boolean);
-      const regionNames = selectedRegions.map((code) => regionOptions.find((item) => item.code === code)?.name).filter(Boolean);
+      const selectedGenreIds = (params.get("genre_ids") ?? "").split(/[|,]/).filter(Boolean);
+      const selectedRegionCodes = (params.get("region_codes") ?? "").split("|").filter(Boolean);
+      const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
+        selectedGenreIds.length && !genreOptions.length
+          ? api.discoveryGenres(type === "tv" ? "tv" : "movie").then((data) => data.genres)
+          : Promise.resolve(genreOptions),
+        selectedRegionCodes.length && !regionOptions.length
+          ? api.discoveryRegions().then((data) => data.regions)
+          : Promise.resolve(regionOptions)
+      ]);
+      if (selectedGenreIds.length && resolvedGenreOptions.length) setGenreOptions(resolvedGenreOptions);
+      if (selectedRegionCodes.length && resolvedRegionOptions.length) setRegionOptions(resolvedRegionOptions);
+      const genreNames = selectedGenreIds.map((id) => resolvedGenreOptions.find((item) => String(item.id) === id)?.name).filter(Boolean);
+      const regionNames = selectedRegionCodes.map((code) => resolvedRegionOptions.find((item) => item.code === code)?.name).filter(Boolean);
       if (genreNames.length) localParams.set("genres", genreNames.join(","));
       if (regionNames.length) localParams.set("regions", regionNames.join(","));
       const hasLocalCriteria = localParams.toString().length > 0;
@@ -860,7 +873,10 @@ function SearchPage() {
       {error && <div className="inline-error">{error}</div>}
       {onlineResults.length > 0 ? (
         <>
-          <div className="movie-grid">{onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}</div>
+          <div className="movie-grid">
+            {onlineResults.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}
+            {localOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
+          </div>
           {onlinePage < onlinePages && <button className="secondary-button load-more" onClick={loadMoreOnline} disabled={loading}>{loading ? "正在加载…" : "加载更多在线结果"}</button>}
         </>
       ) : loading ? <Loading /> : hasSearched ? (
@@ -868,13 +884,7 @@ function SearchPage() {
       ) : (
         <EmptyState title="输入片名或选择筛选条件" detail="关键词搜索覆盖在线电影和剧集；不输入关键词时，可以使用类型、地区、年份和评分发现作品。" />
       )}
-      {localOnly.length > 0 && (
-        <>
-          <div className="section-heading"><div><div className="eyebrow">LOCAL CHART MATCHES</div><h2>本地榜单中的匹配作品</h2></div></div>
-          <div className="movie-grid">{localOnly.map((movie) => <MovieCard key={movie.id} movie={movie} />)}</div>
-          {nextCursor && <button className="secondary-button load-more" onClick={loadMoreLocal}>加载更多本地匹配</button>}
-        </>
-      )}
+
       <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </>
   );
@@ -960,13 +970,13 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <div className="eyebrow">{movie.type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? movie.tmdb_metadata?.year ?? "YEAR UNKNOWN"}</div>
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
-          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count.toLocaleString()} 人评价</span>
+          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count == null ? "暂无评价人数" : `${movie.rating_count.toLocaleString()} 人评价`}</span>
             {movie.tmdb_metadata?.rating != null && <span>TMDB · ★ {movie.tmdb_metadata.rating.toFixed(1)} · {movie.tmdb_metadata.rating_count.toLocaleString()} 票</span>}
           </div>
           <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；豆瓣与 TMDB 评分分别展示。</p>}
           <div className="detail-actions">
-            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchBaseUrl, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
+            <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>

@@ -56,8 +56,10 @@ fi
 docker compose config --quiet
 TOKEN_OK=$(docker compose config --format json | python3 -c 'import json,sys; e=json.load(sys.stdin)["services"]["moviehub"]["environment"]; print("yes" if len(str(e.get("TMDB_API_READ_TOKEN", ""))) >= 80 else "no")')
 API_KEY_OK=$(docker compose config --format json | python3 -c 'import json,sys; e=json.load(sys.stdin)["services"]["moviehub"]["environment"]; print("yes" if len(str(e.get("MOVIEHUB_API_KEY", ""))) >= 32 else "no")')
+XIAOYA_OK=$(docker compose config --format json | python3 -c 'import json,sys; from urllib.parse import urlsplit; e=json.load(sys.stdin)["services"]["moviehub"]["environment"]; u=str(e.get("MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE", "")); p=urlsplit(u.replace("{query}", "test")); print("yes" if "{query}" in u and p.scheme in ("http", "https") and p.netloc else "no")')
 [ "$TOKEN_OK" = "yes" ] || { echo "[FAIL] TMDB_API_READ_TOKEN is missing or unexpectedly short; value not displayed." >&2; exit 1; }
 [ "$API_KEY_OK" = "yes" ] || { echo "[FAIL] MOVIEHUB_API_KEY is missing or too short; value not displayed." >&2; exit 1; }
+[ "$XIAOYA_OK" = "yes" ] || { echo "[FAIL] Set MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE in .env with a valid http(s) URL containing {query}." >&2; exit 1; }
 docker network inspect nginx-proxy-manager_default >/dev/null 2>&1 || { echo "[FAIL] Required NPM Docker network is missing" >&2; exit 1; }
 
 DATA_PATH=$(python3 -c 'from pathlib import Path; p={}; [p.update({k.strip():v.strip().strip(chr(34)).strip(chr(39))}) for line in Path(".env").read_text().splitlines() if "=" in line and not line.lstrip().startswith("#") for k,v in [line.split("=",1)]]; print(p.get("MOVIEHUB_DATA_PATH", "/volume1/docker/moviehub/data"))')

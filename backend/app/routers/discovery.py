@@ -191,7 +191,7 @@ async def get_online_detail(
         f"/{media_type}/{provider_id}",
         {"language": language, "append_to_response": "credits,external_ids"},
         DETAIL_TTL,
-        cache_overview=True,
+        include_overview=True,
     )
     return {
         "provider": "tmdb",

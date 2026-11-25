@@ -40,7 +40,7 @@ MovieHub does not create or migrate a database during module import or applicati
 python -m scripts.init_db
 ```
 
-The initializer applies the core schema and bundled follow-up migrations, validates a temporary schema-v2 database against the ORM contract, then atomically publishes it. It refuses to convert or overwrite an existing non-empty database. To upgrade an existing MovieHub schema-v1 database, stop the application and run `python -m scripts.migrate`; the runner creates and verifies a pre-migration backup and restores it if migration validation fails. Douban Scout is not the MovieHub database and must never be passed to this initializer or migration runner.
+The initializer applies the core schema and bundled follow-up migrations through schema v4, validates the fresh database against the ORM contract, then atomically publishes it. It refuses to convert or overwrite an existing non-empty database. To upgrade an existing MovieHub schema-v1, v2 or v3 database, stop the application and run `python -m scripts.migrate`; the runner creates and verifies a pre-migration backup and restores it if migration validation fails. Douban Scout is not the MovieHub database and must never be passed to this initializer or migration runner.
 
 - `GET /api/health` is a process liveness check.
 - `GET /api/ready` checks that the MovieHub schema is present and at the supported schema version.
@@ -50,14 +50,10 @@ Do not run initialization or migrations against production data until a separate
 
 ## Frontend runtime configuration
 
-The frontend reads the public Xiaoya search URL from `/config.json`. In Compose, `MOVIEHUB_FRONTEND_CONFIG_PATH` mounts the host JSON file at that path. The example file is `deploy/frontend-config.json`:
+The frontend loads the public Xiaoya search URL template from `GET /api/config`. Set it in the MovieHub `.env` file:
 
-```json
-{
-  "xiaoyaSearchBaseUrl": "https://your-xiaoya-host.example/search"
-}
+```dotenv
+MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE=http://zwnas.notedream.com:5678/search?box={query}&type=video&url=
 ```
 
-The value is a public navigation URL, not a credential. MovieHub appends the selected movie title as the URL-encoded `box` query parameter. Keep the real NAS hostname in this runtime config rather than hardcoding it in the React source.
-
-Never put `MOVIEHUB_API_KEY` or any other secret in this file. The frontend must not contain server credentials.
+`{query}` is replaced by the URL-encoded movie title. The backend exposes only this non-secret navigation setting through `/api/config`; do not mount the whole `.env` file into the frontend. Keep `MOVIEHUB_API_KEY`, `TMDB_API_READ_TOKEN` and all other credentials server-side.

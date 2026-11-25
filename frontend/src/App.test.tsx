@@ -169,7 +169,7 @@ describe("MovieHub frontend workflows", () => {
         <App />
       </MemoryRouter>
     );
-    await screen.findByRole("link", { name: "高分" });
+    await screen.findAllByRole("link", { name: "高分" });
     const cards = Array.from(container.querySelectorAll(".movie-grid .movie-card"));
     expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
       .toEqual(["高分", "低分", "无评分"]);

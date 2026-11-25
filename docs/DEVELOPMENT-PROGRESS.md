@@ -1,10 +1,10 @@
 # MovieHub Development Progress
 
 Branch: `main`
-Last updated: 2026-11-24
-Current phase: Pre-deployment hardening — PR #5 merged; localized TMDB real-data audit complete; NAS deployment gate remains
+Last updated: 2026-11-25
+Current phase: NAS base deployment complete; schema-v4 rollout, production data import and live acceptance remain
 
-> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained done/remaining checklist and current 87% delivery estimate. The 288-record first-launch dataset, schema-v3 provenance, and live real-data browser journeys (including favorites add/list/remove) have passed in disposable GitHub Actions SQLite. MovieHub has not been deployed and has no production database. Scout is an optional external read-only source, not a prerequisite or a MovieHub source database.
+> **Current authoritative status:** see [PROJECT-STATUS.md](PROJECT-STATUS.md) for the maintained delivery checklist and progress estimate. PR #21 has merged the unified favorites, runtime Xiaoya configuration, nullable Douban vote counts, strict TMDB enrichment, and search-state fixes. The NAS instance and NPM route were deployed earlier; the production database was last confirmed at schema v3 with built-in chart definitions only. The new guarded rollout script performs a verified backup and schema-v4 migration, but it has not yet been run against production. The 5-snapshot / 288-item dataset has passed isolated CI import, not production import. Scout remains an optional external read-only source.
 
 
 ## Phase 4 — independent database foundation

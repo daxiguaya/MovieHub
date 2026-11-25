@@ -28,6 +28,7 @@ docker compose exec -T moviehub sh -lc "
     --output '$OUTPUT' \
     --max-items 100 \
     --overwrite &&
+  python -m scripts.db_backup backup &&
   python -m scripts.import_chart --input '$OUTPUT' &&
   rm -f '$OUTPUT'
 "

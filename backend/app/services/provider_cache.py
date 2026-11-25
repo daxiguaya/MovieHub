@@ -225,6 +225,16 @@ class ProviderResponseCache:
         return {"provider": "tmdb", "media_type": media_type, "provider_id": int(provider_id),
                 "snapshot": json.loads(row[0]), "note": row[1], "created_at": row[2], "updated_at": row[3]}
 
+    def has_favorite(self, media_type: str, provider_id: int) -> bool:
+        self._init()
+        with self._lock, self._connection() as connection:
+            row = connection.execute(
+                """SELECT 1 FROM external_favorites
+                   WHERE provider=? AND media_type=? AND provider_id=? LIMIT 1""",
+                ("tmdb", media_type, int(provider_id)),
+            ).fetchone()
+        return row is not None
+
     def list_favorites(self) -> list[dict[str, Any]]:
         self._init()
         with self._lock, self._connection() as connection:

@@ -80,7 +80,7 @@ if [ "$MODE" = "check" ]; then
   exit 0
 fi
 
-printf "This will fast-forward main, back up SQLite, rebuild and recreate ONLY moviehub-backend and moviehub-web. NPM will not be restarted. Continue? [y/N] "
+printf "This will fast-forward main, back up SQLite, migrate the MovieHub database, and recreate ONLY moviehub-backend and moviehub-web. NPM will not be restarted. Continue? [y/N] "
 read ANSWER
 [ "$ANSWER" = "y" ] || [ "$ANSWER" = "Y" ] || { echo "Cancelled; nothing deployed."; exit 0; }
 
@@ -133,15 +133,39 @@ git merge --ff-only origin/main
 echo "[4/6] Building only the MovieHub backend and frontend..."
 docker compose build moviehub moviehub-web
 
-echo "[5/6] Updating only the two MovieHub containers (NPM container stays running)..."
+echo "[5/6] Migrating the MovieHub database and updating only its two containers..."
 reload_npm_routes() {
   docker inspect nginx-proxy-manager >/dev/null 2>&1 || { echo "[FAIL] nginx-proxy-manager container is unavailable" >&2; return 1; }
   docker exec nginx-proxy-manager nginx -t
   docker exec nginx-proxy-manager nginx -s reload
 }
-ROLLBACK_NEEDED=1
 rollback() {
-  echo "[ROLLBACK] Restoring the previous backend and frontend images..." >&2
+  echo "[ROLLBACK] Restoring the previous images and pre-migration MovieHub database..." >&2
+  docker compose stop moviehub || true
+  if [ -f "$ROLLBACK_DB_BACKUP" ]; then
+    python3 - "$ROLLBACK_DB_BACKUP" "$DATA_PATH/db/movies.db" <<'PY'
+import sqlite3
+import sys
+from pathlib import Path
+
+backup_path, database_path = Path(sys.argv[1]), Path(sys.argv[2])
+source = sqlite3.connect("file:" + str(backup_path) + "?mode=ro", uri=True, timeout=60)
+target = sqlite3.connect(str(database_path), timeout=60)
+try:
+    source.backup(target)
+    target.commit()
+    integrity = target.execute("PRAGMA integrity_check").fetchone()
+    if not integrity or integrity[0] != "ok":
+        raise RuntimeError("Restored production database failed integrity_check")
+finally:
+    target.close()
+    source.close()
+print("Restored pre-migration database:", database_path)
+PY
+  else
+    echo "[FAIL] Pre-migration database backup is missing: $ROLLBACK_DB_BACKUP" >&2
+    return 1
+  fi
   docker tag "$ROLLBACK_BACKEND" moviehub-backend:local
   docker tag "$ROLLBACK_FRONTEND" moviehub-frontend:local
   docker compose up -d --no-deps moviehub moviehub-web || true
@@ -155,6 +179,10 @@ on_exit() {
 }
 trap on_exit EXIT
 
+ROLLBACK_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/movies.sqlite3"
+ROLLBACK_NEEDED=1
+docker compose stop moviehub
+docker compose run --rm --no-deps moviehub python -m scripts.migrate
 docker compose up -d --no-deps moviehub moviehub-web
 
 wait_healthy() {

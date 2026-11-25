@@ -5,6 +5,8 @@ import {
   NavLink,
   Route,
   Routes,
+  useLocation,
+  useNavigate,
   useParams,
   useSearchParams
 } from "react-router-dom";
@@ -878,6 +880,21 @@ function SearchPage() {
   );
 }
 
+function DetailBackButton() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  return (
+    <button
+      className="secondary-button detail-back-button"
+      type="button"
+      onClick={() => navigate(location.key === "default" ? "/search" : -1)}
+    >
+      <span aria-hidden="true">←</span> 返回上一页
+    </button>
+  );
+}
+
 function MoviePage({ config }: { config: PublicConfig }) {
   const { movieId = "" } = useParams();
   const id = Number(movieId);
@@ -922,6 +939,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
 
   return (
     <>
+      <DetailBackButton />
       <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><Link to="/search">全网搜索</Link><span>/</span><span>{movie.title}</span></div>
       <section className="detail-layout">
         <div className="detail-poster-wrap">
@@ -1001,6 +1019,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
 
   return (
     <>
+      <DetailBackButton />
       <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><Link to="/search">全网搜索</Link><span>/</span><span>{movie.title}</span></div>
       <section className="detail-layout">
         <div className="detail-poster-wrap">

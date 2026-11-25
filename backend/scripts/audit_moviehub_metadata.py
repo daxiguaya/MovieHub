@@ -174,7 +174,11 @@ def audit_database(database_path: str | Path) -> dict[str, Any]:
                 """
                 SELECT l.slug, l.name, l.source,
                        COUNT(DISTINCT cs.id) AS snapshot_count,
-                       COALESCE(SUM(cs.item_count), 0) AS declared_items,
+                       COALESCE((
+                           SELECT SUM(cs2.item_count)
+                           FROM chart_snapshots AS cs2
+                           WHERE cs2.list_id = l.list_id
+                       ), 0) AS declared_items,
                        COUNT(DISTINCT li.movie_id) AS distinct_movies
                 FROM lists AS l
                 LEFT JOIN chart_snapshots AS cs ON cs.list_id = l.list_id

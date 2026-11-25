@@ -69,6 +69,18 @@ def test_has_favorite_checks_only_the_requested_provider_identity(tmp_path):
     assert not cache.has_favorite("tv", 550)
 
 
+def test_delete_favorite_by_imdb_removes_only_the_matching_media_identity(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    cache.save_favorite("movie", 10, {"title": "Film", "imdb_id": "tt1234567"})
+    cache.save_favorite("movie", 11, {"title": "Other Film", "imdb_id": "tt7654321"})
+    cache.save_favorite("tv", 10, {"title": "Series", "imdb_id": "tt1234567"})
+
+    assert cache.delete_favorite_by_imdb("movie", "tt1234567")
+    assert not cache.has_favorite("movie", 10)
+    assert cache.has_favorite("movie", 11)
+    assert cache.has_favorite("tv", 10)
+
+
 def test_external_favorites_survive_cache_eviction(tmp_path):
     cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
     saved = cache.save_favorite(

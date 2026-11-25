@@ -52,7 +52,7 @@ def test_initializer_can_initialize_precreated_empty_file(tmp_path):
     try:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 3
+        ).fetchone()[0] == 4
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"

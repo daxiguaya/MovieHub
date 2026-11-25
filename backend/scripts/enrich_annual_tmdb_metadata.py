@@ -312,7 +312,7 @@ def main() -> int:
     backup_path = None
     if apply and preview["changes"]:
         db_path = Path(get_db_path())
-        backup_path = _backup(db_path, db_path.parent.parent / "backups")
+        backup_path = _backup(db_path, Path(settings.backup_dir))
         # Recalculate and commit against current DB state after the backup.
         result = _apply_records(accepted, apply=True)
     else:

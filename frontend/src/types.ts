@@ -15,6 +15,7 @@ export interface Movie {
   id: number;
   douban_id: string | null;
   tmdb_id?: string | null;
+  imdb_id?: string | null;
   title: string;
   original_title: string | null;
   year: number | null;
@@ -39,8 +40,6 @@ export interface MovieDetail extends Movie {
     runtime: number | null;
     poster_path: string | null;
   } | null;
-  imdb_id: string | null;
-  tmdb_id: string | null;
   directors: string[];
   actors: string[];
   overview: string | null;

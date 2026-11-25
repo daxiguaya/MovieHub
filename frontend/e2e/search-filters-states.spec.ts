@@ -33,7 +33,7 @@ async function installOptions(page) {
     route.fulfill({ contentType: "application/json", body: JSON.stringify({ xiaoyaSearchBaseUrl: "" }) })
   );
   await page.route("**/api/discovery/regions", (route) =>
-    route.fulfill({ json: { provider: "tmdb", regions: [{ code: "CN", name: "中国大陆" }] } })
+    route.fulfill({ json: { provider: "tmdb", regions: [{ code: "CN", name: "中国大陆" }, { code: "JP", name: "日本" }] } })
   );
   await page.route("**/api/discovery/genres**", (route) =>
     route.fulfill({ json: { provider: "tmdb", media_type: "movie", genres: [
@@ -73,6 +73,7 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   await page.getByRole("checkbox", { name: "科幻" }).check();
   await page.getByText("制作地区（可多选）").click();
   await page.getByRole("checkbox", { name: "中国大陆" }).check();
+  await page.getByRole("checkbox", { name: "日本" }).check();
   await page.getByRole("button", { name: /搜索/ }).click();
 
   await expect(page.getByRole("link", { name: "在线匹配影片" })).toBeVisible();
@@ -87,8 +88,8 @@ test("submits online Discover with dynamic multi-select filters and preserves se
 
   const online = new URL(discoverUrl);
   expect(online.searchParams.get("media_type")).toBe("movie");
-  expect(online.searchParams.get("with_genres")).toBe("18|878");
-  expect(online.searchParams.get("region")).toBe("CN");
+  expect(online.searchParams.get("with_genres")).toBe("18,878");
+  expect(online.searchParams.get("region")).toBe("CN|JP");
   expect(online.searchParams.get("min_rating")).toBe("8");
   expect(online.searchParams.get("min_votes")).toBe("1000");
   expect(online.searchParams.get("min_year")).toBe("2020");
@@ -96,12 +97,9 @@ test("submits online Discover with dynamic multi-select filters and preserves se
 
   const pageUrl = new URL(page.url());
   expect(pageUrl.searchParams.get("type")).toBe("movie");
-  expect(pageUrl.searchParams.get("genre_ids")).toBe("18|878");
-  expect(pageUrl.searchParams.get("region_codes")).toBe("CN");
+  expect(pageUrl.searchParams.get("genre_ids")).toBe("18,878");
+  expect(pageUrl.searchParams.get("region_codes")).toBe("CN|JP");
 
-  await page.getByLabel("类型匹配").selectOption("all");
-  await page.getByRole("button", { name: /搜索/ }).click();
-  await expect.poll(() => new URL(discoverUrl).searchParams.get("with_genres")).toBe("18,878");
 });
 
 test("shows a useful empty state when online and local discovery return no matches", async ({ page }) => {

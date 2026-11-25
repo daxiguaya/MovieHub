@@ -97,7 +97,7 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByText("在线搜索结果");
+    await screen.findByLabelText("排序方式");
     await userEvent.type(
       screen.getByPlaceholderText("输入片名，例如：异形、蝙蝠侠…"),
       "星际穿越"
@@ -142,7 +142,6 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
     await userEvent.selectOptions(await screen.findByLabelText("排序方式"), "rating_desc");
-    await userEvent.click(screen.getByRole("button", { name: /搜索 \/ 筛选/ }));
     await waitFor(() => {
       const discoverUrl = fetchMock.mock.calls.map(([input]) => String(input))
         .find((url) => url.startsWith("/api/discovery/discover?"));

@@ -35,6 +35,28 @@ ANNUAL_SLUGS = (
     "annual-2025-hidden-gems",
     "annual-2025-chinese-tv",
 )
+# Curated equivalences for known Chinese/English transliteration variants.
+# These are identity aliases, not fuzzy matching rules.
+DIRECTOR_ALIASES = {
+    "大鹏": {"大鹏", "董成鹏"},
+    "迪恩戴布洛伊": {"迪恩戴布洛伊", "迪恩德布洛斯"},
+    "拜伦霍华德": {"拜伦霍华德", "拜恩霍华德"},
+    "杰拉德布什": {"杰拉德布什", "贾里德布什"},
+    "克里斯托弗麦奎里": {"克里斯托弗麦奎里", "克里斯托弗麦夸里"},
+    "弗朗索瓦欧容": {"弗朗索瓦欧容", "弗朗索瓦奥宗"},
+    "卡门艾米": {"卡门艾米", "carmen emmi"},
+}
+TITLE_ALIASES = {
+    ("movie", "812583", "利刃出鞘3"): {
+        "利刃出鞘3亡者归来", "wakeupdeadmanaknivesoutmystery",
+    },
+    ("movie", "1289936", "唐顿庄园3"): {
+        "唐顿庄园盛世终章", "downtonabbeythegrandfinale",
+    },
+    ("movie", "1088514", "隔壁房间"): {
+        "隔壁的房间", "lahabitacióndeallado",
+    },
+}
 COUNTRY_NAMES = {
     "CN": "中国大陆", "HK": "中国香港", "TW": "中国台湾",
     "US": "美国", "GB": "英国", "JP": "日本", "KR": "韩国",
@@ -112,7 +134,9 @@ def _extract(movie: Movie, payload: dict[str, Any]) -> dict[str, Any]:
     provider_titles.discard("")
     source_title = _normalise(movie.title)
     source_original = _normalise(movie.original_title or "")
-    if not ({source_title, source_original} - {""}) & provider_titles:
+    title_matches = ({source_title, source_original} - {""}) & provider_titles
+    alias_titles = TITLE_ALIASES.get((media_type, str(movie.tmdb_id), movie.title), set())
+    if not title_matches and not (provider_titles & {_normalise(x) for x in alias_titles}):
         raise ValueError(f"TMDB title identity mismatch: stored={movie.title!r}, stored_original={movie.original_title!r}, provider={sorted(provider_titles)!r}")
 
     release = payload.get("release_date") if media_type == "movie" else payload.get("first_air_date")
@@ -128,8 +152,20 @@ def _extract(movie: Movie, payload: dict[str, Any]) -> dict[str, Any]:
         str(p.get("name")).strip() for p in crew
         if isinstance(p, dict) and p.get("job") in {"Director", "Executive Producer"} and p.get("name")
     ]
-    existing_directors = {_normalise(x) for x in json.loads(movie.directors or "[]") if isinstance(x, str)}
-    provider_directors = {_normalise(x) for x in directors}
+    def director_keys(names: list[str]) -> set[str]:
+        keys = set()
+        for name in names:
+            normalised = _normalise(name)
+            keys.add(normalised)
+            for canonical, aliases in DIRECTOR_ALIASES.items():
+                alias_keys = {_normalise(alias) for alias in aliases}
+                if normalised in alias_keys:
+                    keys.add(_normalise(canonical))
+        return keys
+
+    stored_directors = [x for x in json.loads(movie.directors or "[]") if isinstance(x, str)]
+    existing_directors = director_keys(stored_directors)
+    provider_directors = director_keys(directors)
     if existing_directors and provider_directors and not existing_directors.intersection(provider_directors):
         raise ValueError(f"TMDB director identity mismatch: stored={sorted(existing_directors)!r}, provider={sorted(provider_directors)!r}")
 

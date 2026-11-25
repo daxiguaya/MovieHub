@@ -7,7 +7,7 @@ license-gated operation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 import time
 import unicodedata
@@ -37,6 +37,7 @@ class OverviewLookup:
     matched_title: str | None = None
     release_date: str | None = None
     language: str | None = None
+    overview: str | None = field(default=None, repr=False)
     overview_length: int = 0
     overview_sha256: str | None = None
     source_url: str | None = None
@@ -457,6 +458,7 @@ class TMDBOverviewClient:
                 details.get("release_date") or details.get("first_air_date")
             ),
             language=language,
+            overview=clean_overview,
             overview_length=len(clean_overview),
             overview_sha256=hashlib.sha256(
                 clean_overview.encode("utf-8")

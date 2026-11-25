@@ -59,6 +59,7 @@ def test_tmdb_lookup_accepts_one_exact_title_year_and_returns_hash_only():
     assert result.tmdb_id == 278
     assert result.match_method == "exact_title_year"
     assert result.language == "zh-CN"
+    assert result.overview == "一段真实的剧情简介文本"
     assert result.overview_length > 0
     assert len(result.overview_sha256) == 64
     assert "一段真实的剧情简介文本" not in repr(result)

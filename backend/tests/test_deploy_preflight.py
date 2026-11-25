@@ -85,7 +85,7 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
         script = script_path.read_text(encoding="utf-8")
         rollback_start = script.index("rollback() {")
-        rollback_end = script.index("\\non_exit() {", rollback_start)
+        rollback_end = script.index("\non_exit() {", rollback_start)
         rollback = script[rollback_start:rollback_end]
         self.assertIn('ROLLBACK_DISCOVERY_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/discovery.sqlite3"', script)
         self.assertIn("Restored pre-rollout discovery cache (including external favorites)", rollback)

@@ -13,7 +13,7 @@ import os
 import sqlite3
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -59,14 +59,27 @@ def _backup_database(database_path: Path, backup_dir: Path) -> Path:
 
 
 def _load_candidates() -> list[SimpleNamespace]:
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=170)
+    candidates = []
     with SessionLocal() as db:
-        rows = db.execute(
-            select(Movie).where(
-                (Movie.overview.is_(None)) | (Movie.overview == "")
-            ).order_by(Movie.id)
-        ).scalars().all()
-        return [
-            SimpleNamespace(
+        rows = db.execute(select(Movie).order_by(Movie.id)).scalars().all()
+        for row in rows:
+            overview = (row.overview or "").strip()
+            stale_tmdb_hash = None
+            if overview:
+                digest = hashlib.sha256(overview.encode("utf-8")).hexdigest()
+                provenance = db.execute(
+                    select(MovieMetadataProvenance).where(
+                        MovieMetadataProvenance.movie_id == row.id,
+                        MovieMetadataProvenance.field_name == "overview",
+                        MovieMetadataProvenance.source == "tmdb",
+                        MovieMetadataProvenance.value_sha256 == digest,
+                    ).order_by(MovieMetadataProvenance.observed_at.desc())
+                ).scalars().first()
+                if provenance is None or provenance.observed_at > cutoff:
+                    continue
+                stale_tmdb_hash = digest
+            candidates.append(SimpleNamespace(
                 id=row.id,
                 douban_id=row.douban_id,
                 imdb_id=row.imdb_id,
@@ -76,9 +89,9 @@ def _load_candidates() -> list[SimpleNamespace]:
                 year=row.year,
                 type=row.type,
                 directors=_directors(row.directors),
-            )
-            for row in rows
-        ]
+                stale_tmdb_hash=stale_tmdb_hash,
+            ))
+    return candidates
 
 
 def main() -> int:
@@ -101,15 +114,14 @@ def main() -> int:
         return 2
 
     candidates = _load_candidates()
-    results = []
+    results = {}
     counts: Counter[str] = Counter()
     with TMDBOverviewClient(token, min_interval_seconds=args.min_interval) as client:
         for item in candidates:
             try:
                 result = client.lookup(item, language=args.language)
                 counts[result.status] += 1
-                if result.status == "overview_available" and result.overview:
-                    results.append((item.id, result))
+                results[item.id] = result
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in {401, 403}:
                     print(json.dumps({
@@ -127,7 +139,8 @@ def main() -> int:
         "success": True,
         "mode": "dry_run" if args.dry_run else "apply",
         "candidates": len(candidates),
-        "matched_with_overview": len(results),
+        "matched_with_overview": sum(1 for result in results.values() if result.status == "overview_available" and result.overview),
+        "expired_tmdb_overviews": sum(1 for item in candidates if item.stale_tmdb_hash),
         "statuses": dict(sorted(counts.items())),
         "database_written": False,
     }
@@ -144,10 +157,24 @@ def main() -> int:
 
     with SessionLocal() as db:
         with db.begin():
-            for movie_id, result in results:
+            for item in candidates:
+                movie_id = item.id
+                result = results.get(movie_id)
                 movie = db.get(Movie, movie_id)
-                if movie is None or (movie.overview and movie.overview.strip()):
+                if movie is None:
                     skipped_changed += 1
+                    continue
+                current_overview = (movie.overview or "").strip()
+                if current_overview:
+                    current_hash = hashlib.sha256(current_overview.encode("utf-8")).hexdigest()
+                    if not item.stale_tmdb_hash or current_hash != item.stale_tmdb_hash:
+                        skipped_changed += 1
+                        continue
+                    # TMDB content is refreshed before the six-month cache limit.
+                    if result is None or result.status != "overview_available" or not result.overview:
+                        movie.overview = None
+                        continue
+                elif result is None or result.status != "overview_available" or not result.overview:
                     continue
                 overview = result.overview.strip()
                 digest = hashlib.sha256(overview.encode("utf-8")).hexdigest()
@@ -175,6 +202,7 @@ def main() -> int:
     report.update({
         "database_written": True,
         "imported": imported,
+        "expired_tmdb_overviews_purged": sum(1 for item in candidates if item.stale_tmdb_hash and (results.get(item.id) is None or results[item.id].status != "overview_available" or not results[item.id].overview)),
         "skipped_changed": skipped_changed,
         "backup": str(backup_path),
     })

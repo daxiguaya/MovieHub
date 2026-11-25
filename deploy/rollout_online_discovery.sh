@@ -124,6 +124,10 @@ PY
 echo "[3/6] Saving current images and fast-forwarding production checkout..."
 docker tag moviehub-backend:local "$ROLLBACK_BACKEND"
 docker tag moviehub-frontend:local "$ROLLBACK_FRONTEND"
+# The NAS may have an unstaged Compose override that now exactly matches
+# origin/main (for example, the TMDB token mapping). Stage only that verified
+# file so Git can fast-forward without rejecting the local worktree change.
+git add docker-compose.yml
 git merge --ff-only origin/main
 
 echo "[4/6] Building only the MovieHub backend and frontend..."

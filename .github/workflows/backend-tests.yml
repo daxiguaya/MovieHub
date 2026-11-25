@@ -28,7 +28,10 @@ jobs:
         run: python -m compileall -q app scripts tests
         working-directory: backend
       - name: Validate guarded Synology rollout script
-        run: sh -n deploy/rollout_online_discovery.sh
+        run: |
+          sh -n deploy/rollout_online_discovery.sh
+          sh -n deploy/tests/test_fast_forward.sh
+          sh deploy/tests/test_fast_forward.sh
       - name: Compile read-only deployment preflight
         run: python -m py_compile deploy/preflight.py
       - name: Run tests

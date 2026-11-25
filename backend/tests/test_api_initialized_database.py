@@ -158,7 +158,7 @@ def test_local_chart_detail_uses_transient_tmdb_metadata_without_overwriting_dou
         assert body["tmdb_metadata"]["regions"] == ["中国大陆"]
         assert body["directors"] == ["Director from Douban"]
         assert body["tmdb_metadata"]["directors"] == ["TMDB Director", "Director from Douban"]
-        assert calls == [("/search/movie", False), ("/movie/42", True)]
+        assert calls == [("/movie/42", True)]
         with TargetSession() as db:
             stored = db.get(Movie, movie_id)
             assert stored.overview is None

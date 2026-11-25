@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   Link,
+  Navigate,
   NavLink,
   Route,
   Routes,
@@ -171,7 +172,7 @@ function HomePage() {
   useEffect(() => {
     let active = true;
     api.charts()
-      .then((data) => { if (active) setCharts(data); })
+      .then((data) => { if (active) setCharts(data.filter((chart) => !["popular", "high-rated"].includes(chart.slug))); })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -514,6 +515,7 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
 
 function ChartPage() {
   const { slug = "" } = useParams();
+  const retiredDoubanChart = slug === "popular" || slug === "high-rated";
   const [snapshots, setSnapshots] = useState<{ snapshot_date: string; item_count: number }[]>([]);
   const [snapshotDate, setSnapshotDate] = useState("");
   const [items, setItems] = useState<ChartMovie[]>([]);
@@ -543,6 +545,10 @@ function ChartPage() {
     setComparison(null);
     setCompareError("");
     setCompareLoading(false);
+    if (retiredDoubanChart) {
+      setLoading(false);
+      return () => { active = false; };
+    }
     Promise.all([api.snapshots(slug), api.chart(slug)])
       .then(([history, latest]) => {
         if (!active) return;
@@ -558,7 +564,7 @@ function ChartPage() {
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [slug]);
+  }, [slug, retiredDoubanChart]);
 
   async function changeSnapshot(day: string) {
     setSnapshotDate(day);
@@ -600,6 +606,8 @@ function ChartPage() {
       setCompareLoading(false);
     }
   }
+
+  if (retiredDoubanChart) return <Navigate to="/" replace />;
 
   const statusLabel: Record<string, string> = {
     new: "新上榜",

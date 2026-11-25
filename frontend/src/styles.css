@@ -315,3 +315,11 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
   gap: 8px;
 }
 .detail-back-button span { font-size: 16px; line-height: 1; }
+
+
+.detail-source-note {
+  margin: -4px 0 14px;
+  color: var(--muted, #8a8a8a);
+  font-size: 12px;
+  line-height: 1.6;
+}

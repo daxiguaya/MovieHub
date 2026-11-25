@@ -913,12 +913,21 @@ function MoviePage({ config }: { config: PublicConfig }) {
     }
     setLoading(true);
     api.movie(id)
-      .then((data) => { if (active) setMovie(data); })
+      .then((data) => {
+        if (!active) return;
+        setMovie(data);
+        if (data.tmdb_id) {
+          void api.externalFavoriteStatus(data.type, Number(data.tmdb_id), data.imdb_id)
+            .then((result) => { if (active) setIsFavorite(result.is_favorite); })
+            .catch(() => undefined);
+        } else {
+          void api.favorites()
+            .then((items) => { if (active) setIsFavorite(items.some((item) => item.movie.id === id)); })
+            .catch(() => undefined);
+        }
+      })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
-    api.favorites()
-      .then((items) => { if (active) setIsFavorite(items.some((item) => item.movie.id === id)); })
-      .catch(() => { /* Favorites require the configured API key; detail data remains available. */ });
     return () => { active = false; };
   }, [id]);
 
@@ -926,7 +935,8 @@ function MoviePage({ config }: { config: PublicConfig }) {
     if (!movie) return;
     setFavoriteError("");
     try {
-      if (isFavorite) await api.removeFavorite(movie.id);
+      if (isFavorite && movie.tmdb_id) await api.removeExternalFavorite(movie.type, Number(movie.tmdb_id), movie.imdb_id);
+      else if (isFavorite) await api.removeFavorite(movie.id);
       else await api.addFavorite(movie.id);
       setIsFavorite(!isFavorite);
     } catch (err) {
@@ -947,20 +957,23 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <div className="detail-poster-caption">MOVIEHUB COLLECTION</div>
         </div>
         <div className="detail-copy">
-          <div className="eyebrow">{movie.type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? "YEAR UNKNOWN"}</div>
+          <div className="eyebrow">{movie.type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? movie.tmdb_metadata?.year ?? "YEAR UNKNOWN"}</div>
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
-          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count.toLocaleString()} 人评价</span></div>
-          <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag}>{tag}</span>)}{movie.regions.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
+          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count.toLocaleString()} 人评价</span>
+            {movie.tmdb_metadata?.rating != null && <span>TMDB · ★ {movie.tmdb_metadata.rating.toFixed(1)} · {movie.tmdb_metadata.rating_count.toLocaleString()} 票</span>}
+          </div>
+          <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
+          {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；豆瓣与 TMDB 评分分别展示。</p>}
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchBaseUrl, movie.title)} disabled={!config.xiaoyaSearchBaseUrl}>在小雅中搜索 <span>↗</span></button>
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
-          {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}
-          {movie.directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{movie.directors.join(" / ")}</p></section>}
-          {movie.actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{movie.actors.join(" / ")}</p></section>}
+          {(movie.overview || movie.tmdb_metadata?.overview) && <section className="detail-section"><h3>剧情简介{!movie.overview && movie.tmdb_metadata?.overview ? " · TMDB" : ""}</h3><p>{movie.overview || movie.tmdb_metadata?.overview}</p></section>}
+          {(movie.directors.length || movie.tmdb_metadata?.directors.length || 0) > 0 && <section className="detail-section"><h3>导演</h3><p>{(movie.directors.length ? movie.directors : movie.tmdb_metadata?.directors ?? []).join(" / ")}</p></section>}
+          {(movie.actors.length || movie.tmdb_metadata?.actors.length || 0) > 0 && <section className="detail-section"><h3>主演</h3><p>{(movie.actors.length ? movie.actors : movie.tmdb_metadata?.actors ?? []).join(" / ")}</p></section>}
         </div>
       </section>
     </>
@@ -986,12 +999,15 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
     }
     setLoading(true);
     api.discoveryDetail(validType, id)
-      .then((data) => { if (active) setMovie(data); })
+      .then((data) => {
+        if (!active) return;
+        setMovie(data);
+        void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id)
+          .then((result) => { if (active) setIsFavorite(result.is_favorite); })
+          .catch(() => undefined);
+      })
       .catch((err: Error) => { if (active) setError(err.message); })
       .finally(() => { if (active) setLoading(false); });
-    api.externalFavorites()
-      .then((items) => { if (active) setIsFavorite(items.some((item) => item.media_type === validType && item.provider_id === id)); })
-      .catch(() => undefined);
     return () => { active = false; };
   }, [id, mediaType, validType]);
 
@@ -999,7 +1015,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
     if (!movie) return;
     setFavoriteError("");
     try {
-      if (isFavorite) await api.removeExternalFavorite(validType, id);
+      if (isFavorite) await api.removeExternalFavorite(validType, id, movie.external_ids.imdb_id);
       else await api.saveExternalFavorite(movie);
       setIsFavorite(!isFavorite);
     } catch (err) {
@@ -1086,7 +1102,15 @@ function FavoritesPage() {
   async function removeLocal(movieId: number) {
     try {
       await api.removeFavorite(movieId);
+      const removed = favorites.find((item) => item.movie.id === movieId)?.movie;
       setFavorites((current) => current.filter((item) => item.movie.id !== movieId));
+      if (removed) {
+        setExternalFavorites((current) => current.filter((item) =>
+          item.media_type !== removed.type ||
+          (removed.tmdb_id !== String(item.provider_id) &&
+            !(removed.imdb_id && removed.imdb_id === item.snapshot.imdb_id))
+        ));
+      }
     } catch (err) {
       setError((err as Error).message);
     }
@@ -1107,7 +1131,7 @@ function FavoritesPage() {
       {loading ? <Loading /> : error && (error.toLowerCase().includes("api key") || error.toLowerCase().includes("api_key")) ? (
         <section className="api-key-gate">
           <h2>连接收藏功能</h2>
-          <p>收藏接口受 MovieHub API Key 保护。密钥只保存在当前浏览器标签页会话中，不会发送给 TMDB 或其他第三方。</p>
+          <p>收藏接口受 MovieHub API Key 保护。密钥保存在当前浏览器的本地存储中，多个标签页共用；不会发送给 TMDB 或其他第三方。</p>
           <form onSubmit={connectApiKey}>
             <input type="password" value={apiKeyInput} onChange={(event) => setApiKeyInput(event.target.value)} placeholder="输入 NAS 上配置的 MovieHub API Key" autoComplete="off" />
             <button className="primary-button" type="submit" disabled={!apiKeyInput.trim()}>连接收藏</button>
@@ -1116,11 +1140,15 @@ function FavoritesPage() {
         </section>
       ) : error && favorites.length === 0 && externalFavorites.length === 0 ? <ErrorState message={error} /> : (
         <>
-          {externalFavorites.length > 0 && (
+          {externalFavorites.filter((item) => !favorites.some((favorite) =>
+        favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
+      )).length > 0 && (
             <>
               <div className="section-heading"><div><div className="eyebrow">ONLINE FAVORITES</div><h2>在线收藏</h2></div></div>
               <div className="movie-grid">
-                {externalFavorites.map((favorite) => {
+                {externalFavorites.filter((item) => !favorites.some((favorite) =>
+                  favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
+                )).map((favorite) => {
                   const item: DiscoveryItem = {
                     provider: "tmdb",
                     provider_id: favorite.provider_id,

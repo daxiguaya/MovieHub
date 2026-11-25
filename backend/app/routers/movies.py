@@ -35,6 +35,7 @@ from app.schemas import (
 )
 from app.services.movie_service import movie_service
 from app.services.poster_service import poster_cache_service
+from app.services.tmdb_client import DETAIL_TTL, SEARCH_TTL, tmdb_client
 
 logger = logging.getLogger("moviehub.movies")
 
@@ -113,7 +114,66 @@ def _get_movie_detail(movie: Movie) -> MovieDetailResponse:
             )
         ),
         posters=[poster.url for poster in movie.posters],
+        tmdb_metadata=None,
     )
+
+
+async def _get_linked_tmdb_metadata(
+    media_type: str,
+    tmdb_id: str | None,
+    imdb_id: str | None,
+) -> dict | None:
+    """Fetch source-labelled metadata on demand; synopsis stays memory-only."""
+    resolved_id = tmdb_id if tmdb_id and tmdb_id.isdigit() else None
+    if not resolved_id and imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id):
+        try:
+            found = await tmdb_client.get_json(
+                f"/find/{imdb_id}",
+                {"external_source": "imdb_id"},
+                SEARCH_TTL,
+            )
+            key = "movie_results" if media_type == "movie" else "tv_results"
+            candidates = found.get(key, [])
+            if isinstance(candidates, list) and len(candidates) == 1:
+                candidate_id = candidates[0].get("id")
+                if isinstance(candidate_id, int) and candidate_id > 0:
+                    resolved_id = str(candidate_id)
+        except Exception as exc:
+            logger.info("TMDB identity lookup unavailable: %s", type(exc).__name__)
+            return None
+    if not resolved_id:
+        return None
+
+    try:
+        payload = await tmdb_client.get_json(
+            f"/{media_type}/{int(resolved_id)}",
+            {"language": "zh-CN", "append_to_response": "credits,external_ids"},
+            DETAIL_TTL,
+            include_overview=True,
+        )
+    except Exception as exc:
+        logger.info("TMDB detail enrichment unavailable: %s", type(exc).__name__)
+        return None
+
+    if not isinstance(payload, dict) or payload.get("id") != int(resolved_id):
+        return None
+    release_date = payload.get("release_date") or payload.get("first_air_date") or ""
+    year = int(release_date[:4]) if isinstance(release_date, str) and release_date[:4].isdigit() else None
+    credits = payload.get("credits") if isinstance(payload.get("credits"), dict) else {}
+    crew = credits.get("crew") if isinstance(credits.get("crew"), list) else []
+    cast = credits.get("cast") if isinstance(credits.get("cast"), list) else []
+    return {
+        "overview": payload.get("overview") or None,
+        "year": year,
+        "rating": payload.get("vote_average"),
+        "rating_count": int(payload.get("vote_count") or 0),
+        "genres": [item.get("name") for item in payload.get("genres", []) if isinstance(item, dict) and item.get("name")],
+        "regions": [item.get("name") for item in payload.get("production_countries", []) if isinstance(item, dict) and item.get("name")] or (payload.get("origin_country", []) if isinstance(payload.get("origin_country"), list) else []),
+        "directors": [person.get("name") for person in crew if isinstance(person, dict) and person.get("job") == "Director" and person.get("name")],
+        "actors": [person.get("name") for person in cast[:12] if isinstance(person, dict) and person.get("name")],
+        "runtime": payload.get("runtime"),
+        "poster_path": payload.get("poster_path"),
+    }
 
 
 @router.get("", response_model=MoviesListResponse)
@@ -193,12 +253,12 @@ def get_stats(
 
 @router.get("/id/{movie_id:int}", response_model=MovieDetailResponse)
 @limiter.limit(settings.rate_limit_search)
-def get_movie_detail_by_internal_id(
+async def get_movie_detail_by_internal_id(
     request: Request,
     movie_id: int,
     db: Session = Depends(get_db),
 ) -> MovieDetailResponse:
-    """Get a movie detail by MovieHub's stable internal ID."""
+    """Get local Douban details with demand-driven, transient TMDB enrichment."""
     movie = (
         db.query(Movie)
         .options(
@@ -211,7 +271,12 @@ def get_movie_detail_by_internal_id(
     )
     if movie is None:
         raise HTTPException(status_code=404, detail="Movie not found")
-    return _get_movie_detail(movie)
+    detail = _get_movie_detail(movie)
+    media_type, tmdb_id, imdb_id = movie.type, movie.tmdb_id, movie.imdb_id
+    # Release the synchronous SQLite connection before any upstream await.
+    db.close()
+    metadata = await _get_linked_tmdb_metadata(media_type, tmdb_id, imdb_id)
+    return detail.model_copy(update={"tmdb_metadata": metadata})
 
 
 @router.get("/{douban_id}", response_model=MovieDetailResponse)

@@ -15,12 +15,25 @@ import { appPath } from "./paths";
 
 export function setMovieHubApiKey(value: string) {
   if (typeof window === "undefined") return;
-  if (value.trim()) window.sessionStorage.setItem("moviehubApiKey", value.trim());
-  else window.sessionStorage.removeItem("moviehubApiKey");
+  if (value.trim()) window.localStorage.setItem("moviehubApiKey", value.trim());
+  else {
+    window.localStorage.removeItem("moviehubApiKey");
+    window.sessionStorage.removeItem("moviehubApiKey");
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const apiKey = typeof window !== "undefined" ? window.sessionStorage.getItem("moviehubApiKey") : null;
+  let apiKey: string | null = null;
+  if (typeof window !== "undefined") {
+    apiKey = window.localStorage.getItem("moviehubApiKey");
+    if (!apiKey) {
+      apiKey = window.sessionStorage.getItem("moviehubApiKey");
+      if (apiKey) {
+        window.localStorage.setItem("moviehubApiKey", apiKey);
+        window.sessionStorage.removeItem("moviehubApiKey");
+      }
+    }
+  }
   const response = await fetch(appPath(`api${path}`), {
     ...init,
     headers: {
@@ -86,6 +99,14 @@ export const api = {
   discoveryDetail: (mediaType: "movie" | "tv", providerId: number) =>
     request<DiscoveryDetail>("/discovery/" + mediaType + "/" + providerId),
   externalFavorites: () => request<ExternalFavorite[]>("/discovery/favorites"),
+  externalFavoriteStatus: (mediaType: "movie" | "tv", providerId: number, imdbId?: string | null) => {
+    const params = new URLSearchParams();
+    if (imdbId) params.set("imdb_id", imdbId);
+    const query = params.toString();
+    return request<{ is_favorite: boolean }>(
+      `/discovery/favorites/status/${mediaType}/${providerId}${query ? "?" + query : ""}`
+    );
+  },
   saveExternalFavorite: (item: DiscoveryDetail | DiscoveryItem) =>
     request<ExternalFavorite>("/discovery/favorites/" + item.media_type + "/" + item.provider_id, {
       method: "PUT",
@@ -97,12 +118,17 @@ export const api = {
           rating: item.rating,
           rating_count: item.rating_count,
           poster_path: item.poster_path,
-          backdrop_path: item.backdrop_path
+          backdrop_path: item.backdrop_path,
+          imdb_id: "external_ids" in item ? item.external_ids.imdb_id ?? null : null
         }
       })
     }),
-  removeExternalFavorite: (mediaType: "movie" | "tv", providerId: number) =>
-    request<void>("/discovery/favorites/" + mediaType + "/" + providerId, { method: "DELETE" }),
+  removeExternalFavorite: (mediaType: "movie" | "tv", providerId: number, imdbId?: string | null) => {
+    const params = new URLSearchParams();
+    if (imdbId) params.set("imdb_id", imdbId);
+    const query = params.toString();
+    return request<void>("/discovery/favorites/" + mediaType + "/" + providerId + (query ? "?" + query : ""), { method: "DELETE" });
+  },
   addFavorite: (movieId: number, note = "") =>
     request<Favorite>(`/favorites/${movieId}`, {
       method: "PUT",

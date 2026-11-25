@@ -15,6 +15,7 @@ export interface Movie {
   id: number;
   douban_id: string | null;
   tmdb_id?: string | null;
+  imdb_id?: string | null;
   title: string;
   original_title: string | null;
   year: number | null;
@@ -27,8 +28,18 @@ export interface Movie {
 }
 
 export interface MovieDetail extends Movie {
-  imdb_id: string | null;
-  tmdb_id: string | null;
+  tmdb_metadata?: {
+    overview: string | null;
+    year: number | null;
+    rating: number | null;
+    rating_count: number;
+    genres: string[];
+    regions: string[];
+    directors: string[];
+    actors: string[];
+    runtime: number | null;
+    poster_path: string | null;
+  } | null;
   directors: string[];
   actors: string[];
   overview: string | null;
@@ -105,6 +116,7 @@ export interface DiscoveryItem {
   poster_path: string | null;
   backdrop_path: string | null;
   genre_ids: number[];
+  imdb_id?: string | null;
 }
 
 export interface DiscoverySearchResponse {
@@ -122,7 +134,7 @@ export interface ExternalFavorite {
   provider: "tmdb";
   media_type: "movie" | "tv";
   provider_id: number;
-  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path">;
+  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path"> & { imdb_id?: string | null };
   note: string;
   created_at: number;
   updated_at: number;

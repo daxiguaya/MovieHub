@@ -36,6 +36,7 @@ function installFetchMock(handler: (url: string, init?: RequestInit) => unknown)
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.localStorage.removeItem("moviehubApiKey");
   window.sessionStorage.removeItem("moviehubApiKey");
 });
 
@@ -362,11 +363,78 @@ describe("MovieHub frontend workflows", () => {
     await userEvent.click(screen.getByRole("button", { name: "连接收藏" }));
 
     expect(await screen.findByText("收藏夹还是空的")).toBeInTheDocument();
-    expect(window.sessionStorage.getItem("moviehubApiKey")).toBe("local-test-key");
+    expect(window.localStorage.getItem("moviehubApiKey")).toBe("local-test-key");
     expect(fetchMock.mock.calls.some(([, init]) =>
       new Headers(init?.headers).get("X-API-Key") === "local-test-key"
     )).toBe(true);
   });
 
+
+
+  it("shows TMDB fallback metadata on a local Douban chart detail without mixing ratings", async () => {
+    installFetchMock((url) => {
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "http://zwnas.notedream.com:5678/search" };
+      if (url === "/api/movies/id/42") return {
+        id: 42, douban_id: "12345", tmdb_id: "900", imdb_id: "tt1234567",
+        title: "年度影片", original_title: "Annual Film", year: null,
+        rating: 8.4, rating_count: 0, type: "movie", genres: [], regions: [],
+        updated_at: null, directors: ["豆瓣导演"], actors: [], overview: null,
+        douban_url: null, posters: [],
+        tmdb_metadata: {
+          overview: "来自 TMDB 的临时简介", year: 2025, rating: 7.9,
+          rating_count: 2500, genres: ["动画"], regions: ["中国大陆"],
+          directors: ["TMDB Director"], actors: ["TMDB Actor"],
+          runtime: 110, poster_path: "/annual.jpg"
+        }
+      };
+      if (url.startsWith("/api/discovery/favorites/status/movie/900")) return { is_favorite: false };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/movies/42"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole("heading", { name: "年度影片" });
+    expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
+    expect(screen.getByText("豆瓣 · 0 人评价")).toBeInTheDocument();
+    expect(screen.getByText(/TMDB · ★ 7.9 · 2,500 票/)).toBeInTheDocument();
+    expect(screen.getByText("来自 TMDB 的临时简介")).toBeInTheDocument();
+    expect(screen.getByText("豆瓣导演")).toBeInTheDocument();
+    expect(screen.getByText("TMDB Actor")).toBeInTheDocument();
+  });
+
+  it("recognizes a chart favorite when opening the corresponding TMDB detail", async () => {
+    window.localStorage.setItem("moviehubApiKey", "cross-tab-key");
+    const fetchMock = installFetchMock((url, init) => {
+      if (url === "/config.json") return { xiaoyaSearchBaseUrl: "" };
+      if (url === "/api/discovery/movie/900") return {
+        provider: "tmdb", media_type: "movie", provider_id: 900,
+        title: "Linked Film", original_title: "Linked Film", year: 2024,
+        rating: 7.8, rating_count: 3000, poster_path: null,
+        backdrop_path: null, genre_ids: [], overview: null, genres: [],
+        production_countries: [], runtime: null, number_of_seasons: null,
+        number_of_episodes: null, credits: {}, external_ids: { imdb_id: "tt1234567" },
+        attribution: "TMDB"
+      };
+      if (url.startsWith("/api/discovery/favorites/status/movie/900")) {
+        const headers = new Headers(init?.headers);
+        expect(headers.get("X-API-Key")).toBe("cross-tab-key");
+        return { is_favorite: true };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/tmdb/movie/900"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalled();
+  });
 
 });

@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 import sqlite3
-import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -139,8 +138,13 @@ def main() -> int:
         "success": True,
         "mode": "dry_run" if args.dry_run else "apply",
         "candidates": len(candidates),
-        "matched_with_overview": sum(1 for result in results.values() if result.status == "overview_available" and result.overview),
-        "expired_tmdb_overviews": sum(1 for item in candidates if item.stale_tmdb_hash),
+        "matched_with_overview": sum(
+            1 for result in results.values()
+            if result.status == "overview_available" and result.overview
+        ),
+        "expired_tmdb_overviews": sum(
+            1 for item in candidates if item.stale_tmdb_hash
+        ),
         "statuses": dict(sorted(counts.items())),
         "database_written": False,
     }
@@ -166,7 +170,9 @@ def main() -> int:
                     continue
                 current_overview = (movie.overview or "").strip()
                 if current_overview:
-                    current_hash = hashlib.sha256(current_overview.encode("utf-8")).hexdigest()
+                    current_hash = hashlib.sha256(
+                        current_overview.encode("utf-8")
+                    ).hexdigest()
                     if not item.stale_tmdb_hash or current_hash != item.stale_tmdb_hash:
                         skipped_changed += 1
                         continue
@@ -204,7 +210,14 @@ def main() -> int:
     report.update({
         "database_written": True,
         "imported": imported,
-        "expired_tmdb_overviews_purged": sum(1 for item in candidates if item.stale_tmdb_hash and (results.get(item.id) is None or results[item.id].status != "overview_available" or not results[item.id].overview)),
+        "expired_tmdb_overviews_purged": sum(
+            1 for item in candidates
+            if item.stale_tmdb_hash and (
+                results.get(item.id) is None
+                or results[item.id].status != "overview_available"
+                or not results[item.id].overview
+            )
+        ),
         "skipped_changed": skipped_changed,
         "backup": str(backup_path),
     })

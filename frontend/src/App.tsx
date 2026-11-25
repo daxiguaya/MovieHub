@@ -1132,7 +1132,7 @@ function FavoritesPage() {
       ) : error && favorites.length === 0 && externalFavorites.length === 0 ? <ErrorState message={error} /> : (
         <>
           {externalFavorites.filter((item) => !favorites.some((favorite) =>
-        favorite.movie.type === item.media_type && favorite.movie.tmdb_id === String(item.provider_id)
+        favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
       )).length > 0 && (
             <>
               <div className="section-heading"><div><div className="eyebrow">ONLINE FAVORITES</div><h2>在线收藏</h2></div></div>

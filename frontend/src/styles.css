@@ -306,3 +306,12 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .search-panel .multi-filter-option { display: flex; flex-direction: row; align-items: center; gap: 7px; }
 .search-panel .multi-filter-option input { width: 14px; height: 14px; min-width: 14px; flex: 0 0 14px; }
 .search-panel .genre-match-control { display: flex; flex-direction: row; align-items: center; }
+
+
+.detail-back-button {
+  margin: 0 0 14px;
+  min-height: 38px;
+  padding: 9px 13px;
+  gap: 8px;
+}
+.detail-back-button span { font-size: 16px; line-height: 1; }

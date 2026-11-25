@@ -20,7 +20,7 @@ from app.database import Base
 from app.services.chart_init_service import initialize_chart_definitions
 
 logger = logging.getLogger("moviehub.init_db")
-MIGRATION_VERSION = 3
+MIGRATION_VERSION = 4
 REQUIRED_TABLES = {
     "schema_migrations",
     "movies",
@@ -196,6 +196,18 @@ def initialize(path: Path, migration_path: Path) -> None:
         provenance_sql = provenance_migration.read_text(encoding="utf-8").strip()
         if not provenance_sql:
             raise RuntimeError("Provenance migration SQL is empty")
+        nullable_votes_migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "004_nullable_douban_vote_count.sql"
+        )
+        if not nullable_votes_migration.is_file():
+            raise FileNotFoundError(
+                f"Nullable vote-count migration not found: {nullable_votes_migration}"
+            )
+        nullable_votes_sql = nullable_votes_migration.read_text(encoding="utf-8").strip()
+        if not nullable_votes_sql:
+            raise RuntimeError("Nullable vote-count migration SQL is empty")
 
         conn = sqlite3.connect(str(temporary_path), timeout=30)
         try:
@@ -203,6 +215,7 @@ def initialize(path: Path, migration_path: Path) -> None:
             conn.executescript(sql)
             conn.executescript(followup_sql)
             conn.executescript(provenance_sql)
+            conn.executescript(nullable_votes_sql)
         finally:
             conn.close()
 

@@ -1,10 +1,9 @@
-import pytest
+import asyncio
 
 from app.routers.movies import _get_linked_tmdb_metadata, tmdb_client
 
 
-@pytest.mark.asyncio
-async def test_title_year_and_director_match_exposes_transient_tmdb_identity(monkeypatch):
+def test_title_year_and_director_match_exposes_transient_tmdb_identity(monkeypatch):
     async def fake_get_json(endpoint, params, ttl, include_overview=False):
         if endpoint == "/search/movie":
             return {"results": [{
@@ -23,18 +22,17 @@ async def test_title_year_and_director_match_exposes_transient_tmdb_identity(mon
         raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
 
     monkeypatch.setattr(tmdb_client, "get_json", fake_get_json)
-    result = await _get_linked_tmdb_metadata(
+    result = asyncio.run(_get_linked_tmdb_metadata(
         "movie", None, None, title="肖申克的救赎",
         original_title="The Shawshank Redemption", year=1994,
         directors=["Frank Darabont"],
-    )
+    ))
 
     assert result is not None
     assert result["provider_id"] == 278
 
 
-@pytest.mark.asyncio
-async def test_title_and_year_without_director_does_not_expose_tmdb_identity(monkeypatch):
+def test_title_and_year_without_director_does_not_expose_tmdb_identity(monkeypatch):
     async def fake_get_json(endpoint, params, ttl, include_overview=False):
         if endpoint == "/search/movie":
             return {"results": [{
@@ -57,7 +55,7 @@ async def test_title_and_year_without_director_does_not_expose_tmdb_identity(mon
         "movie", None, None, title="肖申克的救赎",
         original_title="The Shawshank Redemption", year=1994,
         directors=[],
-    )
+    ))
 
     assert result is not None
     assert result["provider_id"] is None

@@ -175,6 +175,44 @@ describe("MovieHub frontend workflows", () => {
       .toEqual(["高分", "低分", "无评分"]);
   });
 
+  it("allows favoriting an online search result directly from its card", async () => {
+    window.localStorage.setItem("moviehubApiKey", "test-api-key");
+    const fetchMock = installFetchMock((url, init) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url.startsWith("/api/discovery/regions")) return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/search?")) return {
+        provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 1,
+        items: [{
+          provider: "tmdb", provider_id: 550, media_type: "movie", title: "搏击俱乐部",
+          original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000,
+          poster_path: null, backdrop_path: null, genre_ids: [], imdb_id: "tt0137523"
+        }], attribution: "TMDB"
+      };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      if (url.startsWith("/api/favorites/external/status/")) return { is_favorite: false };
+      if (url === "/api/favorites/external/movie/550" && init?.method === "PUT") return {
+        provider: "tmdb", media_type: "movie", provider_id: 550,
+        snapshot: { title: "搏击俱乐部", original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000, poster_path: null, backdrop_path: null, imdb_id: "tt0137523" },
+        note: "", created_at: 1, updated_at: 1
+      };
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?search=测试"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    const favoriteButton = await screen.findByRole("button", { name: "♡ 加入收藏" });
+    await userEvent.click(favoriteButton);
+    expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/favorites/external/movie/550",
+      expect.objectContaining({ method: "PUT", headers: expect.objectContaining({ "X-API-Key": "test-api-key" }) })
+    );
+  });
+
   it("restores URL-selected genre, region, type and year filters before async options load", async () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };

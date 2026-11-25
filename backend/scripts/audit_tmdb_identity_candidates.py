@@ -220,7 +220,8 @@ def audit_candidates(
 
             if len(verified) == 1 and not review_candidates and not errors:
                 status = "verified_candidate"
-            elif verified or review_candidates:
+            elif verified or review_candidates or errors:
+                # A failed provider request is unknown, not evidence of no match.
                 status = "needs_review"
             else:
                 status = "no_match"

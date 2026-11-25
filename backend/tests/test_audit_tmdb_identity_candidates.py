@@ -85,3 +85,19 @@ def test_candidate_audit_limit_does_not_claim_unprocessed_records(tmp_path):
     assert report["processed"] == 1
     assert report["total_missing_tmdb_id"] == 3
     assert report["remaining_not_processed"] == 2
+
+
+class FailingLookup(FakeLookup):
+    def get(self, endpoint, params=None):
+        raise RuntimeError("provider unavailable")
+
+
+def test_provider_error_is_not_reported_as_no_match(tmp_path):
+    path = tmp_path / "movies.db"
+    make_db(path)
+
+    report = audit_candidates(path, "not-a-real-token", limit=1, lookup_factory=FailingLookup)
+
+    assert report["counts"]["needs_review"] == 1
+    assert report["counts"]["no_match"] == 0
+    assert report["results"][0]["errors"]

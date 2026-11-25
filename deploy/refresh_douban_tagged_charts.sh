@@ -20,7 +20,8 @@ echo "两份数据都采集成功后才会备份并在同一事务中导入。"
 echo "如遇 robots.txt 禁止、403 或 429，将停止且不写数据库。"
 echo "快照日期：$SNAPSHOT_DATE"
 
-docker compose exec -T moviehub \
+# Use a one-off container from the freshly built image so the running backend stays online.
+docker compose run --rm --no-deps -T moviehub \
   python -m scripts.refresh_douban_tagged_charts \
   --date "$SNAPSHOT_DATE" \
   --max-items 100

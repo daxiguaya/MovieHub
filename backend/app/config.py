@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     backup_dir: Path = Path("/backups")
     import_dir: Path = Path("/imports")
     api_key: str = ""
+    xiaoya_search_url_template: str = ""
     cors_origins: list[str] = Field(default_factory=list)
     # TMDB's read access token is intentionally unprefixed to match the
     # existing NAS/GitHub secret name and is never exposed to the browser.

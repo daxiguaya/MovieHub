@@ -1009,7 +1009,6 @@ function SearchPage() {
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
-        <label>排序方式<select value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
         <div className="search-filter">

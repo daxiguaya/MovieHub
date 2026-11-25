@@ -278,6 +278,11 @@ const DISCOVERY_LISTS: Record<string, {
 function DiscoveryListPage() {
   const { slug = "" } = useParams();
   const definition = DISCOVERY_LISTS[slug];
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawYear = searchParams.get("year") ?? "";
+  const selectedYear = /^\\d{4}$/.test(rawYear) && Number(rawYear) >= 1870 && Number(rawYear) <= 2100
+    ? rawYear
+    : "";
   const [items, setItems] = useState<DiscoveryItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -298,6 +303,7 @@ function DiscoveryListPage() {
       sort_by: "vote_average.desc"
     });
     if (definition.maxVotes) params.set("max_votes", String(definition.maxVotes));
+    if (selectedYear) params.set("year", selectedYear);
     try {
       const data = await api.discoveryDiscover(params);
       setItems((current) => append ? current.concat(data.items) : data.items);
@@ -318,24 +324,54 @@ function DiscoveryListPage() {
     setTotal(0);
     if (definition) void load(1);
     else setLoading(false);
-    // The selected definition is derived from the route slug.
+    // The selected list and year are encoded in the URL, including browser history navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [slug, selectedYear]);
+
+  function changeYear(year: string) {
+    const next = new URLSearchParams(searchParams);
+    if (year) next.set("year", year);
+    else next.delete("year");
+    next.delete("page");
+    setSearchParams(next);
+  }
 
   if (!definition) return <ErrorState message="没有找到这份专题榜单" />;
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from(
+    { length: currentYear - 1870 + 1 },
+    (_, index) => currentYear - index
+  );
 
   return (
     <>
       <div className="breadcrumb"><Link to="/">发现</Link><span>/</span><span>恐怖与惊悚专题</span></div>
-      <PageHeading eyebrow="HORROR & THRILLER" title={definition.title} description={definition.description + "。按页在线获取，不做全量导入。"} />
-      <div className="result-caption"><span>TMDB 在线精选</span><span>{total.toLocaleString()} 部 · 第 {page} / {Math.max(totalPages, 1)} 页</span></div>
+      <PageHeading
+        eyebrow="HORROR & THRILLER"
+        title={definition.title}
+        description={definition.description + "。按页在线获取，不做全量导入。"}
+        action={
+          <label className="select-wrap">
+            上映年份
+            <select aria-label="按上映年份筛选" value={selectedYear} onChange={(event) => changeYear(event.target.value)}>
+              <option value="">全部年份</option>
+              {yearOptions.map((year) => <option key={year} value={String(year)}>{year} 年</option>)}
+            </select>
+          </label>
+        }
+      />
+      <div className="result-caption">
+        <span>{selectedYear ? selectedYear + " 年 · " : "全部年份 · "}TMDB 在线精选</span>
+        <span>{total.toLocaleString()} 部 · 第 {page} / {Math.max(totalPages, 1)} 页</span>
+      </div>
       {error && <div className="inline-error">{error}</div>}
       {items.length > 0 ? (
         <>
           <div className="movie-grid">{items.map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} />)}</div>
           {page < totalPages && <button className="secondary-button load-more" onClick={() => void load(page + 1, true)} disabled={loading}>{loading ? "正在加载…" : "加载下一页"}</button>}
         </>
-      ) : loading ? <Loading /> : <EmptyState title="暂时没有符合条件的作品" detail="可以稍后再试，或降低投票数门槛。" />}
+      ) : loading ? <Loading /> : <EmptyState title="暂时没有符合条件的作品" detail="可以更换年份，或稍后再试。" />}
       <p className="tmdb-attribution">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
     </>
   );

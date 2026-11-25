@@ -87,7 +87,7 @@ def _get_movie_detail(movie: Movie) -> MovieDetailResponse:
         original_title=movie.original_title,
         year=movie.year,
         rating=movie.rating,
-        rating_count=movie.rating_count or 0,
+        rating_count=movie.rating_count,
         type=movie.type,
         genres=[
             association.genre_obj.name

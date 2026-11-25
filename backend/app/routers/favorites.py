@@ -299,7 +299,10 @@ def save_external_favorite(
             db.commit()
         # A chart-backed movie has one canonical Favorite row; do not create
         # a second provider-cache favorite for the same work.
-        provider_response_cache.delete_favorite(media_type, provider_id)
+        try:
+            provider_response_cache.delete_favorite(media_type, provider_id)
+        except Exception:
+            pass
         return {"linked_movie_id": linked_movie.id, "is_favorite": True}
     saved = provider_response_cache.save_favorite(
         media_type, provider_id, snapshot, payload.note

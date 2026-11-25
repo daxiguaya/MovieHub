@@ -121,19 +121,21 @@ class TMDBClient:
         endpoint: str,
         params: dict[str, Any] | None = None,
         ttl: int = SEARCH_TTL,
+        cache_overview: bool = False,
     ) -> dict[str, Any]:
         clean_params = {k: v for k, v in (params or {}).items() if v is not None}
         key = provider_response_cache.make_key("tmdb", endpoint, clean_params)
         cached = await self._cache_get(key)
         if cached:
             payload, _ = cached
-            return payload
+            if not cache_overview or "overview" in payload:
+                return payload
 
         async with _inflight_lock:
             task = _inflight.get(key)
             if task is None:
                 task = asyncio.create_task(
-                    self._fetch_and_cache(key, endpoint, clean_params, ttl)
+                    self._fetch_and_cache(key, endpoint, clean_params, ttl, cache_overview)
                 )
                 _inflight[key] = task
                 task.add_done_callback(
@@ -159,6 +161,7 @@ class TMDBClient:
         endpoint: str,
         params: dict[str, Any],
         ttl: int,
+        cache_overview: bool = False,
     ) -> dict[str, Any]:
         started = time.perf_counter()
         self._requests += 1
@@ -209,14 +212,14 @@ class TMDBClient:
 
         if isinstance(payload, list):
             payload = {"items": payload}
-        payload = _strip_unapproved_synopsis(payload)
         if not isinstance(payload, dict):
             self._failures += 1
             self._record_latency(started)
             raise HTTPException(status_code=502, detail="TMDB returned an invalid response")
         if isinstance(payload.get("results"), list) and not payload["results"]:
             ttl = NEGATIVE_TTL
-        await self._cache_set(key, endpoint, payload, ttl)
+        cache_payload = payload if cache_overview else _strip_unapproved_synopsis(payload)
+        await self._cache_set(key, endpoint, cache_payload, ttl)
         self._successes += 1
         self._record_latency(started)
         return payload

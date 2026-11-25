@@ -213,15 +213,6 @@ async def _collect(targets: list[dict[str, Any]], token: str) -> tuple[list[dict
     return accepted, counts, errors
 
 
-def _current_association_names(db, model, relation_model, foreign_key: str, movie_id: int) -> set[str]:
-    stmt = (
-        select(model.name)
-        .join(relation_model, getattr(relation_model, f"{model.__tablename__[:-1]}_id") == model.id)
-        .where(relation_model.movie_id == movie_id)
-    )
-    return set(db.execute(stmt).scalars().all())
-
-
 def _apply_records(records: list[dict[str, Any]], apply: bool) -> dict[str, Any]:
     field_counts: Counter = Counter()
     changed: list[dict[str, Any]] = []

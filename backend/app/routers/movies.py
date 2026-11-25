@@ -151,6 +151,7 @@ async def _get_linked_tmdb_metadata(
         except Exception as exc:
             logger.info("TMDB identity lookup unavailable: %s", type(exc).__name__)
             return None
+    resolved_by_external_id = bool(resolved_id)
     resolved_payload: dict | None = None
     if not resolved_id:
         source_titles = {
@@ -302,11 +303,7 @@ async def _get_linked_tmdb_metadata(
     # A title/year candidate is suitable for UI deduplication only when the
     # local record also supplied a director that independently agrees. Do not
     # expose an inferred provider identity from title/year alone.
-    verified_identity = bool(tmdb_id and tmdb_id.isdigit()) or bool(
-        imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id)
-    )
-    if not verified_identity and source_directors:
-        verified_identity = True
+    verified_identity = resolved_by_external_id or bool(source_directors)
 
     return {
         "provider_id": int(resolved_id) if verified_identity and resolved_id else None,

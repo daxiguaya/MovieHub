@@ -37,7 +37,7 @@ def director_name_keys(value: str | None) -> set[str]:
     keys: set[str] = set()
     cjk = "".join(
         char for char in normalized
-        if "\\u3400" <= char <= "\\u9fff" or "\\uf900" <= char <= "\\ufaff"
+        if 0x3400 <= ord(char) <= 0x9fff or 0xf900 <= ord(char) <= 0xfaff
     )
     if key := normalize(cjk):
         keys.add("cjk:" + key)

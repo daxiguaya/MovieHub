@@ -37,6 +37,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   window.localStorage.removeItem("moviehubApiKey");
+  window.sessionStorage.removeItem("moviehubApiKey");
 });
 
 describe("MovieHub frontend workflows", () => {

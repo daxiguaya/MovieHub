@@ -195,6 +195,7 @@ describe("MovieHub frontend workflows", () => {
         snapshot: { title: "搏击俱乐部", original_title: "Fight Club", year: 1999, rating: 8.4, rating_count: 28000, poster_path: null, backdrop_path: null, imdb_id: "tt0137523" },
         note: "", created_at: 1, updated_at: 1
       };
+      if (url === "/api/favorites/external/movie/550" && init?.method === "DELETE") return {};
       throw new Error(`Unexpected request: ${url}`);
     });
 
@@ -206,10 +207,17 @@ describe("MovieHub frontend workflows", () => {
 
     const favoriteButton = await screen.findByRole("button", { name: "♡ 加入收藏" });
     await userEvent.click(favoriteButton);
-    expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+    const savedButton = await screen.findByRole("button", { name: "♥ 已收藏" });
+    expect(savedButton).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/favorites/external/movie/550",
       expect.objectContaining({ method: "PUT", headers: expect.objectContaining({ "X-API-Key": "test-api-key" }) })
+    );
+    await userEvent.click(savedButton);
+    expect(await screen.findByRole("button", { name: "♡ 加入收藏" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/favorites/external/movie/550",
+      expect.objectContaining({ method: "DELETE", headers: expect.objectContaining({ "X-API-Key": "test-api-key" }) })
     );
   });
 

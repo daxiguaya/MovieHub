@@ -73,7 +73,12 @@ Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout 
 
 ## Current operator workflow
 
-Prepare a UTF-8 JSON snapshot in the documented normalized format, validate it with `--dry-run`, then import it using [CHART-IMPORT.md](CHART-IMPORT.md). Re-importing the same chart/date replaces only that snapshot; other dates remain intact.
+- Douban high-rated: `sh deploy/refresh_douban_high_rated.sh [YYYY-MM-DD]`.
+- Douban real-time popular: `sh deploy/refresh_douban_popular.sh [YYYY-MM-DD]`.
+- Both scripts are operator-invoked only. They stop when robots.txt disallows the endpoint or Douban returns 401/403/429; they do not bypass access controls, and they do not restart containers.
+- Each script writes a temporary normalized snapshot, dry-run validates it, creates a database backup, imports the dated snapshot, and removes the temporary file only after success.
+
+For a manually prepared UTF-8 JSON snapshot, validate it with `--dry-run`, then import it using [CHART-IMPORT.md](CHART-IMPORT.md). Re-importing the same chart/date replaces only that snapshot; other dates remain intact.
 
 ## Decision
 

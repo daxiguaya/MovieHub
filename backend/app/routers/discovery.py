@@ -191,6 +191,7 @@ async def get_online_detail(
         f"/{media_type}/{provider_id}",
         {"language": language, "append_to_response": "credits,external_ids"},
         DETAIL_TTL,
+        include_overview=True,
     )
     return {
         "provider": "tmdb",
@@ -201,6 +202,7 @@ async def get_online_detail(
         "year": int((payload.get("release_date") or payload.get("first_air_date") or "")[:4]) if (payload.get("release_date") or payload.get("first_air_date") or "")[:4].isdigit() else None,
         "rating": payload.get("vote_average"),
         "rating_count": payload.get("vote_count", 0),
+        "overview": payload.get("overview") or None,
         "poster_path": payload.get("poster_path"),
         "backdrop_path": payload.get("backdrop_path"),
         "genre_ids": [item.get("id") for item in payload.get("genres", []) if isinstance(item, dict) and isinstance(item.get("id"), int)],

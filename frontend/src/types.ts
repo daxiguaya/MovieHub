@@ -129,6 +129,7 @@ export interface ExternalFavorite {
 }
 
 export interface DiscoveryDetail extends DiscoveryItem {
+  overview: string | null;
   genres: { id: number; name: string }[];
   production_countries: { iso_3166_1?: string; name?: string }[] | string[];
   runtime: number | null;

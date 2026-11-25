@@ -32,7 +32,7 @@ def test_cache_read_failure_does_not_block_upstream_response(monkeypatch):
     def broken_cache_read(*args, **kwargs):
         raise sqlite3.OperationalError("simulated cache I/O failure")
 
-    async def fake_fetch(key, endpoint, params, ttl):
+    async def fake_fetch(key, endpoint, params, ttl, include_overview=False):
         return {"results": [{"id": 42, "title": "Alien"}]}
 
     monkeypatch.setattr(tmdb_module.provider_response_cache, "get", broken_cache_read)
@@ -66,7 +66,7 @@ def test_cancelling_one_waiter_does_not_cancel_shared_upstream(monkeypatch):
         async def no_cache(key, allow_stale=False):
             return None
 
-        async def fake_fetch(key, endpoint, params, ttl):
+        async def fake_fetch(key, endpoint, params, ttl, include_overview=False):
             nonlocal calls
             calls += 1
             started.set()
@@ -89,3 +89,15 @@ def test_cancelling_one_waiter_does_not_cancel_shared_upstream(monkeypatch):
         assert calls == 1
 
     asyncio.run(scenario())
+
+
+def test_transient_overview_is_bounded_and_not_part_of_persistent_payload():
+    client = tmdb_module.TMDBClient()
+    client._remember_transient_overview("detail-key", "A short synopsis")
+    assert client._get_transient_overview("detail-key") == "A short synopsis"
+    persistent = _strip_unapproved_synopsis({
+        "id": 42,
+        "overview": "A short synopsis",
+        "title": "Example"
+    })
+    assert persistent == {"id": 42, "title": "Example"}

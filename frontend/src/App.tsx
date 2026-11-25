@@ -107,6 +107,60 @@ function EmptyState({ title, detail }: { title: string; detail: string }) {
   return <div className="empty-state"><span className="empty-icon">✳</span><strong>{title}</strong><p>{detail}</p></div>;
 }
 
+type FilterOption = { value: string; label: string };
+
+function MultiSelectFilter({
+  label, options, value, onChange, searchPlaceholder
+}: {
+  label: string;
+  options: FilterOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+  searchPlaceholder: string;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = options.filter((option) =>
+    option.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+  );
+  return (
+    <details className="multi-filter">
+      <summary>
+        <span>{label}</span>
+        <span className="multi-filter-count">{value.length ? `已选 ${value.length} 项` : "不限"} <span aria-hidden="true">⌄</span></span>
+      </summary>
+      <div className="multi-filter-panel">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+        />
+        <div className="multi-filter-options">
+          {filtered.map((option) => (
+            <label className="multi-filter-option" key={option.value}>
+              <input
+                type="checkbox"
+                checked={value.includes(option.value)}
+                onChange={(event) => onChange(
+                  event.target.checked
+                    ? [...value, option.value]
+                    : value.filter((item) => item !== option.value)
+                )}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+          {filtered.length === 0 && <p className="multi-filter-empty">没有匹配的选项</p>}
+        </div>
+        {value.length > 0 && (
+          <button className="multi-filter-clear" type="button" onClick={() => onChange([])}>清空已选</button>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function HomePage() {
   const [charts, setCharts] = useState<Chart[]>([]);
   const [loading, setLoading] = useState(true);
@@ -580,8 +634,9 @@ function SearchPage() {
   const [maxYear, setMaxYear] = useState(searchParams.get("max_year") ?? "");
   const [genreOptions, setGenreOptions] = useState<{ id: number; name: string }[]>([]);
   const [regionOptions, setRegionOptions] = useState<{ code: string; name: string }[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>(searchParams.get("genre_ids")?.split("|") ?? []);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(searchParams.get("genre_ids")?.split(/[|,]/) ?? []);
   const [selectedRegions, setSelectedRegions] = useState<string[]>(searchParams.get("region_codes")?.split("|") ?? []);
+  const [genreMatch, setGenreMatch] = useState<"any" | "all">(searchParams.get("genre_match") === "all" ? "all" : "any");
   const [results, setResults] = useState<Movie[]>([]);
   const [onlineResults, setOnlineResults] = useState<DiscoveryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -647,7 +702,7 @@ function SearchPage() {
           min_votes: params.get("min_rating_count") || "100",
           sort_by: minRating ? "vote_average.desc" : "popularity.desc"
         });
-        if (selectedGenres.length) discoverParams.set("with_genres", selectedGenres.join("|"));
+        if (selectedGenres.length) discoverParams.set("with_genres", selectedGenres.join(genreMatch === "all" ? "," : "|"));
         if (selectedRegions.length) discoverParams.set("region", selectedRegions.join("|"));
         if (minRating) discoverParams.set("min_rating", minRating);
         if (minYear) discoverParams.set("min_year", minYear);
@@ -709,8 +764,9 @@ function SearchPage() {
     if (minRatingCount) params.set("min_rating_count", minRatingCount);
     if (minYear) params.set("min_year", minYear);
     if (maxYear) params.set("max_year", maxYear);
-    if (selectedGenres.length) params.set("genre_ids", selectedGenres.join("|"));
+    if (selectedGenres.length) params.set("genre_ids", selectedGenres.join(genreMatch === "all" ? "," : "|"));
     if (selectedRegions.length) params.set("region_codes", selectedRegions.join("|"));
+    if (selectedGenres.length && genreMatch === "all") params.set("genre_match", "all");
     setSearchParams(params);
     void runSearch(params);
   }
@@ -776,15 +832,35 @@ function SearchPage() {
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
-        <label>类型（可多选）<select multiple value={selectedGenres} onChange={(e) => setSelectedGenres(Array.from(e.target.selectedOptions).map((option) => option.value))}>
-          {genreOptions.map((genre) => <option key={genre.id} value={String(genre.id)}>{genre.name}</option>)}
-        </select></label>
-        <label>制作地区（可多选）<select multiple value={selectedRegions} onChange={(e) => setSelectedRegions(Array.from(e.target.selectedOptions).map((option) => option.value))}>
-          {regionOptions.map((region) => <option key={region.code} value={region.code}>{region.name}</option>)}
-        </select></label>
+        <div className="search-filter">
+          <MultiSelectFilter
+            label="类型（可多选）"
+            options={genreOptions.map((genre) => ({ value: String(genre.id), label: genre.name }))}
+            value={selectedGenres}
+            onChange={setSelectedGenres}
+            searchPlaceholder="搜索类型，例如：恐怖、悬疑…"
+          />
+          {selectedGenres.length > 1 && (
+            <label className="genre-match-control">类型匹配
+              <select value={genreMatch} onChange={(event) => setGenreMatch(event.target.value as "any" | "all")}>
+                <option value="any">任一类型（OR）</option>
+                <option value="all">同时包含全部类型（AND）</option>
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="search-filter">
+          <MultiSelectFilter
+            label="制作地区（可多选）"
+            options={regionOptions.map((region) => ({ value: region.code, label: region.name }))}
+            value={selectedRegions}
+            onChange={setSelectedRegions}
+            searchPlaceholder="搜索国家或地区…"
+          />
+        </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">关键词模式可同时搜索电影和剧集；清空关键词后，请选择电影或剧集再组合类型、地区、年份和评分筛选。每次只加载当前页。</p>
+      <p className="search-hint">类型和地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型默认匹配任意一个；也可切换为同时包含全部类型。关键词搜索按片名匹配，组合筛选请清空关键词后使用。</p>
       <div className="result-caption"><span>在线搜索结果</span><span>{onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
@@ -953,6 +1029,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
             {movie.external_ids.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.external_ids.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
+          {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}
           {directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{directors.join(" / ")}</p></section>}
           {actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{actors.join(" / ")}</p></section>}
           {movie.runtime && <section className="detail-section"><h3>片长</h3><p>{movie.runtime} 分钟</p></section>}

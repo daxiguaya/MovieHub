@@ -61,3 +61,28 @@ def test_discover_enforces_page_and_vote_threshold_defaults(monkeypatch):
     with _client(monkeypatch) as client:
         response = client.get("/api/discovery/discover", params={"page": 501})
     assert response.status_code == 422
+
+def test_detail_returns_transient_overview(monkeypatch):
+    calls = []
+
+    async def fake_get_json(endpoint, params=None, ttl=900, include_overview=False):
+        calls.append((endpoint, include_overview))
+        return {
+            "id": 42,
+            "title": "Alien",
+            "original_title": "Alien",
+            "release_date": "1979-05-25",
+            "overview": "A commercial spaceship crew encounters a deadly organism.",
+            "vote_average": 8.5,
+            "vote_count": 1000,
+            "genres": [{"id": 27, "name": "恐怖"}],
+            "production_countries": [{"iso_3166_1": "US", "name": "美国"}],
+        }
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/movie/42")
+
+    assert response.status_code == 200
+    assert response.json()["overview"].startswith("A commercial spaceship")
+    assert calls == [("/movie/42", True)]

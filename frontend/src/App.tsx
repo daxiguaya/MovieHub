@@ -280,7 +280,7 @@ function DiscoveryListPage() {
   const definition = DISCOVERY_LISTS[slug];
   const [searchParams, setSearchParams] = useSearchParams();
   const rawYear = searchParams.get("year") ?? "";
-  const selectedYear = /^\\d{4}$/.test(rawYear) && Number(rawYear) >= 1870 && Number(rawYear) <= 2100
+  const selectedYear = /^\d{4}$/.test(rawYear) && Number(rawYear) >= 1870 && Number(rawYear) <= 2100
     ? rawYear
     : "";
   const [items, setItems] = useState<DiscoveryItem[]>([]);

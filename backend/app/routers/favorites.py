@@ -1,5 +1,7 @@
 """Single-user favorites API, keyed by MovieHub's internal movie ID."""
 
+import json
+import unicodedata
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -160,11 +162,77 @@ class ExternalFavoriteSnapshot(BaseModel):
     poster_path: str | None = Field(default=None, max_length=512)
     backdrop_path: str | None = Field(default=None, max_length=512)
     imdb_id: str | None = Field(default=None, max_length=32)
+    directors: list[str] = Field(default_factory=list, max_length=20)
 
 
 class ExternalFavoritePayload(BaseModel):
     snapshot: ExternalFavoriteSnapshot
     note: str = Field(default="", max_length=1000)
+
+
+def _normalize_identity(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").casefold()
+    return "".join(char for char in normalized if char.isalnum())
+
+
+def _linked_chart_movie(
+    db: Session,
+    media_type: str,
+    provider_id: int,
+    imdb_id: str | None = None,
+    title: str | None = None,
+    original_title: str | None = None,
+    year: int | None = None,
+    directors: list[str] | None = None,
+) -> Movie | None:
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
+    linked = db.query(Movie).filter(
+        Movie.type == media_type,
+        identity_filter,
+    ).first()
+    if linked is not None:
+        return linked
+
+    # Fallback is intentionally strict: title + exact year + at least one
+    # matching director, and exactly one local candidate must satisfy all.
+    source_titles = {
+        _normalize_identity(value)
+        for value in (title, original_title)
+        if _normalize_identity(value)
+    }
+    source_directors = {
+        _normalize_identity(value) for value in (directors or [])
+        if _normalize_identity(value)
+    }
+    if not source_titles or not source_directors or year is None:
+        return None
+
+    matches: list[Movie] = []
+    candidates = db.query(Movie).filter(
+        Movie.type == media_type,
+        Movie.year == year,
+    ).all()
+    for movie in candidates:
+        local_titles = {
+            _normalize_identity(movie.title),
+            _normalize_identity(movie.original_title),
+        } - {""}
+        if not source_titles.intersection(local_titles):
+            continue
+        try:
+            raw_directors = json.loads(movie.directors or "[]")
+        except (TypeError, json.JSONDecodeError):
+            raw_directors = []
+        local_directors = {
+            _normalize_identity(value)
+            for value in raw_directors
+            if isinstance(value, str) and _normalize_identity(value)
+        } if isinstance(raw_directors, list) else set()
+        if source_directors.intersection(local_directors):
+            matches.append(movie)
+    return matches[0] if len(matches) == 1 else None
 
 
 @router.get("/external")
@@ -181,17 +249,21 @@ def external_favorite_status(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     imdb_id: str | None = Query(None, max_length=32),
+    title: str | None = Query(None, max_length=256),
+    original_title: str | None = Query(None, max_length=256),
+    year: int | None = Query(None, ge=1870, le=2100),
+    directors: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id:
-        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    local_saved = db.query(Favorite).join(Movie).filter(
-        Movie.type == media_type,
-        identity_filter,
-    ).first() is not None
+    linked_movie = _linked_chart_movie(
+        db, media_type, provider_id, imdb_id, title, original_title, year, directors
+    )
+    local_saved = (
+        linked_movie is not None
+        and db.get(Favorite, linked_movie.id) is not None
+    )
     external_saved = provider_response_cache.has_favorite(media_type, provider_id)
     return {"is_favorite": local_saved or external_saved}
 
@@ -211,13 +283,24 @@ def save_external_favorite(
     identity_filter = Movie.tmdb_id == str(provider_id)
     if snapshot.get("imdb_id"):
         identity_filter = identity_filter | (Movie.imdb_id == snapshot["imdb_id"])
-    linked_movie = db.query(Movie).filter(
-        Movie.type == media_type,
-        identity_filter,
-    ).first()
-    if linked_movie is not None and db.get(Favorite, linked_movie.id) is None:
-        db.add(Favorite(movie_id=linked_movie.id, note=payload.note))
-        db.commit()
+    linked_movie = _linked_chart_movie(
+        db,
+        media_type,
+        provider_id,
+        snapshot.get("imdb_id"),
+        snapshot.get("title"),
+        snapshot.get("original_title"),
+        snapshot.get("year"),
+        snapshot.get("directors", []),
+    )
+    if linked_movie is not None:
+        if db.get(Favorite, linked_movie.id) is None:
+            db.add(Favorite(movie_id=linked_movie.id, note=payload.note))
+            db.commit()
+        # A chart-backed movie has one canonical Favorite row; do not create
+        # a second provider-cache favorite for the same work.
+        provider_response_cache.delete_favorite(media_type, provider_id)
+        return {"linked_movie_id": linked_movie.id, "is_favorite": True}
     saved = provider_response_cache.save_favorite(
         media_type, provider_id, snapshot, payload.note
     )
@@ -247,13 +330,21 @@ def remove_external_favorite(
         media_type, provider_id
     )
     imdb_id = request.query_params.get("imdb_id")
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id and len(imdb_id) <= 32:
-        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    linked = db.query(Favorite).join(Movie).filter(
-        Movie.type == media_type,
-        identity_filter,
-    ).all()
+    title = request.query_params.get("title")
+    original_title = request.query_params.get("original_title")
+    try:
+        year = int(request.query_params["year"]) if request.query_params.get("year") else None
+    except ValueError:
+        year = None
+    directors = request.query_params.getlist("directors")
+    linked_movie = _linked_chart_movie(
+        db, media_type, provider_id, imdb_id, title, original_title, year, directors
+    )
+    linked = (
+        [db.get(Favorite, linked_movie.id)]
+        if linked_movie is not None and db.get(Favorite, linked_movie.id) is not None
+        else []
+    )
     for favorite in linked:
         db.delete(favorite)
     if linked:

@@ -60,3 +60,48 @@ def test_blank_treats_empty_json_list_as_missing_but_preserves_values():
     assert _blank("[]")
     assert not _blank('["已有演员"]')
     assert not _blank(2025)
+
+
+
+@pytest.mark.parametrize(
+    ("stored", "provider"),
+    [
+        ("大鹏", "董成鹏"),
+        ("迪恩戴布洛伊", "迪恩德布洛斯"),
+        ("拜伦霍华德", "拜恩霍华德"),
+        ("杰拉德布什", "贾里德布什"),
+        ("克里斯托弗麦奎里", "克里斯托弗麦夸里"),
+        ("弗朗索瓦欧容", "弗朗索瓦奥宗"),
+        ("卡门艾米", "Carmen Emmi"),
+    ],
+)
+def test_accepts_curated_director_transliteration_aliases(stored, provider):
+    movie = _movie(directors=__import__("json").dumps([stored], ensure_ascii=False))
+    payload = {
+        "id": 1500536,
+        "title": "南京照相馆",
+        "original_title": "Dead to Rights",
+        "release_date": "2025-07-25",
+        "credits": {"crew": [{"job": "Director", "name": provider}], "cast": []},
+    }
+    assert _extract(movie, payload)["original_title"] == "Dead to Rights"
+
+
+@pytest.mark.parametrize(
+    ("tmdb_id", "stored_title", "provider_title", "provider_original"),
+    [
+        ("812583", "利刃出鞘3", "利刃出鞘3亡者归来", "Wake Up Dead Man: A Knives Out Mystery"),
+        ("1289936", "唐顿庄园3", "唐顿庄园盛世终章", "Downton Abbey: The Grand Finale"),
+        ("1088514", "隔壁房间", "隔壁的房间", "La habitación de al lado"),
+    ],
+)
+def test_accepts_curated_tmdb_title_aliases(tmdb_id, stored_title, provider_title, provider_original):
+    movie = _movie(tmdb_id=tmdb_id, title=stored_title, directors="[]")
+    payload = {
+        "id": int(tmdb_id),
+        "title": provider_title,
+        "original_title": provider_original,
+        "release_date": "2025-01-01",
+        "credits": {"crew": [], "cast": []},
+    }
+    assert _extract(movie, payload)["original_title"] == provider_original

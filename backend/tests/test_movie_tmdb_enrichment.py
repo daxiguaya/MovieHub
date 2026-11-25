@@ -58,7 +58,7 @@ def test_local_chart_movie_resolves_one_exact_tmdb_title_year_and_director(monke
     assert result["overview"] == "一段经过身份核验的临时简介。"
     assert result["rating"] == 9.3
     assert result["rating_count"] == 2500000
-    assert [call[0] for call in calls] == ["/search/movie", "/movie/278"]
+    assert [call[0] for call in calls] == ["/search/movie", "/search/movie", "/movie/278"]
 
 
 def test_local_chart_movie_does_not_accept_ambiguous_tmdb_candidates(monkeypatch):
@@ -81,7 +81,7 @@ def test_local_chart_movie_does_not_accept_ambiguous_tmdb_candidates(monkeypatch
     ))
 
     assert result is None
-    assert calls == ["/search/movie"]
+    assert calls == ["/search/movie", "/search/movie"]
 
 
 def test_local_chart_movie_rejects_tmdb_director_mismatch(monkeypatch):

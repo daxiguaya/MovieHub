@@ -76,3 +76,17 @@ def test_read_only_lookup_uses_exact_imdb_ids(tmp_path, monkeypatch):
         "tt0111161": (9.3, 3000000),
         "tt0068646": (9.2, 2000000),
     }
+
+
+
+def test_importer_honors_configured_index_path(tmp_path, monkeypatch):
+    source = tmp_path / "ratings.tsv"
+    target = tmp_path / "custom" / "ratings-index.sqlite3"
+    _write_tsv(source, [("tt0111161", "9.3", "10")])
+    monkeypatch.setenv("IMDB_RATINGS_INDEX_PATH", str(target))
+
+    result = import_imdb_rating_index(source, min_rows=1)
+
+    assert result["database"] == str(target)
+    assert target.exists() is False
+    assert target.parent.is_dir()

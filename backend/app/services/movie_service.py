@@ -522,7 +522,7 @@ class MovieService:
         elif effective_max < MAX_RATING:
             query = query.filter(
                 (
-                    Movie.rating.between(0, effective_max)
+                    Movie.imdb_rating.between(0, effective_max)
                 )
                 | Movie.imdb_rating.is_(None)
             )

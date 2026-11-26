@@ -257,7 +257,7 @@ class ProviderResponseCache:
         self,
         media_type: str,
         imdb_id: str,
-        title: str,
+        title: str | None = None,
         original_title: str | None = None,
         year: int | None = None,
     ) -> bool:

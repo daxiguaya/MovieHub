@@ -6,15 +6,15 @@ gzip integrity, runs the importer in dry-run mode, and optionally applies it.
 """
 from __future__ import annotations
 
+import fcntl
 import gzip
 import hashlib
 import json
 import logging
 import os
 import time
-import urllib.error
 import urllib.request
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -43,6 +43,8 @@ def load_config() -> dict:
     if not isinstance(raw, dict):
         raise ValueError("IMDb update config must be a JSON object")
     config = {**defaults, **raw}
+    if not isinstance(config["enabled"], bool) or not isinstance(config["auto_apply"], bool):
+        raise ValueError("enabled and auto_apply must be JSON booleans")
     hour, minute = (int(part) for part in config["run_at"].split(":"))
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise ValueError("run_at must use HH:MM")
@@ -152,6 +154,13 @@ def run_update(config: dict, state: dict, today: date) -> dict:
 def main() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
     LOG.info("IMDb updater started; config=%s", CONFIG_PATH)
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    lock_handle = (STATE_PATH.parent / "updater.lock").open("w")
+    try:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        LOG.error("Another IMDb updater process already holds the state lock; exiting")
+        return
     attempted: dict[str, float] = {}
     while True:
         try:

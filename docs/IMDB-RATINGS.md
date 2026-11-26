@@ -34,6 +34,7 @@ or metadata.
 Run the standard migration after pulling the code:
 
 ```sh
+cd /volume1/docker/moviehub && docker compose build moviehub
 cd /volume1/docker/moviehub && docker compose run --rm --no-deps moviehub python -m scripts.migrate
 ```
 

@@ -47,6 +47,39 @@ services:
       - default
       - npm_proxy
 
+  moviehub-imdb-updater:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: moviehub-backend:local
+    container_name: moviehub-imdb-updater
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "${MOVIEHUB_UID:-10001}:${MOVIEHUB_GID:-10001}"
+    command: ["python", "-m", "scripts.imdb_update_daemon"]
+    environment:
+      MOVIEHUB_DATA_DIR: /data
+      IMDB_UPDATE_CONFIG: /config/imdb-update.json
+      IMDB_UPDATE_STATE: /state/state.json
+      IMDB_UPDATE_IMPORT_DIR: /imports/imdb
+      LOG_LEVEL: INFO
+    volumes:
+      - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
+      - ${MOVIEHUB_IMPORT_PATH:-./deploy/empty-imports}:/imports:rw
+      - ${MOVIEHUB_IMDB_CONFIG_PATH:-./deploy/imdb-update.json}:/config/imdb-update.json:ro
+      - ${MOVIEHUB_IMDB_STATE_PATH:-/volume1/docker/moviehub/imdb-update}:/state:rw
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 32
+    mem_limit: 256m
+    networks:
+      - default
+
   moviehub-web:
     build:
       context: ./frontend

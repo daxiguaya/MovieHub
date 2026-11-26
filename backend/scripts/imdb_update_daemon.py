@@ -33,7 +33,7 @@ def load_config() -> dict:
         "run_at": "04:30",
         "timezone": "Asia/Singapore",
         "auto_apply": False,
-        "min_matched": 1,
+        "min_matched": 10,
         "backup_keep": 7,
         "retry_minutes": 15,
     }

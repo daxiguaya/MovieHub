@@ -42,6 +42,14 @@ The migration runner creates and verifies a SQLite online backup before
 applying the numbered migration, then validates integrity, foreign keys and
 the ORM schema. Do not manually alter the production database.
 
+After the migration succeeds, deploy the API and UI code with:
+
+```sh
+cd /volume1/docker/moviehub && docker compose up -d --build moviehub moviehub-web
+```
+
+No Nginx Proxy Manager restart is required.
+
 ## Import ratings
 
 Download the official file directly from IMDb into the host directory configured by

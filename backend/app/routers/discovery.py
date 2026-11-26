@@ -217,7 +217,7 @@ async def get_favorite_status(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     imdb_id: str | None = Query(None, max_length=32),
-    db: Session | None = Depends(get_optional_db),
+    db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     """Check one TMDB identity against both online and linked chart favorites."""
     if provider_id < 1:

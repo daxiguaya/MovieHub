@@ -1,7 +1,7 @@
 #!/bin/sh
 # Safe one-command MovieHub online-discovery rollout for the Synology production repo.
-# Default mode is read-only preflight. --deploy updates only moviehub and moviehub-web;
-# Nginx Proxy Manager is never restarted by this script.
+# Default mode is read-only preflight. --deploy updates MovieHub backend, IMDb updater,
+# and frontend; Nginx Proxy Manager is never restarted by this script.
 set -eu
 
 EXPECTED_ROOT="/volume1/docker/moviehub"
@@ -64,6 +64,34 @@ docker network inspect nginx-proxy-manager_default >/dev/null 2>&1 || { echo "[F
 
 DATA_PATH=$(python3 -c 'from pathlib import Path; p={}; [p.update({k.strip():v.strip().strip(chr(34)).strip(chr(39))}) for line in Path(".env").read_text().splitlines() if "=" in line and not line.lstrip().startswith("#") for k,v in [line.split("=",1)]]; print(p.get("MOVIEHUB_DATA_PATH", "/volume1/docker/moviehub/data"))')
 BACKUP_PATH=$(python3 -c 'from pathlib import Path; p={}; [p.update({k.strip():v.strip().strip(chr(34)).strip(chr(39))}) for line in Path(".env").read_text().splitlines() if "=" in line and not line.lstrip().startswith("#") for k,v in [line.split("=",1)]]; print(p.get("MOVIEHUB_BACKUP_PATH", "/volume1/docker/moviehub/backup"))')
+IMDB_CONFIG_DIR=$(python3 -c 'from pathlib import Path; p={}; [p.update({k.strip():v.strip().strip(chr(34)).strip(chr(39))}) for line in Path(".env").read_text().splitlines() if "=" in line and not line.lstrip().startswith("#") for k,v in [line.split("=",1)]]; q=Path(p.get("MOVIEHUB_IMDB_CONFIG_DIR", "./config")); print((q if q.is_absolute() else Path.cwd()/q).resolve())')
+IMDB_CONFIG_PATH="$IMDB_CONFIG_DIR/imdb-update.json"
+IMDB_CONFIG_TEMPLATE="$ROOT/deploy/imdb-update.json.example"
+[ -d "$IMDB_CONFIG_DIR" ] || { echo "[FAIL] IMDb config directory missing: $IMDB_CONFIG_DIR" >&2; exit 1; }
+[ -f "$IMDB_CONFIG_PATH" ] || { echo "[FAIL] IMDb updater config missing: $IMDB_CONFIG_PATH" >&2; exit 1; }
+[ -f "$IMDB_CONFIG_TEMPLATE" ] || { echo "[FAIL] Tracked IMDb config template missing: $IMDB_CONFIG_TEMPLATE" >&2; exit 1; }
+python3 - "$IMDB_CONFIG_PATH" "$IMDB_CONFIG_TEMPLATE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+for filename in sys.argv[1:]:
+    with open(filename, encoding="utf-8") as source:
+        config = json.load(source)
+    if not isinstance(config, dict):
+        raise SystemExit("IMDb updater config must be a JSON object: " + filename)
+    if not isinstance(config.get("enabled"), bool) or not isinstance(config.get("auto_apply"), bool):
+        raise SystemExit("IMDb updater enabled/auto_apply must be booleans: " + filename)
+    hour, minute = (int(part) for part in config["run_at"].split(":"))
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise SystemExit("Invalid IMDb updater run_at: " + filename)
+    zone = Path("/usr/share/zoneinfo") / str(config["timezone"])
+    if not zone.is_file():
+        raise SystemExit("Unknown IMDb updater timezone: " + filename)
+    if int(config.get("min_matched", 10)) < 1 or int(config.get("min_index_rows", 100000)) < 1:
+        raise SystemExit("Invalid IMDb updater quality thresholds: " + filename)
+print("IMDb updater config and template are valid.")
+PY
 [ -d "$DATA_PATH" ] || { echo "[FAIL] MovieHub data directory missing: $DATA_PATH" >&2; exit 1; }
 [ -f "$DATA_PATH/db/movies.db" ] || { echo "[FAIL] Production movies.db missing; refusing rollout" >&2; exit 1; }
 [ -d "$BACKUP_PATH" ] || { echo "[FAIL] Backup directory missing: $BACKUP_PATH" >&2; exit 1; }
@@ -74,7 +102,8 @@ CURRENT=$(git rev-parse --short HEAD)
 TARGET=$(git rev-parse --short origin/main)
 echo "[OK] Current code: $CURRENT; target main: $TARGET"
 echo "[OK] Compose valid; TMDB token and API key present (values hidden)."
-echo "[OK] Existing data, backup directory, NPM network, and rollback images found."
+echo "[OK] Existing data, backup directory, NPM network, rollback images, and IMDb config found."
+echo "[OK] Deployment installs tracked IMDb config template; scheduler and auto-apply remain disabled."
 
 if [ "$MODE" = "check" ]; then
   echo "[CHECK ONLY] No files, databases, images, or containers were changed."
@@ -82,7 +111,7 @@ if [ "$MODE" = "check" ]; then
   exit 0
 fi
 
-printf "This will fast-forward main, back up SQLite, migrate the MovieHub database, and recreate ONLY moviehub-backend and moviehub-web. NPM will not be restarted. Continue? [y/N] "
+printf "This will fast-forward main, back up SQLite and IMDb config, migrate the database, update IMDb config, and recreate ONLY MovieHub backend, IMDb updater, and frontend. NPM gets a graceful reload, not a restart. Continue? [y/N] "
 read ANSWER
 [ "$ANSWER" = "y" ] || [ "$ANSWER" = "Y" ] || { echo "Cancelled; nothing deployed."; exit 0; }
 
@@ -122,6 +151,9 @@ for source_path in sources:
     print("Backed up " + source_path.name + " -> " + str(destination))
 print("Backup directory: " + str(backup_dir))
 PY
+cp -p "$IMDB_CONFIG_PATH" "$BACKUP_PATH/online-discovery-rollout-$STAMP/imdb-update.json"
+: > "$BACKUP_PATH/online-discovery-rollout-$STAMP/imdb-config-existed"
+echo "Backed up current IMDb updater config."
 
 echo "[3/6] Saving current images and fast-forwarding production checkout..."
 docker tag moviehub-backend:local "$ROLLBACK_BACKEND"
@@ -132,18 +164,18 @@ docker tag moviehub-frontend:local "$ROLLBACK_FRONTEND"
 git add docker-compose.yml
 git merge --ff-only origin/main
 
-echo "[4/6] Building only the MovieHub backend and frontend..."
-docker compose build moviehub moviehub-web
+echo "[4/6] Building the MovieHub backend, IMDb updater, and frontend images..."
+docker compose build moviehub moviehub-imdb-updater moviehub-web
 
-echo "[5/6] Migrating the MovieHub database and updating only its two containers..."
+echo "[5/6] Migrating the MovieHub database and updating its three containers..."
 reload_npm_routes() {
   docker inspect nginx-proxy-manager >/dev/null 2>&1 || { echo "[FAIL] nginx-proxy-manager container is unavailable" >&2; return 1; }
   docker exec nginx-proxy-manager nginx -t
   docker exec nginx-proxy-manager nginx -s reload
 }
 rollback() {
-  echo "[ROLLBACK] Restoring the previous images and pre-migration MovieHub database..." >&2
-  docker compose stop moviehub || true
+  echo "[ROLLBACK] Restoring previous images, IMDb config, and pre-migration MovieHub databases..." >&2
+  docker compose stop moviehub moviehub-imdb-updater || true
   if [ -f "$ROLLBACK_DB_BACKUP" ]; then
     python3 - "$ROLLBACK_DB_BACKUP" "$DATA_PATH/db/movies.db" <<'PY'
 import sqlite3
@@ -200,9 +232,11 @@ PY
     rm -f "$DATA_PATH/cache/discovery.sqlite3" "$DATA_PATH/cache/discovery.sqlite3-wal" "$DATA_PATH/cache/discovery.sqlite3-shm"
     echo "No discovery cache existed before rollout; removed failed-version cache files."
   fi
+  cp -p "$ROLLBACK_CONFIG_BACKUP" "$IMDB_CONFIG_PATH"
+  echo "Restored pre-rollout IMDb updater config."
   docker tag "$ROLLBACK_BACKEND" moviehub-backend:local
   docker tag "$ROLLBACK_FRONTEND" moviehub-frontend:local
-  docker compose up -d --no-deps moviehub moviehub-web || true
+  docker compose up -d --no-deps moviehub moviehub-imdb-updater moviehub-web || true
   # Container IPs may have changed again during rollback; refresh Nginx workers too.
   reload_npm_routes || echo "[WARN] NPM route reload failed after rollback; inspect NPM before retrying." >&2
 }
@@ -215,10 +249,12 @@ trap on_exit EXIT
 
 ROLLBACK_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/movies.sqlite3"
 ROLLBACK_DISCOVERY_DB_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/discovery.sqlite3"
+ROLLBACK_CONFIG_BACKUP="$BACKUP_PATH/online-discovery-rollout-$STAMP/imdb-update.json"
 ROLLBACK_NEEDED=1
-docker compose stop moviehub
+docker compose stop moviehub moviehub-imdb-updater
 docker compose run --rm --no-deps -T --name "moviehub-schema-migrate-$STAMP" moviehub python -m scripts.migrate
-docker compose up -d --no-deps moviehub moviehub-web
+install -m 0644 "$IMDB_CONFIG_TEMPLATE" "$IMDB_CONFIG_PATH"
+docker compose up -d --no-deps moviehub moviehub-imdb-updater moviehub-web
 
 wait_healthy() {
   name="$1"
@@ -236,6 +272,32 @@ wait_healthy() {
 
 wait_healthy moviehub-backend
 wait_healthy moviehub-web
+
+wait_running() {
+  name="$1"
+  attempt=0
+  while [ "$attempt" -lt 25 ]; do
+    state=$(docker inspect --format '{{.State.Status}}' "$name" 2>/dev/null || true)
+    if [ "$state" = "running" ]; then return 0; fi
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  echo "[FAIL] $name did not enter running state" >&2
+  docker logs --tail 80 "$name" >&2 || true
+  return 1
+}
+wait_running moviehub-imdb-updater
+
+docker exec moviehub-imdb-updater python - <<'PY'
+from scripts.imdb_update_daemon import load_config
+config = load_config()
+assert config["enabled"] is False, "IMDb scheduler must remain disabled"
+assert config["auto_apply"] is False, "IMDb auto-apply must remain disabled"
+assert config["run_at"] == "04:30"
+assert config["timezone"] == "Asia/Singapore"
+assert config["min_index_rows"] == 100000
+print("IMDb updater config verified: scheduler disabled, auto-apply disabled, Asia/Singapore 04:30.")
+PY
 
 # NPM caches static proxy_pass hostname resolution until its workers reload.
 # This is a graceful Nginx reload, not an NPM container restart.
@@ -303,7 +365,7 @@ echo "$HEADERS" | grep -F "img-src 'self' data: https://image.tmdb.org https://w
 
 ROLLBACK_NEEDED=0
 trap - EXIT
-echo "[SUCCESS] MovieHub online discovery is deployed and passed live smoke tests."
+echo "[SUCCESS] MovieHub is deployed and passed live smoke tests."
 echo "Rollback image tags retained: $ROLLBACK_BACKEND and $ROLLBACK_FRONTEND"
-echo "Only moviehub-backend and moviehub-web were recreated. NPM received a graceful Nginx reload; its container was not restarted."
+echo "moviehub-backend, moviehub-imdb-updater, and moviehub-web were recreated. NPM received a graceful Nginx reload; its container was not restarted."
 echo "SQLite backups retained under: $BACKUP_PATH/online-discovery-rollout-$STAMP"

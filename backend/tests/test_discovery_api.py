@@ -104,3 +104,34 @@ def test_detail_returns_transient_overview(monkeypatch):
     assert response.status_code == 200
     assert response.json()["overview"].startswith("A commercial spaceship")
     assert calls == [("/movie/42", True)]
+
+
+
+def test_local_imdb_rating_is_attached_only_by_exact_tmdb_identity():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from app.database import Base, Movie
+    from app.routers.discovery import _attach_local_imdb_ratings
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(Movie(
+            tmdb_id="278",
+            imdb_id="tt0111161",
+            title="肖申克的救赎",
+            type="movie",
+            imdb_rating=9.3,
+            imdb_rating_count=3000000,
+        ))
+        db.commit()
+        items = [
+            {"provider_id": 278, "media_type": "movie"},
+            {"provider_id": 999999, "media_type": "movie"},
+        ]
+        result = _attach_local_imdb_ratings(db, items)
+        assert result[0]["imdb_rating"] == 9.3
+        assert result[0]["imdb_rating_count"] == 3000000
+        assert result[1]["imdb_rating"] is None
+        assert result[1]["imdb_rating_count"] is None
+    engine.dispose()

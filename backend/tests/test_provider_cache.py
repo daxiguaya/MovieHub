@@ -147,3 +147,20 @@ def test_forced_daily_backup_refreshes_after_favorite_write(tmp_path):
     assert first == refreshed
     restored = ProviderResponseCache(refreshed)
     assert restored.list_favorites()[0]["snapshot"]["title"] == "New Favorite"
+
+
+
+def test_cache_max_age_rejects_an_entry_even_when_its_ttl_is_still_fresh(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    key = cache.make_key("tmdb", "/movie/1", {"language": "zh-CN"})
+    cache.set(key, "tmdb", "/movie/1", {"vote_average": 7.8}, 7 * 86400)
+
+    with cache._connection() as connection:
+        connection.execute(
+            "UPDATE provider_response_cache SET fetched_at=? WHERE cache_key=?",
+            (int(time.time()) - 7 * 3600, key),
+        )
+
+    assert cache.get(key) == ({"vote_average": 7.8}, False)
+    assert cache.get(key, max_age_seconds=6 * 3600) is None
+    assert cache.get(key, allow_stale=True, max_age_seconds=6 * 3600) is None

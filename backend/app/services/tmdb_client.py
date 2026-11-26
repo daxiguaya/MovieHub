@@ -42,11 +42,11 @@ def _strip_unapproved_synopsis(value: Any) -> Any:
 
 
 class TMDBClient:
-    async def _cache_get(self, key: str, allow_stale: bool = False):
+    async def _cache_get(self, key: str, allow_stale: bool = False, max_age_seconds: int | None = None):
         """Keep SQLite reads and their locks off the ASGI event loop."""
         try:
             return await asyncio.to_thread(
-                provider_response_cache.get, key, allow_stale
+                provider_response_cache.get, key, allow_stale, max_age_seconds
             )
         except Exception as exc:
             logger.warning("TMDB response-cache read failed: %s", type(exc).__name__)
@@ -144,10 +144,11 @@ class TMDBClient:
         params: dict[str, Any] | None = None,
         ttl: int = SEARCH_TTL,
         include_overview: bool = False,
+        max_cache_age_seconds: int | None = None,
     ) -> dict[str, Any]:
         clean_params = {k: v for k, v in (params or {}).items() if v is not None}
         key = provider_response_cache.make_key("tmdb", endpoint, clean_params)
-        cached = await self._cache_get(key)
+        cached = await self._cache_get(key, max_age_seconds=max_cache_age_seconds)
         if cached:
             payload, _ = cached
             if not include_overview:
@@ -174,7 +175,9 @@ class TMDBClient:
             # upstream request still needed by other callers.
             return await asyncio.shield(task)
         except Exception:
-            stale = await self._cache_get(key, allow_stale=True)
+            stale = await self._cache_get(
+                key, allow_stale=True, max_age_seconds=max_cache_age_seconds
+            )
             if stale:
                 logger.warning("Serving stale TMDB cache after upstream failure: %s", endpoint)
                 return stale[0]

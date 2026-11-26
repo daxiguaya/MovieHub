@@ -9,11 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.config import settings
-from app.database import Favorite, Movie, get_db
+from app.database import Favorite, Movie, database_is_ready, get_db
 from app.limiter import limiter
 from app.dependencies.auth import verify_api_key
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
+
+def get_optional_db():
+    """Provide local rating lookup when the private MovieHub DB is initialized."""
+    if not database_is_ready():
+        yield None
+        return
+    yield from get_db()
+
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
 logger = logging.getLogger("moviehub.discovery")
@@ -68,8 +76,13 @@ def _normalize_result(item: dict, media_type: str) -> dict:
     }
 
 
-def _attach_local_imdb_ratings(db: Session, items: list[dict]) -> list[dict]:
+def _attach_local_imdb_ratings(db: Session | None, items: list[dict]) -> list[dict]:
     """Attach ratings only through an exact local TMDB-ID identity match."""
+    if db is None:
+        for item in items:
+            item["imdb_rating"] = None
+            item["imdb_rating_count"] = None
+        return items
     provider_ids = {str(item["provider_id"]) for item in items if isinstance(item.get("provider_id"), int)}
     media_types = {item.get("media_type") for item in items}
     if not provider_ids or not media_types:
@@ -92,7 +105,7 @@ async def search_online(
     media_type: Literal["all", "movie", "tv"] = Query("all"),
     page: int = Query(1, ge=1, le=500),
     language: str = Query("zh-CN", min_length=2, max_length=12),
-    db: Session = Depends(get_db),
+    db: Session | None = Depends(get_optional_db),
 ) -> dict:
     """Search one requested page only; never crawl subsequent pages."""
     query = " ".join(q.split())
@@ -243,7 +256,7 @@ async def get_online_detail(
     identity_filter = Movie.tmdb_id == str(provider_id)
     if imdb_id:
         identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    local_movie = db.query(Movie).filter(Movie.type == media_type, identity_filter).first()
+    local_movie = db.query(Movie).filter(Movie.type == media_type, identity_filter).first() if db is not None else None
     return {
         "provider": "tmdb",
         "media_type": media_type,

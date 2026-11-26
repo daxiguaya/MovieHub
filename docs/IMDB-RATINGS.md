@@ -43,8 +43,10 @@ the ORM schema. Do not manually alter the production database.
 
 ## Import ratings
 
-Download the official file directly from IMDb to a private NAS directory. Do
-not commit or upload the dataset to GitHub.
+Download the official file directly from IMDb into the host directory configured by
+Compose's `MOVIEHUB_IMPORT_PATH` (mounted read-only at `/imports` in the backend
+container). If that variable points to the existing NAS `import-staging` folder,
+place the file there. Do not commit or upload the dataset to GitHub.
 
 Example:
 
@@ -55,7 +57,7 @@ curl -fL https://datasets.imdbws.com/title.ratings.tsv.gz -o /volume1/docker/mov
 After schema v5 is active, run a dry-run first:
 
 ```sh
-cd /volume1/docker/moviehub && docker compose run --rm --no-deps moviehub python -m scripts.import_imdb_ratings --input /data/import-staging/title.ratings.tsv.gz
+cd /volume1/docker/moviehub && docker compose run --rm --no-deps moviehub python -m scripts.import_imdb_ratings --input /imports/title.ratings.tsv.gz
 ```
 
 Only exact, already stored IMDb title IDs (`tt...`) are eligible. No title

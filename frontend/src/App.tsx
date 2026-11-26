@@ -1137,6 +1137,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
           <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
+          {(movie.douban_id || movie.douban_url) && <div className="detail-rating detail-rating-secondary"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString() + " 人评价"}</span></div>}
           <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；评分仅采用 IMDb 数据。</p>}
           <div className="detail-actions">

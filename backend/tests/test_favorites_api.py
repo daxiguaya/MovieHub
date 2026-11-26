@@ -326,3 +326,73 @@ def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_rating
         assert item["snapshot"]["imdb_rating_count"] == 3000000
     finally:
         engine.dispose()
+
+
+def test_external_favorite_rejects_conflicting_tmdb_and_imdb_local_identities(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "moviehub-data" / "movies.db"
+    backend_dir = Path(__file__).resolve().parents[1]
+    initialize(db_path, backend_dir / "migrations" / "001_moviehub_core.sql")
+    engine = database.create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with TargetSession() as db:
+        tmdb_match = database.Movie(
+            tmdb_id="901",
+            title="TMDB Identity Match",
+            year=2024,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        imdb_match = database.Movie(
+            imdb_id="tt7654323",
+            title="IMDb Identity Match",
+            year=2024,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        db.add_all([tmdb_match, imdb_match])
+        db.commit()
+
+    monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(database, "SessionLocal", TargetSession)
+    monkeypatch.setattr(main_module, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(settings, "api_key", "favorites-test-key")
+    monkeypatch.setattr(main_module.poster_cache_service, "clear_expired_cache", lambda: None)
+    monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
+    monkeypatch.setattr(discovery.provider_response_cache, "backup_daily", lambda *args, **kwargs: None)
+
+    saved_external = []
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "save_favorite",
+        lambda *args, **kwargs: saved_external.append((args, kwargs)),
+    )
+
+    try:
+        with TestClient(main_module.app) as client:
+            response = client.put(
+                "/api/favorites/external/movie/901",
+                headers={"X-API-Key": "favorites-test-key"},
+                json={"snapshot": {
+                    "title": "Incoming Online Title",
+                    "year": 2024,
+                    "imdb_id": "tt7654323",
+                }},
+            )
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == (
+            "TMDB and IMDb identifiers resolve to different local movies"
+        )
+        assert saved_external == []
+        with TargetSession() as db:
+            assert db.scalars(select(database.Favorite)).all() == []
+    finally:
+        engine.dispose()

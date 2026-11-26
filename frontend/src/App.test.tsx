@@ -145,7 +145,7 @@ describe("MovieHub frontend workflows", () => {
     await waitFor(() => {
       const discoverUrl = fetchMock.mock.calls.map(([input]) => String(input))
         .find((url) => url.startsWith("/api/discovery/discover?"));
-      expect(discoverUrl).toContain("sort_by=vote_average.desc");
+      expect(discoverUrl).toContain("sort_by=popularity.desc");
     });
   });
 

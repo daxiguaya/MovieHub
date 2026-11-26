@@ -826,7 +826,7 @@ function SearchPage() {
     setKeyword(params.get("search") ?? "");
     setType((params.get("type") as "all" | "movie" | "tv" | null) ?? "all");
     setMinRating(params.get("min_rating") ?? "");
-    setMinRatingCount(params.get("min_rating_count") ?? "100");
+    setMinRatingCount(params.get("min_rating_count") ?? "");
     setMinYear(params.get("min_year") ?? "");
     setMaxYear(params.get("max_year") ?? "");
     setSortBy(params.get("sort") ?? "relevance");

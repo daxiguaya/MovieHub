@@ -351,7 +351,7 @@ function DiscoveryListPage() {
       <PageHeading
         eyebrow="HORROR & THRILLER"
         title={definition.title}
-        description={definition.description + "。按页在线获取，不做全量导入。"}
+        description={definition.description + "。榜单筛选与排序依据 TMDB 评分和投票数；卡片另行展示 IMDb 评分。按页在线获取，不做全量导入。"}
         action={
           <label className="select-wrap">
             上映年份
@@ -406,7 +406,7 @@ function DiscoverySpotlight() {
   return (
     <section className="genre-spotlight">
       <div className="section-heading">
-        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>专门为类型片爱好者精选，按口碑和投票量动态发现作品。</p></div>
+        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>按 TMDB 评分和投票量筛选；作品卡片同时展示 IMDb 评分，两个来源分别标注。</p></div>
         <Link className="text-link" to="/search">更多类型筛选 <span>→</span></Link>
       </div>
       {loading ? <Loading label="正在加载恐怖与惊悚精选…" /> : lists.length === 0 ? (

@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "run_at": "04:30",
+  "timezone": "Asia/Singapore",
+  "auto_apply": false,
+  "min_matched": 10,
+  "backup_keep": 7,
+  "retry_minutes": 15
+}

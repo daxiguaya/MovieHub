@@ -140,6 +140,12 @@ def import_imdb_ratings(
 
             ratings = list(iter_matching_ratings(input_path, set(movie_by_imdb)))
             matched_ids = {item[0] for item in ratings}
+            changed_ids = {
+                imdb_id for imdb_id, rating, votes in ratings
+                if movie_by_imdb[imdb_id].imdb_rating != rating
+                or movie_by_imdb[imdb_id].imdb_rating_count != votes
+            }
+            unchanged_ids = matched_ids - changed_ids
             summary = {
                 "valid": True,
                 "applied": False,
@@ -148,6 +154,9 @@ def import_imdb_ratings(
                 "local_movies_with_imdb_id": len(movie_by_imdb),
                 "imdb_id_coverage_percent": round(len(movie_by_imdb) * 100 / total_local_movies, 2) if total_local_movies else 0.0,
                 "matched": len(ratings),
+                "changed": len(changed_ids),
+                "unchanged": len(unchanged_ids),
+                "missing_in_snapshot": len(movie_by_imdb) - len(matched_ids),
                 "unmatched": len(movie_by_imdb) - len(matched_ids),
                 "matched_examples": sorted(matched_ids)[:10],
                 "unmatched_examples": sorted(set(movie_by_imdb) - matched_ids)[:10],
@@ -157,14 +166,11 @@ def import_imdb_ratings(
             if not ratings:
                 raise RuntimeError("No exact IMDb IDs matched; refusing an empty import.")
 
-            backup_path = create_verified_backup(db_path)
             now = datetime.utcnow()
-            updated = 0
             provenance_added = 0
+            provenance_rows = []
             for imdb_id, rating, vote_count in ratings:
                 movie = movie_by_imdb[imdb_id]
-                movie.imdb_rating = rating
-                movie.imdb_rating_count = vote_count
                 for field_name, value in (
                     ("imdb_rating", f"{rating:.1f}"),
                     ("imdb_rating_count", str(vote_count)),
@@ -180,7 +186,7 @@ def import_imdb_ratings(
                         ).limit(1)
                     )
                     if existing is None:
-                        db.add(
+                        provenance_rows.append(
                             MovieMetadataProvenance(
                                 movie_id=movie.id,
                                 field_name=field_name,
@@ -191,14 +197,30 @@ def import_imdb_ratings(
                             )
                         )
                         provenance_added += 1
-                updated += 1
 
+            # Create a backup only when this run will mutate the database.
+            backup_path = (
+                create_verified_backup(db_path)
+                if changed_ids or provenance_rows
+                else None
+            )
+            for imdb_id, rating, vote_count in ratings:
+                if imdb_id not in changed_ids:
+                    continue
+                movie = movie_by_imdb[imdb_id]
+                movie.imdb_rating = rating
+                movie.imdb_rating_count = vote_count
+
+            if provenance_rows:
+                db.add_all(provenance_rows)
             db.commit()
             summary.update({
                 "applied": True,
-                "updated": updated,
+                "updated": len(changed_ids),
+                "changed": len(changed_ids),
+                "unchanged": len(unchanged_ids),
                 "provenance_added": provenance_added,
-                "backup": str(backup_path),
+                "backup": str(backup_path) if backup_path else None,
                 "integrity_check": "backup verified before import; database transaction committed",
             })
             return summary

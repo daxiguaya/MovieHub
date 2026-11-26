@@ -42,12 +42,22 @@ def test_unchanged_etag_skips_download_and_marks_day_complete(tmp_path, monkeypa
     monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("must not download"))
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
     (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
-    state = {"dataset_fingerprint": '"same-version"', "last_result": {
-        "status": "applied", "dry_run": {"full_index": {"indexed_titles": 1000000}}
-    }}
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "same-catalogue")
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "same-catalogue",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 20},
+                "full_index": {"valid": True, "indexed_titles": 1000000},
+            },
+        },
+    }
     result = updater.run_update({}, state, date(2026, 11, 26))
     assert result["status"] == "unchanged_dataset"
     assert state["last_successful_date"] == "2026-11-26"
+    assert state["local_catalogue_fingerprint"] == "same-catalogue"
     assert json.loads(state_path.read_text())["last_successful_date"] == "2026-11-26"
 
 
@@ -55,6 +65,7 @@ def test_new_snapshot_runs_dry_run_without_auto_applying(tmp_path, monkeypatch):
     snapshot = tmp_path / "title.ratings.tsv.gz"
     snapshot.write_bytes(b"test")
     monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "catalogue-v1")
     monkeypatch.setattr(updater, "request_headers", lambda: {
         "etag": '"new-version"', "last_modified": "", "content_length": "4"
     })
@@ -90,6 +101,7 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
     monkeypatch.setattr(updater, "import_imdb_ratings", fake_import)
     monkeypatch.setattr(updater, "import_imdb_rating_index", fake_import)
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "catalogue-v1")
     monkeypatch.setattr(updater, "prune_backups", lambda path, keep: None)
     state = {
         "dataset_fingerprint": '"known-version"',
@@ -112,6 +124,7 @@ def test_old_dry_run_state_builds_missing_full_index_without_new_etag(tmp_path, 
     monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
     monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "catalogue-v1")
     monkeypatch.setattr(updater, "request_headers", lambda: {
         "etag": '"same-version"', "last_modified": "", "content_length": "123"
     })
@@ -148,11 +161,162 @@ def test_updater_checks_configured_index_path_for_unchanged_etag(tmp_path, monke
     monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("must not download"))
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
     monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "catalogue-v1")
     state = {
         "dataset_fingerprint": '"same-version"',
-        "last_result": {"status": "applied", "dry_run": {"full_index": {"indexed_titles": 1000000}}},
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 20},
+                "full_index": {"valid": True, "indexed_titles": 1000000},
+            },
+        },
     }
 
     result = updater.run_update({}, state, date(2026, 11, 27))
 
     assert result["status"] == "unchanged_dataset"
+
+
+
+def test_unchanged_etag_refreshes_local_ratings_when_catalogue_changes(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    snapshot = snapshot_dir / "title.ratings.tsv.gz"
+    snapshot.write_bytes(b"saved official snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("saved snapshot should be reused"))
+    fingerprints = iter(["catalogue-v2", "catalogue-v2"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(("local", apply)) or {"valid": True, "matched": 275, "changed": 12}
+    ))
+    monkeypatch.setattr(updater, "import_imdb_rating_index", lambda *args, **kwargs: (
+        calls.append(("index", kwargs.get("apply", False)))
+        or {"valid": True, "indexed_titles": 1500000}
+    ))
+    monkeypatch.setattr(updater, "index_database_path", lambda: tmp_path / "imdb-ratings.sqlite3")
+    (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    result = updater.run_update(
+        {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+        state,
+        date(2026, 11, 28),
+    )
+
+    assert result["status"] == "dry_run_only"
+    assert result["dry_run"]["local"]["matched"] == 275
+    assert calls == [("local", False)]
+    saved_state = json.loads((tmp_path / "state.json").read_text())
+    assert saved_state["local_catalogue_fingerprint"] == "catalogue-v2"
+
+
+def test_catalogue_change_during_refresh_does_not_mark_day_complete(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    (snapshot_dir / "title.ratings.tsv.gz").write_bytes(b"saved official snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    fingerprints = iter(["catalogue-v2", "catalogue-v3"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    monkeypatch.setattr(updater, "index_database_path", lambda: tmp_path / "imdb-ratings.sqlite3")
+    (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(apply) or {"valid": True, "matched": 275}
+    ))
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    with pytest.raises(RuntimeError, match="catalogue changed during refresh"):
+        updater.run_update(
+            {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+            state,
+            date(2026, 11, 28),
+        )
+
+    assert not (tmp_path / "state.json").exists()
+
+
+
+def test_unchanged_snapshot_without_http_validators_refreshes_changed_catalogue(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    snapshot = snapshot_dir / "title.ratings.tsv.gz"
+    snapshot.write_bytes(b"same official snapshot")
+    index_path = tmp_path / "imdb-ratings.sqlite3"
+    index_path.write_bytes(b"present")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "index_database_path", lambda: index_path)
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": "", "last_modified": "", "content_length": ""
+    })
+    monkeypatch.setattr(updater, "download_snapshot", lambda: (snapshot, "same-sha256"))
+    fingerprints = iter(["catalogue-v2", "catalogue-v2"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(("local", apply)) or {"valid": True, "matched": 280, "changed": 7}
+    ))
+    monkeypatch.setattr(
+        updater,
+        "import_imdb_rating_index",
+        lambda *args, **kwargs: pytest.fail("the existing full index must not be rebuilt"),
+    )
+    state = {
+        "dataset_fingerprint": "same-sha256",
+        "dataset_sha256": "same-sha256",
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    result = updater.run_update(
+        {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+        state,
+        date(2026, 11, 29),
+    )
+
+    assert result["status"] == "dry_run_only"
+    assert result["dry_run"]["local"]["matched"] == 280
+    assert calls == [("local", False)]
+    saved_state = json.loads((tmp_path / "state.json").read_text())
+    assert saved_state["local_catalogue_fingerprint"] == "catalogue-v2"

@@ -1014,7 +1014,10 @@ class ImportService:
             movie.rating = rating
 
         imdb_id = self._safe_string(row["imdb_id"])
-        if imdb_id:
+        # Scout's IMDb field is external input. Only accept canonical title IDs;
+        # a URL, malformed value, or unrelated text must never overwrite a
+        # previously verified IMDb identity.
+        if imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id):
             movie.imdb_id = imdb_id
 
         update_time = self._safe_int(row["update_time"])

@@ -80,7 +80,7 @@ For an existing NPM Proxy Host that already serves DSM at the root of `zwnas.not
 
 The frontend container and backend both join `nginx-proxy-manager_default`. NPM forwards to the frontend only; the frontend proxies API requests to the backend. No host ports are published. Same-origin routing means no broad CORS allowlist is required.
 
-Because the frontend Nginx is now the immediate proxy seen by FastAPI, set `MOVIEHUB_TRUSTED_PROXY_IPS` to the frontend container's exact IP on `nginx-proxy-manager_default` (inspect it after the frontend container is recreated). Do not leave it set to the NPM container IP, and never use `*` or a default route (`0.0.0.0/0`, `::/0`). The frontend forwards the original client address chain to FastAPI.
+Because the frontend Nginx is the immediate proxy seen by FastAPI, `MOVIEHUB_TRUSTED_PROXY_IPS` must contain the frontend container's exact IP on `nginx-proxy-manager_default`, not the backend or NPM IP. The production Compose file pins the backend to `172.20.0.3` and frontend to `172.20.0.4`; set the NAS `.env` value to `MOVIEHUB_TRUSTED_PROXY_IPS=172.20.0.4`. These addresses must be available in the external NPM network subnet (the verified NAS network is `172.20.0.0/16`). Never use `*` or a default route (`0.0.0.0/0`, `::/0`). The frontend forwards the original client address chain to FastAPI.
 
 ## Health and readiness
 

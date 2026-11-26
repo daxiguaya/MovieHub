@@ -947,7 +947,6 @@ function SearchPage() {
     const nextPage = onlinePage + 1;
     const q = (searchParams.get("search") ?? "").trim();
     const requestedType = (searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all";
-    const requestedMinRating = searchParams.get("min_rating") ?? "";
     const requestedSort = searchParams.get("sort") ?? "relevance";
     const request = q.length >= 2
       ? api.discoverySearch(q, requestedType, nextPage)
@@ -955,14 +954,13 @@ function SearchPage() {
           media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(nextPage),
           min_votes: searchParams.get("min_rating_count") || "100",
-          sort_by: requestedSort === "rating_desc" ? "vote_average.desc"
-            : requestedSort === "rating_asc" ? "vote_average.asc"
-            : requestedSort === "votes_desc" ? "vote_count.desc"
-            : requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
-            : requestedMinRating ? "vote_average.desc" : "popularity.desc",
+          // Rating and vote sorting is applied to the loaded results using IMDb data.
+          // Keep TMDB pagination on the same stable order as the initial request.
+          sort_by: requestedSort === "year_desc"
+            ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
+            : "popularity.desc",
           ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")!.split(/[|,]/).filter(Boolean).join(",") } : {}),
           ...(searchParams.get("region_codes") ? { region: searchParams.get("region_codes")! } : {}),
-          ...(requestedMinRating ? { min_rating: requestedMinRating } : {}),
           ...(searchParams.get("min_year") ? { min_year: searchParams.get("min_year")! } : {}),
           ...(searchParams.get("max_year") ? { max_year: searchParams.get("max_year")! } : {})
         }));

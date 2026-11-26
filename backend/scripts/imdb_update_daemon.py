@@ -117,7 +117,7 @@ def prune_backups(database_path: Path, keep: int) -> None:
 
 def index_database_path() -> Path:
     configured = os.environ.get("IMDB_RATINGS_INDEX_PATH")
-    return Path(configured).expanduser().resolve() if configured else index_database_path()
+    return Path(configured).expanduser().resolve() if configured else Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3")
 
 
 def prune_index_backups(index_path: Path, keep: int) -> None:
@@ -135,7 +135,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         previous_result = state.get("last_result", {})
         saved_snapshot = IMPORT_DIR / "title.ratings.tsv.gz"
         previous_dry_run = previous_result.get("dry_run") or {}
-        index_path = Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3")
+        index_path = index_database_path()
         # Older updater state only records the local catalogue import. Ensure
         # the complete index is built even when IMDb's ETag has not changed.
         needs_full_index = not index_path.is_file() or "full_index" not in previous_dry_run
@@ -174,7 +174,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         return result
 
     snapshot, content_hash = download_snapshot()
-    index_path = Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3")
+    index_path = index_database_path()
     previous_dry_run = (state.get("last_result") or {}).get("dry_run") or {}
     if not fingerprint and content_hash == previous and index_path.is_file() and "full_index" in previous_dry_run:
         result = {"status": "unchanged_dataset", "sha256": content_hash}
@@ -196,7 +196,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         applied_local = import_imdb_ratings(snapshot, apply=True)
         result = {"status": "applied", "dry_run": dry_run, "applied_result": {"local": applied_local, "full_index": applied_index}}
         prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
-        prune_index_backups(Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3"), int(config["backup_keep"]))
+        prune_index_backups(index_database_path(), int(config["backup_keep"]))
 
     state["dataset_fingerprint"] = fingerprint or content_hash
     state["dataset_sha256"] = content_hash

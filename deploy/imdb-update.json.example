@@ -1,8 +1,8 @@
 {
-  "enabled": false,
-  "run_at": "04:30",
-  "timezone": "Asia/Singapore",
-  "auto_apply": false,
+  "enabled": true,
+  "run_at": "00:00",
+  "timezone": "Asia/Shanghai",
+  "auto_apply": true,
   "min_matched": 10,
   "min_index_rows": 100000,
   "backup_keep": 7,

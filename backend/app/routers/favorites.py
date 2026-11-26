@@ -347,10 +347,10 @@ def save_external_favorite(
             db.commit()
         # A chart-backed movie has one canonical Favorite row; do not create
         # a second provider-cache favorite for the same work.
-        try:
-            provider_response_cache.delete_favorite(media_type, provider_id)
-        except Exception:
-            pass
+        # The local Favorite row is already committed. If external cleanup
+        # fails, propagate the error so the caller can retry this idempotent
+        # operation; silently reporting success would leave duplicate favorites.
+        provider_response_cache.delete_favorite(media_type, provider_id)
         return {"linked_movie_id": linked_movie.id, "is_favorite": True}
     saved = provider_response_cache.save_favorite(
         media_type, provider_id, snapshot, payload.note

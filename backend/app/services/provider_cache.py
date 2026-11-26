@@ -269,8 +269,10 @@ class ProviderResponseCache:
         if not imdb_id or len(imdb_id) > 32 or not title or year is None:
             return False
 
-        def normalize(value: str | None) -> str:
-            normalized = unicodedata.normalize("NFKC", value or "").casefold()
+        def normalize(value: object) -> str:
+            if not isinstance(value, str):
+                return ""
+            normalized = unicodedata.normalize("NFKC", value).casefold()
             return "".join(char for char in normalized if char.isalnum())
 
         local_titles = {

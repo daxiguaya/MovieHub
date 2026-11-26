@@ -46,6 +46,8 @@ class FavoriteSnapshot(BaseModel):
     year: int | None = Field(default=None, ge=1870, le=2100)
     rating: float | None = Field(default=None, ge=0, le=10)
     rating_count: int = Field(default=0, ge=0)
+    imdb_rating: float | None = Field(default=None, ge=0, le=10)
+    imdb_rating_count: int | None = Field(default=None, ge=0)
     poster_path: str | None = Field(default=None, max_length=512)
     backdrop_path: str | None = Field(default=None, max_length=512)
     imdb_id: str | None = Field(default=None, max_length=32)

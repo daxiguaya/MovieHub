@@ -159,10 +159,20 @@ def remove_favorite(
 ) -> Response:
     """Remove one favorite using the MovieHub internal movie ID."""
     favorite = db.get(Favorite, movie_id)
-    if favorite is None:
+    movie = db.get(Movie, movie_id)
+    has_external_identity = movie is not None and (
+        (movie.tmdb_id and movie.tmdb_id.isdigit()) or bool(movie.imdb_id)
+    )
+    if favorite is None and not has_external_identity:
         raise HTTPException(status_code=404, detail="Favorite not found")
 
-    movie = db.get(Movie, movie_id)
+    # Commit the canonical local deletion first. If the external-cache cleanup
+    # then fails, a repeated DELETE can retry it using the still-present movie
+    # identity even though the local Favorite row is already gone.
+    if favorite is not None:
+        db.delete(favorite)
+        db.commit()
+
     removed_external = False
     if movie is not None:
         if movie.tmdb_id and movie.tmdb_id.isdigit():
@@ -178,8 +188,6 @@ def remove_favorite(
                 movie.year,
             ) or removed_external
 
-    db.delete(favorite)
-    db.commit()
     if removed_external:
         try:
             provider_response_cache.backup_daily(

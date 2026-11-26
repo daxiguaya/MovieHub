@@ -419,7 +419,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · TMDB ★ {item.rating?.toFixed(1) ?? "—"} · {item.rating_count.toLocaleString()} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -475,7 +475,7 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
-function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: number; localMatch?: boolean }) {
+function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null }) {
   return (
     <article className="movie-card">
       <MoviePoster movie={movie} rank={rank} />
@@ -483,8 +483,11 @@ function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: n
         <Link to={`/movies/${movie.id}`} className="movie-title">{movie.title}</Link>
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
         {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
-        <div className="movie-rating"><span>★</span> 豆瓣 {movie.rating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
-        {movie.tmdb_rating_count != null && <div className="movie-subtitle">TMDB {movie.tmdb_rating == null ? "" : `★ ${movie.tmdb_rating.toFixed(1)} · `}{movie.tmdb_rating_count.toLocaleString()} 票</div>}
+        {sourceRating !== undefined ? (
+          <div className="movie-rating"><span>★</span> 豆瓣 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
+        ) : (
+          <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
+        )}
         {movie.overview && <p className="movie-overview">{movie.overview}</p>}
       </div>
     </article>
@@ -509,8 +512,8 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
       <div className="movie-card-info">
         <Link to={"/tmdb/" + item.media_type + "/" + item.provider_id} className="movie-title">{item.title}</Link>
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
-        {localMovie && <div className="movie-subtitle">本地榜单收录 · 豆瓣 {localMovie.rating?.toFixed(1) ?? "暂无评分"}</div>}
-        <div className="movie-rating"><span>★</span> TMDB {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()})</small></div>
+        {localMovie && <div className="movie-subtitle">本地榜单匹配</div>}
+        <div className="movie-rating"><span>★</span> IMDb {item.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({item.imdb_rating_count == null ? "暂无投票人数" : item.imdb_rating_count.toLocaleString()})</small></div>
       </div>
     </article>
   );
@@ -638,7 +641,7 @@ function ChartPage() {
       ) : (
         <>
           <div className="result-caption"><span>{snapshotDate || "最新快照"}</span><span>{total} 部作品</span></div>
-          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} />)}</div>
+          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} />)}</div>
           {nextCursor && <button className="secondary-button load-more" onClick={() => void loadMore()}>加载更多</button>}
         </>
       )}
@@ -679,7 +682,7 @@ function SearchPage() {
   const [keyword, setKeyword] = useState(searchParams.get("search") ?? "");
   const [type, setType] = useState<"all" | "movie" | "tv">((searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all");
   const [minRating, setMinRating] = useState(searchParams.get("min_rating") ?? "");
-  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "100");
+  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "");
   const [minYear, setMinYear] = useState(searchParams.get("min_year") ?? "");
   const [maxYear, setMaxYear] = useState(searchParams.get("max_year") ?? "");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "relevance");
@@ -717,7 +720,6 @@ function SearchPage() {
   async function runSearch(params: URLSearchParams, appendLocal = false, appendOnline = false) {
     const q = (params.get("search") ?? "").trim();
     const requestedType = (params.get("type") as "all" | "movie" | "tv" | null) ?? "all";
-    const requestedMinRating = params.get("min_rating") ?? "";
     const requestedMinYear = params.get("min_year") ?? "";
     const requestedMaxYear = params.get("max_year") ?? "";
     const requestedSort = params.get("sort") ?? "relevance";
@@ -770,16 +772,11 @@ function SearchPage() {
         const discoverParams = new URLSearchParams({
           media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(requestedPage),
-          min_votes: params.get("min_rating_count") || "100",
-          sort_by: requestedSort === "rating_desc" ? "vote_average.desc"
-            : requestedSort === "rating_asc" ? "vote_average.asc"
-            : requestedSort === "votes_desc" ? "vote_count.desc"
-            : requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
-            : requestedMinRating ? "vote_average.desc" : "popularity.desc"
+          min_votes: "0",
+          sort_by: requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc") : "popularity.desc"
         });
         if (genreIds) discoverParams.set("with_genres", genreIds);
         if (selectedRegionCodes.length) discoverParams.set("region", selectedRegionCodes.join("|"));
-        if (requestedMinRating) discoverParams.set("min_rating", requestedMinRating);
         if (requestedMinYear) discoverParams.set("min_year", requestedMinYear);
         if (requestedMaxYear) discoverParams.set("max_year", requestedMaxYear);
         onlinePromise = api.discoveryDiscover(discoverParams);
@@ -829,7 +826,7 @@ function SearchPage() {
     setKeyword(params.get("search") ?? "");
     setType((params.get("type") as "all" | "movie" | "tv" | null) ?? "all");
     setMinRating(params.get("min_rating") ?? "");
-    setMinRatingCount(params.get("min_rating_count") ?? "100");
+    setMinRatingCount(params.get("min_rating_count") ?? "");
     setMinYear(params.get("min_year") ?? "");
     setMaxYear(params.get("max_year") ?? "");
     setSortBy(params.get("sort") ?? "relevance");
@@ -995,9 +992,9 @@ function SearchPage() {
   const sortedLocalOnly = [...localOnly].sort((left, right) => {
     const compare = (x: number | null, y: number | null, direction: 1 | -1) =>
       x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
-    const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1)
-      : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1)
-      : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1)
+    const result = sortBy === "rating_desc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, -1)
+      : sortBy === "rating_asc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, 1)
+      : sortBy === "votes_desc" ? compare(left.imdb_rating_count ?? null, right.imdb_rating_count ?? null, -1)
       : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
     return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
   });
@@ -1008,8 +1005,8 @@ function SearchPage() {
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
-        <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
-        <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
+        <label>最低 IMDb 评分（本地匹配）<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
+        <label>最低 IMDb 投票数（本地匹配）<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="不限" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
         <div className="search-filter">
@@ -1032,7 +1029,7 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
+      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。IMDb 评分和投票数筛选仅作用于本地匹配记录；在线发现按 TMDB 目录分页，评分展示仍只使用 IMDb。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
       <div className="result-caption"><span>在线搜索结果 · {onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span><label className="result-sort">排序方式<select aria-label="排序方式" value={sortBy} onChange={(e) => changeSort(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}
@@ -1041,7 +1038,7 @@ function SearchPage() {
           <div className="movie-grid">
             {[...onlineResults].sort((left, right) => {
               const compare = (x: number | null, y: number | null, direction: 1 | -1) => x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
-              const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
+              const result = sortBy === "rating_desc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, -1) : sortBy === "rating_asc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, 1) : sortBy === "votes_desc" ? compare(left.imdb_rating_count ?? null, right.imdb_rating_count ?? null, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
               return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
             }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
             {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}
@@ -1140,14 +1137,13 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <div className="eyebrow">{movie.type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? movie.tmdb_metadata?.year ?? "YEAR UNKNOWN"}</div>
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
-          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count == null ? "暂无评价人数" : `${movie.rating_count.toLocaleString()} 人评价`}</span>
-            {movie.tmdb_metadata?.rating != null && <span>TMDB · ★ {movie.tmdb_metadata.rating.toFixed(1)} · {movie.tmdb_metadata.rating_count.toLocaleString()} 票</span>}
-          </div>
+          <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
           <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
-          {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；豆瓣与 TMDB 评分分别展示。</p>}
+          {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；评分仅采用 IMDb 数据。</p>}
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
+            {movie.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
             {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
@@ -1238,7 +1234,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <div className="eyebrow">{movie.media_type === "tv" ? "TELEVISION SERIES" : "FEATURE FILM"} · {movie.year ?? "YEAR UNKNOWN"}</div>
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
-          <div className="detail-rating"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB · {movie.rating_count.toLocaleString()} 票</span></div>
+          <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
@@ -1348,6 +1344,8 @@ function FavoritesPage() {
                     year: favorite.snapshot.year,
                     rating: favorite.snapshot.rating,
                     rating_count: favorite.snapshot.rating_count,
+                    imdb_rating: favorite.snapshot.imdb_rating ?? null,
+                    imdb_rating_count: favorite.snapshot.imdb_rating_count ?? null,
                     poster_path: favorite.snapshot.poster_path,
                     backdrop_path: favorite.snapshot.backdrop_path,
                     genre_ids: []
@@ -1400,6 +1398,13 @@ function CreditsPage() {
           <h2>The Movie Database (TMDB)</h2>
           <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
           <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer">Visit The Movie Database ↗</a>
+        </div>
+      </section>
+      <section className="credits-panel">
+        <div className="credits-copy">
+          <h2>IMDb</h2>
+          <p>Information courtesy of IMDb (https://www.imdb.com). Used with permission. IMDb ratings are used for personal, non-commercial use only.</p>
+          <a href="https://www.imdb.com" target="_blank" rel="noreferrer">Visit IMDb ↗</a>
         </div>
       </section>
       <section className="credits-panel">

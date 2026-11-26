@@ -28,6 +28,8 @@ def _migrated_database(path: Path) -> None:
         conn.executescript(provenance.read_text(encoding="utf-8"))
         nullable_votes = MIGRATION.with_name("004_nullable_douban_vote_count.sql")
         conn.executescript(nullable_votes.read_text(encoding="utf-8"))
+        imdb_ratings = MIGRATION.with_name("005_imdb_ratings.sql")
+        conn.executescript(imdb_ratings.read_text(encoding="utf-8"))
     finally:
         conn.close()
 
@@ -52,7 +54,7 @@ def test_initial_migration_builds_independent_schema(tmp_path):
         with engine.connect() as conn:
             assert conn.exec_driver_sql(
                 "SELECT MAX(version) FROM schema_migrations"
-            ).scalar_one() == 4
+            ).scalar_one() == 5
     finally:
         engine.dispose()
 

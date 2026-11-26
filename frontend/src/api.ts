@@ -136,6 +136,8 @@ export const api = {
           year: item.year,
           rating: item.rating,
           rating_count: item.rating_count,
+          imdb_rating: item.imdb_rating ?? null,
+          imdb_rating_count: item.imdb_rating_count ?? null,
           poster_path: item.poster_path,
           backdrop_path: item.backdrop_path,
           imdb_id: "external_ids" in item ? item.external_ids.imdb_id ?? null : null,

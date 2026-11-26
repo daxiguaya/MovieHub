@@ -34,8 +34,8 @@ MAX_RATING = 10.0
 MAX_PAGE_SIZE = 50
 
 SORT_COLUMNS = {
-    "rating": Movie.rating,
-    "rating_count": Movie.rating_count,
+    "rating": Movie.imdb_rating,
+    "rating_count": Movie.imdb_rating_count,
     "year": Movie.year,
 }
 
@@ -101,7 +101,9 @@ class MovieService:
             original_title=movie.original_title,
             year=movie.year,
             rating=movie.rating,
-            rating_count=movie.rating_count or 0,
+            rating_count=movie.rating_count,
+            imdb_rating=movie.imdb_rating,
+            imdb_rating_count=movie.imdb_rating_count,
             type=movie.type,
             genres=self._movie_genres(movie),
             regions=self._movie_regions(movie),
@@ -119,7 +121,9 @@ class MovieService:
             original_title=movie.original_title,
             year=movie.year,
             rating=movie.rating,
-            rating_count=movie.rating_count or 0,
+            rating_count=movie.rating_count,
+            imdb_rating=movie.imdb_rating,
+            imdb_rating_count=movie.imdb_rating_count,
             type=movie.type,
             genres=self._movie_genres(movie),
             regions=self._movie_regions(movie),
@@ -435,7 +439,7 @@ class MovieService:
 
         if min_rating_count is not None:
             query = query.filter(
-                Movie.rating_count >= min_rating_count
+                Movie.imdb_rating_count >= min_rating_count
             )
 
         query = self._apply_rating_range(
@@ -508,8 +512,8 @@ class MovieService:
 
         if effective_min > 0:
             query = query.filter(
-                Movie.rating.isnot(None),
-                Movie.rating.between(
+                Movie.imdb_rating.isnot(None),
+                Movie.imdb_rating.between(
                     effective_min,
                     effective_max,
                 ),
@@ -518,9 +522,9 @@ class MovieService:
         elif effective_max < MAX_RATING:
             query = query.filter(
                 (
-                    Movie.rating.between(0, effective_max)
+                    Movie.imdb_rating.between(0, effective_max)
                 )
-                | Movie.rating.is_(None)
+                | Movie.imdb_rating.is_(None)
             )
 
         return query
@@ -679,7 +683,7 @@ class MovieService:
         )
 
         average = (
-            db.query(func.avg(Movie.rating))
+            db.query(func.avg(Movie.imdb_rating))
             .scalar()
             or 0.0
         )

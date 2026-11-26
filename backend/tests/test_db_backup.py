@@ -373,7 +373,7 @@ def test_full_deployment_lifecycle_initialize_backup_restore_and_readiness(tmp_p
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
         assert connection.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
     finally:
         connection.close()
 

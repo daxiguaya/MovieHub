@@ -6,22 +6,22 @@ from pathlib import Path
 from scripts.migrate import execute_migration
 
 
-def test_v1_database_migrates_to_v4_with_receipt_and_provenance_constraints(tmp_path):
+def test_v1_database_migrates_to_v5_with_receipt_and_provenance_constraints(tmp_path):
     backend_root = Path(__file__).resolve().parents[1]
     database_path = tmp_path / "moviehub-v1.sqlite"
     initial_migration = backend_root / "migrations" / "001_moviehub_core.sql"
-    latest_migration = backend_root / "migrations" / "004_nullable_douban_vote_count.sql"
+    latest_migration = backend_root / "migrations" / "005_imdb_ratings.sql"
 
     with sqlite3.connect(database_path) as conn:
         conn.executescript(initial_migration.read_text(encoding="utf-8"))
 
     version = execute_migration(database_path, latest_migration)
-    assert version == 4
+    assert version == 5
 
     with sqlite3.connect(database_path) as conn:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         columns = {
             row[1] for row in conn.execute(
                 "PRAGMA table_info(import_batch_receipts)"

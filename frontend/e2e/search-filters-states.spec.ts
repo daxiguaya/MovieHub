@@ -8,6 +8,8 @@ const resultMovie = {
   year: 2022,
   rating: 8.7,
   rating_count: 12500,
+  imdb_rating: 8.7,
+  imdb_rating_count: 12500,
   type: "movie",
   genres: ["剧情", "科幻"],
   regions: ["中国大陆"],
@@ -23,6 +25,8 @@ const discoveryItem = {
   year: 2022,
   rating: 8.1,
   rating_count: 2500,
+  imdb_rating: 8.1,
+  imdb_rating_count: 2500,
   poster_path: null,
   backdrop_path: null,
   genre_ids: [18, 878]
@@ -62,8 +66,8 @@ test("submits online Discover with dynamic multi-select filters and preserves se
 
   await page.goto("/search");
   await page.getByLabel("影视类型").selectOption("movie");
-  await page.getByLabel("最低 TMDB 评分").selectOption("8");
-  await page.getByLabel("最低投票数").fill("1000");
+  await page.getByLabel("最低 IMDb 评分（本地匹配）").selectOption("8");
+  await page.getByLabel("最低 IMDb 投票数（本地匹配）").fill("1000");
   await page.getByLabel("起始年份").fill("2020");
   await page.getByLabel("结束年份").fill("2024");
   await page.getByText("类型（可多选）").click();
@@ -90,8 +94,8 @@ test("submits online Discover with dynamic multi-select filters and preserves se
   expect(online.searchParams.get("media_type")).toBe("movie");
   expect(online.searchParams.get("with_genres")).toBe("18,878");
   expect(online.searchParams.get("region")).toBe("CN|JP");
-  expect(online.searchParams.get("min_rating")).toBe("8");
-  expect(online.searchParams.get("min_votes")).toBe("1000");
+  expect(online.searchParams.get("min_rating")).toBeNull();
+  expect(online.searchParams.get("min_votes")).toBe("0");
   expect(online.searchParams.get("min_year")).toBe("2020");
   expect(online.searchParams.get("max_year")).toBe("2024");
 

@@ -20,7 +20,7 @@ from app.database import Base
 from app.services.chart_init_service import initialize_chart_definitions
 
 logger = logging.getLogger("moviehub.init_db")
-MIGRATION_VERSION = 4
+MIGRATION_VERSION = 5
 REQUIRED_TABLES = {
     "schema_migrations",
     "movies",
@@ -209,6 +209,17 @@ def initialize(path: Path, migration_path: Path) -> None:
         if not nullable_votes_sql:
             raise RuntimeError("Nullable vote-count migration SQL is empty")
 
+        imdb_ratings_migration = (
+            Path(__file__).resolve().parents[1]
+            / "migrations"
+            / "005_imdb_ratings.sql"
+        )
+        if not imdb_ratings_migration.is_file():
+            raise FileNotFoundError(f"IMDb ratings migration not found: {imdb_ratings_migration}")
+        imdb_ratings_sql = imdb_ratings_migration.read_text(encoding="utf-8").strip()
+        if not imdb_ratings_sql:
+            raise RuntimeError("IMDb ratings migration SQL is empty")
+
         conn = sqlite3.connect(str(temporary_path), timeout=30)
         try:
             conn.execute("PRAGMA foreign_keys=ON")
@@ -216,6 +227,7 @@ def initialize(path: Path, migration_path: Path) -> None:
             conn.executescript(followup_sql)
             conn.executescript(provenance_sql)
             conn.executescript(nullable_votes_sql)
+            conn.executescript(imdb_ratings_sql)
         finally:
             conn.close()
 

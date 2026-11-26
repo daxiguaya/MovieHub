@@ -10,7 +10,7 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "004_nullable_douban_vote_count.sql"
+    / "005_imdb_ratings.sql"
 )
 
 
@@ -53,18 +53,18 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_version_four_migration_upgrades_v2_and_is_idempotent(tmp_path):
+def test_version_five_migration_upgrades_v2_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
     _create_v2_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 4
-    assert execute_migration(db_path, MIGRATION) == 4
+    assert execute_migration(db_path, MIGRATION) == 5
+    assert execute_migration(db_path, MIGRATION) == 5
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         tables = {
@@ -238,12 +238,12 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
         ]
         results = [future.result(timeout=30) for future in futures]
 
-    assert results == [4, 4]
+    assert results == [5, 5]
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version=3"
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=4"
         ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:
@@ -254,7 +254,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
 
 
 
-def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
+def test_v5_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     """A populated v2 database must retain every user-facing relation on v3."""
     db_path = tmp_path / "populated-v1.db"
     _create_v2_database(db_path)
@@ -323,7 +323,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     finally:
         conn.close()
 
-    assert execute_migration(db_path, MIGRATION) == 4
+    assert execute_migration(db_path, MIGRATION) == 5
 
     backup_path = next(tmp_path.glob("populated-v1.db.pre-migration-*.bak"))
     for candidate in (db_path, backup_path):
@@ -336,6 +336,16 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
                 "The Shawshank Redemption",
                 "fixture overview",
             )
+            if candidate == db_path:
+                assert check.execute(
+                    "SELECT imdb_rating, imdb_rating_count FROM movies WHERE id=41"
+                ).fetchone() == (None, None)
+            else:
+                backup_columns = {
+                    row[1] for row in check.execute("PRAGMA table_info(movies)")
+                }
+                assert "imdb_rating" not in backup_columns
+                assert "imdb_rating_count" not in backup_columns
             assert check.execute(
                 "SELECT name FROM genres WHERE id=7"
             ).fetchone() == ("剧情",)
@@ -372,7 +382,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     try:
         assert migrated.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         assert migrated.execute(
             "SELECT COUNT(*) FROM import_batch_receipts"
         ).fetchone()[0] == 0

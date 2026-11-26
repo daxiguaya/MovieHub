@@ -39,8 +39,8 @@ from app.database import Base
 
 logger = logging.getLogger("moviehub.migrate")
 
-MIGRATION_VERSION = 4
-MIGRATION_FILENAME = "004_nullable_douban_vote_count.sql"
+MIGRATION_VERSION = 5
+MIGRATION_FILENAME = "005_imdb_ratings.sql"
 
 REQUIRED_MOVIE_COLUMNS = {
     "id",
@@ -52,6 +52,8 @@ REQUIRED_MOVIE_COLUMNS = {
     "year",
     "rating",
     "rating_count",
+    "imdb_rating",
+    "imdb_rating_count",
     "type",
     "updated_at",
     "directors",
@@ -509,10 +511,10 @@ def _execute_migration_locked(
         logger.info("Existing MovieHub schema passed validation")
         return current_version
 
-    if current_version not in (1, 2, 3):
+    if current_version not in (1, 2, 3, 4):
         raise RuntimeError(
             f"Unsupported starting schema version: {current_version}. "
-            "This migration runner upgrades schema versions 1, 2 or 3 to version 4."
+            "This migration runner upgrades schema versions 1, 2, 3 or 4 to version 5."
         )
 
     migration_paths = []
@@ -523,6 +525,10 @@ def _execute_migration_locked(
     if migration_path.name == MIGRATION_FILENAME and current_version <= 2:
         migration_paths.append(
             migration_path.parent / "003_movie_metadata_provenance.sql"
+        )
+    if migration_path.name == MIGRATION_FILENAME and current_version <= 3:
+        migration_paths.append(
+            migration_path.parent / "004_nullable_douban_vote_count.sql"
         )
     migration_paths.append(migration_path)
     migration_sql = []

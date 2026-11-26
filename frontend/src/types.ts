@@ -21,6 +21,8 @@ export interface Movie {
   year: number | null;
   rating: number | null;
   rating_count: number | null;
+  imdb_rating?: number | null;
+  imdb_rating_count?: number | null;
   tmdb_rating?: number | null;
   tmdb_rating_count?: number | null;
   type: "movie" | "tv";
@@ -121,6 +123,8 @@ export interface DiscoveryItem {
   backdrop_path: string | null;
   genre_ids: number[];
   imdb_id?: string | null;
+  imdb_rating?: number | null;
+  imdb_rating_count?: number | null;
 }
 
 export interface DiscoverySearchResponse {
@@ -138,7 +142,7 @@ export interface ExternalFavorite {
   provider: "tmdb";
   media_type: "movie" | "tv";
   provider_id: number;
-  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path"> & { imdb_id?: string | null };
+  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path" | "imdb_rating" | "imdb_rating_count"> & { imdb_id?: string | null };
   note: string;
   created_at: number;
   updated_at: number;

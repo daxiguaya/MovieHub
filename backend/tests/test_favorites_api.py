@@ -156,6 +156,11 @@ def test_online_favorite_links_existing_chart_movie_by_imdb_without_creating_cat
         "provider": "tmdb", "media_type": media_type, "provider_id": provider_id,
         "snapshot": snapshot, "note": note, "created_at": 1, "updated_at": 1
     })
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "delete_favorite",
+        lambda media_type, provider_id: True,
+    )
 
     try:
         with TestClient(main_module.app) as client:

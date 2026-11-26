@@ -32,9 +32,7 @@ def test_full_index_dry_run_then_atomic_apply(tmp_path):
     assert applied["applied"] is True
     connection = sqlite3.connect(target)
     try:
-        assert connection.execute(
-            "SELECT rating, vote_count FROM ratings WHERE imdb_id='tt1234567'"
-        ).fetchone() == (8.4, 12345)
+        assert connection.execute("SELECT rating, vote_count FROM ratings WHERE imdb_id='tt1234567'").fetchone() == (8.4, 12345)
         assert connection.execute("SELECT COUNT(*) FROM ratings").fetchone()[0] == 3
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:

@@ -169,7 +169,9 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         return result
 
     snapshot, content_hash = download_snapshot()
-    if not fingerprint and content_hash == previous:
+    index_path = Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3")
+    previous_dry_run = (state.get("last_result") or {}).get("dry_run") or {}
+    if not fingerprint and content_hash == previous and index_path.is_file() and "full_index" in previous_dry_run:
         result = {"status": "unchanged_dataset", "sha256": content_hash}
         state["last_result"] = result
         state["last_successful_date"] = today.isoformat()

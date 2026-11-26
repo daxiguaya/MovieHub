@@ -953,7 +953,7 @@ function SearchPage() {
       : api.discoveryDiscover(new URLSearchParams({
           media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(nextPage),
-          min_votes: searchParams.get("min_rating_count") || "100",
+          min_votes: "0",
           // Rating and vote sorting is applied to the loaded results using IMDb data.
           // Keep TMDB pagination on the same stable order as the initial request.
           sort_by: requestedSort === "year_desc"

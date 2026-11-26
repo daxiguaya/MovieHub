@@ -42,7 +42,7 @@ def iter_matching_ratings(
 
     opener = gzip.open if path.name.endswith(".gz") else open
     with opener(path, "rt", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\\t")
+        reader = csv.DictReader(handle, delimiter="\t")
         required = {"tconst", "averageRating", "numVotes"}
         if not reader.fieldnames or not required.issubset(reader.fieldnames):
             raise ValueError(
@@ -161,7 +161,7 @@ def import_imdb_ratings(
                 movie.imdb_rating = rating
                 movie.imdb_rating_count = vote_count
                 digest = hashlib.sha256(
-                    f"{imdb_id}\\t{rating:.1f}\\t{vote_count}".encode("utf-8")
+                    f"{imdb_id}\t{rating:.1f}\t{vote_count}".encode("utf-8")
                 ).hexdigest()
                 existing = db.scalar(
                     select(MovieMetadataProvenance.id).where(

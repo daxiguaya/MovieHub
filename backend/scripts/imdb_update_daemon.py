@@ -118,7 +118,22 @@ def run_update(config: dict, state: dict, today: date) -> dict:
     fingerprint = headers["etag"] or headers["last_modified"]
     previous = state.get("dataset_fingerprint")
     if fingerprint and fingerprint == previous:
-        result = {"status": "unchanged_dataset", "checked_at": datetime.now().astimezone().isoformat()}
+        previous_result = state.get("last_result", {})
+        saved_snapshot = IMPORT_DIR / "title.ratings.tsv.gz"
+        # If the operator enables auto-apply after a dry-run-only day, apply
+        # that already-verified snapshot rather than waiting for IMDb to change.
+        if config.get("auto_apply") and previous_result.get("status") == "dry_run_only":
+            if not saved_snapshot.is_file():
+                saved_snapshot, saved_hash = download_snapshot()
+                state["dataset_sha256"] = saved_hash
+            dry_run = import_imdb_ratings(saved_snapshot, apply=False)
+            if not dry_run.get("valid") or int(dry_run.get("matched", 0)) < int(config["min_matched"]):
+                raise RuntimeError(f"IMDb dry-run quality gate failed before deferred apply: {dry_run}")
+            applied = import_imdb_ratings(saved_snapshot, apply=True)
+            prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
+            result = {"status": "applied", "dry_run": dry_run, "applied_result": applied}
+        else:
+            result = {"status": "unchanged_dataset", "checked_at": datetime.now().astimezone().isoformat()}
         state["last_result"] = result
         state["last_successful_date"] = today.isoformat()
         state["last_success_at"] = datetime.now().astimezone().isoformat()

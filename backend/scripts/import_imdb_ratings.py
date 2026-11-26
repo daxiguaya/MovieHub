@@ -165,30 +165,32 @@ def import_imdb_ratings(
                 movie = movie_by_imdb[imdb_id]
                 movie.imdb_rating = rating
                 movie.imdb_rating_count = vote_count
-                digest = hashlib.sha256(
-                    f"{imdb_id}\t{rating:.1f}\t{vote_count}".encode("utf-8")
-                ).hexdigest()
-                existing = db.scalar(
-                    select(MovieMetadataProvenance.id).where(
-                        MovieMetadataProvenance.movie_id == movie.id,
-                        MovieMetadataProvenance.field_name == "imdb_rating",
-                        MovieMetadataProvenance.source == "imdb",
-                        MovieMetadataProvenance.source_url == IMDB_RATINGS_URL,
-                        MovieMetadataProvenance.value_sha256 == digest,
-                    ).limit(1)
-                )
-                if existing is None:
-                    db.add(
-                        MovieMetadataProvenance(
-                            movie_id=movie.id,
-                            field_name="imdb_rating",
-                            source="imdb",
-                            source_url=IMDB_RATINGS_URL,
-                            observed_at=now,
-                            value_sha256=digest,
-                        )
+                for field_name, value in (
+                    ("imdb_rating", f"{rating:.1f}"),
+                    ("imdb_rating_count", str(vote_count)),
+                ):
+                    digest = hashlib.sha256(f"{imdb_id}\t{value}".encode("utf-8")).hexdigest()
+                    existing = db.scalar(
+                        select(MovieMetadataProvenance.id).where(
+                            MovieMetadataProvenance.movie_id == movie.id,
+                            MovieMetadataProvenance.field_name == field_name,
+                            MovieMetadataProvenance.source == "imdb",
+                            MovieMetadataProvenance.source_url == IMDB_RATINGS_URL,
+                            MovieMetadataProvenance.value_sha256 == digest,
+                        ).limit(1)
                     )
-                    provenance_added += 1
+                    if existing is None:
+                        db.add(
+                            MovieMetadataProvenance(
+                                movie_id=movie.id,
+                                field_name=field_name,
+                                source="imdb",
+                                source_url=IMDB_RATINGS_URL,
+                                observed_at=now,
+                                value_sha256=digest,
+                            )
+                        )
+                        provenance_added += 1
                 updated += 1
 
             db.commit()

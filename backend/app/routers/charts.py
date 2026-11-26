@@ -14,9 +14,10 @@ from app.database import get_db
 from app.limiter import limiter
 from app.schemas import ChartCompareResponse, ChartMoviesListResponse, ChartResponse, ChartSnapshotResponse
 from app.services.chart_service import ChartCursorError, chart_service
-from app.services.tmdb_client import DETAIL_TTL, tmdb_client
+from app.services.tmdb_client import tmdb_client
 
 logger = logging.getLogger("moviehub.charts")
+TMDB_RATING_TTL = 6 * 60 * 60
 
 TMDB_TITLE_ALIASES = {
     ("movie", "812583"): {"利刃出鞘3", "利刃出鞘3亡者归来", "Wake Up Dead Man: A Knives Out Mystery"},
@@ -70,7 +71,8 @@ async def _enrich_annual_tmdb_votes(result: ChartMoviesListResponse) -> ChartMov
                 payload = await tmdb_client.get_json(
                     f"/{item.type}/{item.tmdb_id}",
                     {"language": "zh-CN"},
-                    DETAIL_TTL,
+                    TMDB_RATING_TTL,
+                    max_cache_age_seconds=TMDB_RATING_TTL,
                 )
                 votes = _extract_tmdb_votes(item, payload)
                 if votes is None:

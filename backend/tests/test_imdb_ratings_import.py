@@ -103,9 +103,12 @@ def test_apply_updates_only_imdb_fields_and_keeps_douban_data(tmp_path):
         assert movie.imdb_rating_count == 3000000
         assert movie.rating == 9.7
         assert movie.rating_count == 2500000
-        assert db.scalar(select(MovieMetadataProvenance).where(
-            MovieMetadataProvenance.field_name == "imdb_rating"
-        )) is not None
+        provenance = db.scalars(select(MovieMetadataProvenance).where(
+            MovieMetadataProvenance.source == "imdb"
+        )).all()
+        assert {item.field_name for item in provenance} == {
+            "imdb_rating", "imdb_rating_count"
+        }
     engine.dispose()
 
     check = sqlite3.connect(str(database_path))

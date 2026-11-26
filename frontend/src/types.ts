@@ -142,7 +142,7 @@ export interface ExternalFavorite {
   provider: "tmdb";
   media_type: "movie" | "tv";
   provider_id: number;
-  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path"> & { imdb_id?: string | null };
+  snapshot: Pick<DiscoveryItem, "title" | "original_title" | "year" | "rating" | "rating_count" | "poster_path" | "backdrop_path" | "imdb_rating" | "imdb_rating_count"> & { imdb_id?: string | null };
   note: string;
   created_at: number;
   updated_at: number;

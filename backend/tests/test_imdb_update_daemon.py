@@ -267,3 +267,56 @@ def test_catalogue_change_during_refresh_does_not_mark_day_complete(tmp_path, mo
         )
 
     assert not (tmp_path / "state.json").exists()
+
+
+
+def test_unchanged_snapshot_without_http_validators_refreshes_changed_catalogue(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    snapshot = snapshot_dir / "title.ratings.tsv.gz"
+    snapshot.write_bytes(b"same official snapshot")
+    index_path = tmp_path / "imdb-ratings.sqlite3"
+    index_path.write_bytes(b"present")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "index_database_path", lambda: index_path)
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": "", "last_modified": "", "content_length": ""
+    })
+    monkeypatch.setattr(updater, "download_snapshot", lambda: (snapshot, "same-sha256"))
+    fingerprints = iter(["catalogue-v2", "catalogue-v2"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(("local", apply)) or {"valid": True, "matched": 280, "changed": 7}
+    ))
+    monkeypatch.setattr(
+        updater,
+        "import_imdb_rating_index",
+        lambda *args, **kwargs: pytest.fail("the existing full index must not be rebuilt"),
+    )
+    state = {
+        "dataset_fingerprint": "same-sha256",
+        "dataset_sha256": "same-sha256",
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    result = updater.run_update(
+        {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+        state,
+        date(2026, 11, 29),
+    )
+
+    assert result["status"] == "dry_run_only"
+    assert result["dry_run"]["local"]["matched"] == 280
+    assert calls == [("local", False)]
+    saved_state = json.loads((tmp_path / "state.json").read_text())
+    assert saved_state["local_catalogue_fingerprint"] == "catalogue-v2"

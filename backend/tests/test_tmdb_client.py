@@ -63,7 +63,7 @@ def test_cancelling_one_waiter_does_not_cancel_shared_upstream(monkeypatch):
         release = asyncio.Event()
         calls = 0
 
-        async def no_cache(key, allow_stale=False):
+        async def no_cache(key, allow_stale=False, max_age_seconds=None):
             return None
 
         async def fake_fetch(key, endpoint, params, ttl, include_overview=False):
@@ -101,3 +101,22 @@ def test_transient_overview_is_bounded_and_not_part_of_persistent_payload():
         "title": "Example"
     })
     assert persistent == {"id": 42, "title": "Example"}
+
+
+
+def test_cache_get_passes_max_age_to_provider_cache(monkeypatch):
+    client = tmdb_module.TMDBClient()
+    captured = {}
+
+    def fake_get(key, allow_stale=False, max_age_seconds=None):
+        captured.update(key=key, allow_stale=allow_stale, max_age_seconds=max_age_seconds)
+        return None
+
+    monkeypatch.setattr(tmdb_module.provider_response_cache, "get", fake_get)
+    result = asyncio.run(client._cache_get("rating-key", max_age_seconds=6 * 3600))
+    assert result is None
+    assert captured == {
+        "key": "rating-key",
+        "allow_stale": False,
+        "max_age_seconds": 6 * 3600,
+    }

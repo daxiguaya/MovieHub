@@ -90,11 +90,23 @@ def test_apply_updates_only_imdb_fields_and_keeps_douban_data(tmp_path):
     dry_run = import_imdb_ratings(source, database_path=database_path)
     assert dry_run["applied"] is False
     assert dry_run["matched"] == 1
+    assert dry_run["changed"] == 1
+    assert dry_run["unchanged"] == 0
 
     applied = import_imdb_ratings(source, database_path=database_path, apply=True)
     assert applied["applied"] is True
     assert applied["updated"] == 1
+    assert applied["changed"] == 1
+    assert applied["unchanged"] == 0
     assert Path(applied["backup"]).is_file()
+
+    # Re-importing an identical snapshot must not rewrite movie rows or create
+    # another full database backup.
+    repeated = import_imdb_ratings(source, database_path=database_path, apply=True)
+    assert repeated["updated"] == 0
+    assert repeated["changed"] == 0
+    assert repeated["unchanged"] == 1
+    assert repeated["backup"] is None
 
     engine = create_engine(f"sqlite:///{database_path}")
     with Session(engine) as db:

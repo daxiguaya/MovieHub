@@ -1150,7 +1150,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={`secondary-button ${isFavorite ? "is-saved" : ""}`} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {movie.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
-            {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>
+            {movie.douban_url && <a className="secondary-button" href={movie.douban_url} target="_blank" rel="noreferrer">豆瓣资料 ↗</a>}
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {(movie.overview || movie.tmdb_metadata?.overview) && <section className="detail-section"><h3>剧情简介{!movie.overview && movie.tmdb_metadata?.overview ? " · TMDB" : ""}</h3><p>{movie.overview || movie.tmdb_metadata?.overview}</p></section>}

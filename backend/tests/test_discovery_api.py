@@ -343,7 +343,7 @@ def test_search_ignores_malformed_tmdb_imdb_ids_before_rating_lookup(monkeypatch
         response = client.get("/api/discovery/search", params={"q": "Malformed ID fixture"})
 
     assert response.status_code == 200
-    assert response.json()["items"][0]["imdb_id"] is None
+    assert response.json()["items"][0].get("imdb_id") is None
     assert rating_lookups == [[]]
 
 

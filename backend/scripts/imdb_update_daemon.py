@@ -23,7 +23,7 @@ from scripts.import_imdb_ratings import IMDB_RATINGS_URL, import_imdb_ratings
 
 CONFIG_PATH = Path(os.environ.get("IMDB_UPDATE_CONFIG", "/config/imdb-update.json"))
 STATE_PATH = Path(os.environ.get("IMDB_UPDATE_STATE", "/state/state.json"))
-IMPORT_DIR = Path(os.environ.get("IMDB_UPDATE_IMPORT_DIR", "/imports/imdb"))
+IMPORT_DIR = Path(os.environ.get("IMDB_UPDATE_IMPORT_DIR", "/data/imdb-imports"))
 LOG = logging.getLogger("moviehub.imdb_update")
 
 

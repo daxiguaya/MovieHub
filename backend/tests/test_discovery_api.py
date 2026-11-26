@@ -310,3 +310,38 @@ def test_external_favorite_missing_tmdb_imdb_id_does_not_break_listing(monkeypat
     assert result[0]["snapshot"]["imdb_id"] is None
     assert result[0]["snapshot"]["imdb_rating"] is None
     assert result[0]["snapshot"]["imdb_rating_count"] is None
+
+
+def test_search_ignores_malformed_tmdb_imdb_ids_before_rating_lookup(monkeypatch):
+    rating_lookups = []
+
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        if endpoint == "/search/multi":
+            return {
+                "page": 1,
+                "total_pages": 1,
+                "total_results": 1,
+                "results": [{
+                    "id": 4321,
+                    "media_type": "movie",
+                    "title": "Malformed ID fixture",
+                    "release_date": "2024-01-01",
+                }],
+            }
+        if endpoint == "/movie/4321/external_ids":
+            return {"id": 4321, "imdb_id": "tt123"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    def fake_lookup_ratings(imdb_ids):
+        rating_lookups.append(list(imdb_ids))
+        return {}
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", fake_lookup_ratings)
+
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/search", params={"q": "Malformed ID fixture"})
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["imdb_id"] is None
+    assert rating_lookups == [[]]

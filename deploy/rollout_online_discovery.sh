@@ -86,7 +86,7 @@ for filename in sys.argv[1:]:
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise SystemExit("Invalid IMDb updater run_at: " + filename)
     ZoneInfo(config["timezone"])
-    if int(config["min_matched"]) < 1 or int(config["min_index_rows"]) < 1:
+    if int(config.get("min_matched", 10)) < 1 or int(config.get("min_index_rows", 100000)) < 1:
         raise SystemExit("Invalid IMDb updater quality thresholds: " + filename)
 print("IMDb updater config and template are valid.")
 PY

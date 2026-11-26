@@ -121,9 +121,9 @@ download SHA-256 when the server provides neither validator. Downloads are
 written to a temporary file, fully read through gzip validation, and atomically
 renamed before import.
 
-The updater state and latest result are written to the host path configured by
-`MOVIEHUB_IMDB_STATE_PATH` (default
-`/volume1/docker/moviehub/imdb-update/state.json`). Logs are available with
+The updater state and latest result are written under the existing writable
+MovieHub data volume at `/data/imdb-update-state/state.json` (host-side
+`data/imdb-update-state/state.json`). Logs are available with
 `docker compose logs -f moviehub-imdb-updater`. The updater holds a process
 lock to prevent overlapping instances. Backup retention applies only to the
 IMDb importer backup filename pattern; it does not remove migration or general

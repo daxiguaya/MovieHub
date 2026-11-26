@@ -326,3 +326,86 @@ def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_rating
         assert item["snapshot"]["imdb_rating_count"] == 3000000
     finally:
         engine.dispose()
+
+
+def test_linked_external_favorite_cleanup_failure_is_reported_and_retryable(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "moviehub-data" / "movies.db"
+    backend_dir = Path(__file__).resolve().parents[1]
+    initialize(db_path, backend_dir / "migrations" / "001_moviehub_core.sql")
+    engine = database.create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with TargetSession() as db:
+        movie = database.Movie(
+            douban_id="123458",
+            imdb_id="tt7654322",
+            title="Retryable Linked Movie",
+            year=2024,
+            rating=8.2,
+            rating_count=200,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        db.add(movie)
+        db.commit()
+        movie_id = movie.id
+
+    monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(database, "SessionLocal", TargetSession)
+    monkeypatch.setattr(main_module, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(settings, "api_key", "favorites-test-key")
+    monkeypatch.setattr(main_module.poster_cache_service, "clear_expired_cache", lambda: None)
+    monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
+    monkeypatch.setattr(discovery.provider_response_cache, "backup_daily", lambda *args, **kwargs: None)
+
+    cleanup_calls = 0
+
+    def flaky_delete(media_type, provider_id):
+        nonlocal cleanup_calls
+        cleanup_calls += 1
+        if cleanup_calls == 1:
+            raise OSError("discovery database temporarily unavailable")
+        return True
+
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "delete_favorite",
+        flaky_delete,
+    )
+
+    headers = {"X-API-Key": "favorites-test-key"}
+    payload = {"snapshot": {
+        "title": "Retryable Linked Movie",
+        "year": 2024,
+        "imdb_id": "tt7654322",
+    }}
+    try:
+        with TestClient(main_module.app, raise_server_exceptions=False) as client:
+            first = client.put(
+                "/api/favorites/external/movie/901",
+                headers=headers,
+                json=payload,
+            )
+            # The local write committed, but the failed cross-database cleanup
+            # must not be reported as a successful complete operation.
+            assert first.status_code == 500
+
+            retry = client.put(
+                "/api/favorites/external/movie/901",
+                headers=headers,
+                json=payload,
+            )
+
+        assert retry.status_code == 200
+        assert retry.json() == {"linked_movie_id": movie_id, "is_favorite": True}
+        assert cleanup_calls == 2
+        with TargetSession() as db:
+            assert db.get(database.Favorite, movie_id) is not None
+    finally:
+        engine.dispose()

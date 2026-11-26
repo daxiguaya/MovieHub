@@ -76,7 +76,7 @@ async def fetch_candidates(movies: list[dict[str, Any]]) -> list[dict[str, Any]]
     return await asyncio.gather(*(fetch_one(movie, semaphore) for movie in movies))
 
 
-def load_local_snapshot() -> tuple[list[dict[str, Any]], dict[str, int]]:
+def load_local_snapshot() -> tuple[list[dict[str, Any]], dict[str, int], dict[str, int]]:
     """Read the local identity fields without holding a DB session during HTTP calls."""
     with SessionLocal() as db:
         all_movies = db.scalars(select(Movie).order_by(Movie.id)).all()
@@ -85,13 +85,17 @@ def load_local_snapshot() -> tuple[list[dict[str, Any]], dict[str, int]]:
         counts = {
             "total": len(all_movies),
             "already_has_imdb_id": 0,
+            "invalid_existing_imdb_id": 0,
             "without_tmdb_id": 0,
             "eligible": 0,
         }
         for movie in all_movies:
-            if movie.imdb_id and IMDB_ID_PATTERN.fullmatch(movie.imdb_id.strip()):
-                counts["already_has_imdb_id"] += 1
-                existing_ids[movie.imdb_id.strip()] = movie.id
+            if movie.imdb_id:
+                if IMDB_ID_PATTERN.fullmatch(movie.imdb_id.strip()):
+                    counts["already_has_imdb_id"] += 1
+                    existing_ids[movie.imdb_id.strip()] = movie.id
+                else:
+                    counts["invalid_existing_imdb_id"] += 1
                 continue
             if not movie.tmdb_id or not str(movie.tmdb_id).isdigit():
                 counts["without_tmdb_id"] += 1
@@ -104,7 +108,7 @@ def load_local_snapshot() -> tuple[list[dict[str, Any]], dict[str, int]]:
                 "type": movie.type,
                 "tmdb_id": str(movie.tmdb_id),
             })
-        return pending, existing_ids
+        return pending, existing_ids, counts
 
 
 def classify_duplicates(
@@ -269,7 +273,7 @@ def main() -> int:
         print("MovieHub database is not ready at the current schema.", file=sys.stderr)
         return 2
 
-    pending, existing_ids = load_local_snapshot()
+    pending, existing_ids, snapshot_counts = load_local_snapshot()
     results = classify_duplicates(
         asyncio.run(fetch_candidates(pending)),
         existing_ids,
@@ -282,9 +286,11 @@ def main() -> int:
     report: dict[str, Any] = {
         "read_only": not args.apply,
         "database": str(database_path),
-        "local_total": sum(1 for _ in existing_ids) + len(pending),
-        "already_has_valid_imdb_id": len(existing_ids),
-        "eligible_with_tmdb_id": len(pending),
+        "local_total": snapshot_counts["total"],
+        "already_has_valid_imdb_id": snapshot_counts["already_has_imdb_id"],
+        "invalid_existing_imdb_id": snapshot_counts["invalid_existing_imdb_id"],
+        "without_tmdb_id": snapshot_counts["without_tmdb_id"],
+        "eligible_with_tmdb_id": snapshot_counts["eligible"],
         "results": counts,
         "candidate_count": counts.get("candidate", 0),
         "quality_gate_minimum": args.min_matched,

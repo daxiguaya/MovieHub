@@ -383,16 +383,6 @@ def test_linked_external_favorite_cleanup_failure_is_reported_and_retryable(
         "delete_favorite",
         flaky_delete,
     )
-    imdb_cleanup_calls = []
-    monkeypatch.setattr(
-        favorites_router.provider_response_cache,
-        "delete_favorite_by_imdb",
-        lambda media_type, imdb_id, title, original_title, year: (
-            imdb_cleanup_calls.append((media_type, imdb_id, title, original_title, year))
-            or False
-        ),
-    )
-
     headers = {"X-API-Key": "favorites-test-key"}
     payload = {"snapshot": {
         "title": "Retryable Linked Movie",
@@ -478,6 +468,15 @@ def test_adding_local_favorite_cleans_exact_external_tmdb_favorite_and_retries(
         favorites_router.provider_response_cache,
         "delete_favorite",
         flaky_delete,
+    )
+    imdb_cleanup_calls = []
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "delete_favorite_by_imdb",
+        lambda media_type, imdb_id, title, original_title, year: (
+            imdb_cleanup_calls.append((media_type, imdb_id, title, original_title, year))
+            or False
+        ),
     )
 
     headers = {"X-API-Key": "favorites-test-key"}

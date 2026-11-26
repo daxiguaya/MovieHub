@@ -66,7 +66,7 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         main_flow = script[main_flow_start:]
         stop_backend = main_flow.index("docker compose stop moviehub")
         migrate = main_flow.index("docker compose run --rm --no-deps -T --name \"moviehub-schema-migrate-$STAMP\" moviehub python -m scripts.migrate")
-        start_backend = main_flow.index("docker compose up -d --no-deps moviehub moviehub-web")
+        start_backend = main_flow.index("docker compose up -d --no-deps moviehub moviehub-imdb-updater moviehub-web")
         self.assertLess(backup, main_flow_start)
         self.assertLess(stop_backend, migrate)
         self.assertLess(migrate, start_backend)
@@ -79,7 +79,8 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         rollback = script[rollback_start:rollback_end]
         self.assertIn("source.backup(target)", rollback)
         self.assertLess(rollback.index("source.backup(target)"), rollback.index('docker tag "$ROLLBACK_BACKEND"'))
-        self.assertIn('docker compose up -d --no-deps moviehub moviehub-web', rollback)
+        self.assertIn('docker compose up -d --no-deps moviehub moviehub-imdb-updater moviehub-web', rollback)
+        self.assertIn('cp -p "$ROLLBACK_CONFIG_BACKUP" "$IMDB_CONFIG_PATH"', rollback)
 
     def test_rollback_restores_discovery_cache_before_previous_images(self):
         script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
@@ -121,3 +122,19 @@ class ComposeServiceCoverageTests(unittest.TestCase):
         for service_name in ("moviehub", "moviehub-imdb-updater", "moviehub-web"):
             with self.subTest(service_name=service_name):
                 self.assertIn(f'for service_name in ("moviehub", "moviehub-imdb-updater", "moviehub-web")', source)
+
+class ImdbUpdaterRolloutTests(unittest.TestCase):
+    def test_rollout_backs_up_and_installs_tracked_imdb_config(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn('cp -p "$IMDB_CONFIG_PATH" "$BACKUP_PATH/online-discovery-rollout-$STAMP/imdb-update.json"', script)
+        self.assertIn('install -m 0644 "$IMDB_CONFIG_TEMPLATE" "$IMDB_CONFIG_PATH"', script)
+        self.assertIn('config["enabled"] is False', script)
+        self.assertIn('config["auto_apply"] is False', script)
+
+    def test_rollout_recreates_and_checks_imdb_updater(self):
+        script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
+        script = script_path.read_text(encoding="utf-8")
+        self.assertIn("docker compose build moviehub moviehub-imdb-updater moviehub-web", script)
+        self.assertIn("wait_running moviehub-imdb-updater", script)
+        self.assertIn("docker exec moviehub-imdb-updater python", script)

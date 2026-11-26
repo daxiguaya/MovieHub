@@ -134,7 +134,7 @@ Useful operator guides:
 
 - [Project status and delivery checklist](docs/PROJECT-STATUS.md)
 - [Development progress history](docs/DEVELOPMENT-PROGRESS.md)
-- [Product scope and architecture](docs/PRODUCT-SCOPE.md)
+- [Original product scope and architecture baseline](docs/PRODUCT-SCOPE.md)
 - [Database design](docs/phase4-database-design.md)
 - [Chart snapshot import](docs/CHART-IMPORT.md)
 - [Chart source policy](docs/CHART-SOURCES.md)

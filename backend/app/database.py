@@ -15,7 +15,7 @@ from app.config import settings
 
 Base = declarative_base()
 DATABASE_NAME = "movies.db"
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 REQUIRED_DATABASE_TABLES = {
     "schema_migrations",
     "movies",
@@ -91,6 +91,8 @@ class Movie(Base):
     year = Column(Integer, nullable=True, index=True)
     rating = Column(Float, nullable=True, index=True)
     rating_count = Column(Integer, nullable=True, default=None, index=True)
+    imdb_rating = Column(Float, nullable=True, index=True)
+    imdb_rating_count = Column(Integer, nullable=True, default=None, index=True)
     type = Column(String(16), nullable=False, default="movie", index=True)
     directors = Column(Text, nullable=False, default="[]")
     actors = Column(Text, nullable=False, default="[]")
@@ -107,6 +109,8 @@ class Movie(Base):
     __table_args__ = (
         CheckConstraint("rating IS NULL OR (rating >= 0 AND rating <= 10)", name="ck_movies_rating"),
         CheckConstraint("rating_count IS NULL OR rating_count >= 0", name="ck_movies_rating_count"),
+        CheckConstraint("imdb_rating IS NULL OR (imdb_rating >= 0 AND imdb_rating <= 10)", name="ck_movies_imdb_rating"),
+        CheckConstraint("imdb_rating_count IS NULL OR imdb_rating_count >= 0", name="ck_movies_imdb_rating_count"),
         CheckConstraint("type IN ('movie', 'tv')", name="ck_movies_type"),
         Index("ix_movies_rating_id", "rating", "id"),
         Index("ix_movies_year_id", "year", "id"),

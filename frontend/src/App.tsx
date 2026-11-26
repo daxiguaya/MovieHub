@@ -351,7 +351,7 @@ function DiscoveryListPage() {
       <PageHeading
         eyebrow="HORROR & THRILLER"
         title={definition.title}
-        description={definition.description + "。榜单筛选与排序依据 TMDB 评分和投票数；卡片另行展示 IMDb 评分。按页在线获取，不做全量导入。"}
+        description={definition.description + "。按类型与投票量精选，页面评分统一展示 IMDb 数据。按页在线获取，不做全量导入。"}
         action={
           <label className="select-wrap">
             上映年份
@@ -406,7 +406,7 @@ function DiscoverySpotlight() {
   return (
     <section className="genre-spotlight">
       <div className="section-heading">
-        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>按 TMDB 评分和投票量筛选；作品卡片同时展示 IMDb 评分，两个来源分别标注。</p></div>
+        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>按类型与热度精选，评分统一展示 IMDb 数据。</p></div>
         <Link className="text-link" to="/search">更多类型筛选 <span>→</span></Link>
       </div>
       {loading ? <Loading label="正在加载恐怖与惊悚精选…" /> : lists.length === 0 ? (
@@ -419,7 +419,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small><small>TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} · {item.rating_count.toLocaleString()} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -514,7 +514,6 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
         {localMovie && <div className="movie-subtitle">本地榜单匹配</div>}
         <div className="movie-rating"><span>★</span> IMDb {item.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({item.imdb_rating_count == null ? "暂无投票人数" : item.imdb_rating_count.toLocaleString()})</small></div>
-        <div className="movie-rating secondary-rating">TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()} 票)</small></div>
       </div>
     </article>
   );
@@ -1238,7 +1237,6 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
           <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
-          <div className="detail-rating detail-rating-secondary"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB 目录评分 · {movie.rating_count.toLocaleString()} 票</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>

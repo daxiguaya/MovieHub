@@ -1344,6 +1344,8 @@ function FavoritesPage() {
                     year: favorite.snapshot.year,
                     rating: favorite.snapshot.rating,
                     rating_count: favorite.snapshot.rating_count,
+                    imdb_rating: favorite.snapshot.imdb_rating ?? null,
+                    imdb_rating_count: favorite.snapshot.imdb_rating_count ?? null,
                     poster_path: favorite.snapshot.poster_path,
                     backdrop_path: favorite.snapshot.backdrop_path,
                     genre_ids: []

@@ -12,6 +12,7 @@ import {
   useSearchParams
 } from "react-router-dom";
 import { api, setMovieHubApiKey } from "./api";
+import { appPath } from "./paths";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
 import { appPath } from "./paths";
 import type {
@@ -1405,7 +1406,7 @@ function CreditsPage() {
       <PageHeading eyebrow="ABOUT & CREDITS" title="关于与数据来源" description="MovieHub 使用公开数据服务辅助电影与剧集发现；各数据来源保持独立标注。" />
       <section className="credits-panel">
         <a className="source-logo-link tmdb-source-logo" href="https://www.themoviedb.org" target="_blank" rel="noreferrer" aria-label="访问 TMDB">
-          <img src="/tmdb.svg" alt="TMDB 标志" />
+          <img src={appPath("tmdb.svg")} alt="TMDB 标志" />
         </a>
         <div className="credits-copy">
           <h2>The Movie Database (TMDB)</h2>
@@ -1415,7 +1416,7 @@ function CreditsPage() {
       </section>
       <section className="credits-panel">
         <a className="source-logo-link imdb-source-logo" href="https://www.imdb.com" target="_blank" rel="noreferrer" aria-label="访问 IMDb">
-          <img src="/imdb.svg" alt="IMDb 标志" />
+          <img src={appPath("imdb.svg")} alt="IMDb 标志" />
         </a>
         <div className="credits-copy">
           <h2>IMDb</h2>
@@ -1425,7 +1426,7 @@ function CreditsPage() {
       </section>
       <section className="credits-panel">
         <a className="source-logo-link douban-source-logo" href="https://movie.douban.com" target="_blank" rel="noreferrer" aria-label="访问豆瓣电影">
-          <img src="/douban.svg" alt="豆瓣标志" />
+          <img src={appPath("douban.svg")} alt="豆瓣标志" />
         </a>
         <div className="credits-copy">
           <h2>豆瓣</h2>

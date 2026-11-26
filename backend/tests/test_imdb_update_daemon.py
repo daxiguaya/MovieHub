@@ -124,6 +124,7 @@ def test_old_dry_run_state_builds_missing_full_index_without_new_etag(tmp_path, 
     monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
     monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "catalogue-v1")
     monkeypatch.setattr(updater, "request_headers", lambda: {
         "etag": '"same-version"', "last_modified": "", "content_length": "123"
     })

@@ -1406,6 +1406,13 @@ function CreditsPage() {
       </section>
       <section className="credits-panel">
         <div className="credits-copy">
+          <h2>IMDb</h2>
+          <p>Information courtesy of IMDb (https://www.imdb.com). Used with permission. IMDb ratings are used for personal, non-commercial use only.</p>
+          <a href="https://www.imdb.com" target="_blank" rel="noreferrer">Visit IMDb ↗</a>
+        </div>
+      </section>
+      <section className="credits-panel">
+        <div className="credits-copy">
           <h2>豆瓣</h2>
           <p>现有豆瓣榜单数据按榜单来源单独展示。MovieHub 不代表豆瓣官方，也不将豆瓣评分与 TMDB 评分合并。</p>
           <a href="https://movie.douban.com" target="_blank" rel="noreferrer">访问豆瓣电影 ↗</a>

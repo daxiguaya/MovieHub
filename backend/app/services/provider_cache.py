@@ -100,16 +100,20 @@ class ProviderResponseCache:
         raw = f"{provider}\n{endpoint}\n{normalized}".encode("utf-8")
         return hashlib.sha256(raw).hexdigest()
 
-    def get(self, key: str, allow_stale: bool = False) -> tuple[dict[str, Any], bool] | None:
+    def get(self, key: str, allow_stale: bool = False, max_age_seconds: int | None = None) -> tuple[dict[str, Any], bool] | None:
         self._init()
         now = int(time.time())
         with self._lock, self._connection() as connection:
             row = connection.execute(
-                """SELECT response_json, expires_at, stale_until
+                """SELECT response_json, expires_at, stale_until, fetched_at
                    FROM provider_response_cache WHERE cache_key=?""",
                 (key,),
             ).fetchone()
-            if row is None or (row[1] <= now and (not allow_stale or row[2] <= now)):
+            if (
+                row is None
+                or (max_age_seconds is not None and now - row[3] > max(1, int(max_age_seconds)))
+                or (row[1] <= now and (not allow_stale or row[2] <= now))
+            ):
                 self._misses += 1
                 return None
             connection.execute(

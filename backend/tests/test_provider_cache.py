@@ -69,16 +69,39 @@ def test_has_favorite_checks_only_the_requested_provider_identity(tmp_path):
     assert not cache.has_favorite("tv", 550)
 
 
-def test_delete_favorite_by_imdb_removes_only_the_matching_media_identity(tmp_path):
+def test_delete_favorite_by_imdb_requires_matching_title_and_year(tmp_path):
     cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
-    cache.save_favorite("movie", 10, {"title": "Film", "imdb_id": "tt1234567"})
-    cache.save_favorite("movie", 11, {"title": "Other Film", "imdb_id": "tt7654321"})
-    cache.save_favorite("tv", 10, {"title": "Series", "imdb_id": "tt1234567"})
+    cache.save_favorite(
+        "movie", 10,
+        {"title": "Film", "original_title": "Film Original", "year": 2020, "imdb_id": "tt1234567"},
+    )
+    cache.save_favorite(
+        "movie", 11,
+        {"title": "Different Film", "year": 2020, "imdb_id": "tt1234567"},
+    )
+    cache.save_favorite(
+        "movie", 12,
+        {"title": "Film", "year": 2021, "imdb_id": "tt1234567"},
+    )
+    cache.save_favorite(
+        "movie", 13,
+        {"title": "Film", "year": 2020, "imdb_id": "tt7654321"},
+    )
+    cache.save_favorite(
+        "tv", 10,
+        {"title": "Film", "year": 2020, "imdb_id": "tt1234567"},
+    )
 
-    assert cache.delete_favorite_by_imdb("movie", "tt1234567")
+    # Missing corroborating metadata must never trigger broad IMDb deletion.
+    assert not cache.delete_favorite_by_imdb("movie", "tt1234567", "Film")
+    assert cache.delete_favorite_by_imdb(
+        "movie", "tt1234567", "Film", "Film Original", 2020
+    )
     assert not cache.has_favorite("movie", 10)
-    assert cache.has_favorite("movie", 11)
-    assert cache.has_favorite("tv", 10)
+    assert cache.has_favorite("movie", 11)  # same IMDb ID, different title
+    assert cache.has_favorite("movie", 12)  # same IMDb ID, different year
+    assert cache.has_favorite("movie", 13)  # different IMDb ID
+    assert cache.has_favorite("tv", 10)     # different media type
 
 
 def test_external_favorites_survive_cache_eviction(tmp_path):

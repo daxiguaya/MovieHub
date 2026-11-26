@@ -288,6 +288,9 @@ def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_rating
         "provider_id": 278,
         "snapshot": {
             "title": "肖申克的救赎",
+            "original_title": "The Shawshank Redemption",
+            "rating": 6.0,
+            "rating_count": 5,
             "imdb_id": None,
             "imdb_rating": None,
             "imdb_rating_count": None,
@@ -303,8 +306,17 @@ def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_rating
     )
 
     async def fake_get_json(endpoint, params=None, ttl=900):
-        assert endpoint == "/movie/278/external_ids"
-        return {"id": 278, "imdb_id": "tt0111161"}
+        if endpoint == "/movie/278/external_ids":
+            return {"id": 278, "imdb_id": "tt0111161"}
+        if endpoint == "/movie/278":
+            return {
+                "id": 278,
+                "title": "肖申克的救赎",
+                "original_title": "The Shawshank Redemption",
+                "vote_average": 9.3,
+                "vote_count": 3000000,
+            }
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
 
     monkeypatch.setattr(favorites_router.tmdb_client, "get_json", fake_get_json)
     monkeypatch.setattr(
@@ -324,5 +336,7 @@ def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_rating
         assert item["snapshot"]["imdb_id"] == "tt0111161"
         assert item["snapshot"]["imdb_rating"] == 9.3
         assert item["snapshot"]["imdb_rating_count"] == 3000000
+        assert item["snapshot"]["rating"] == 9.3
+        assert item["snapshot"]["rating_count"] == 3000000
     finally:
         engine.dispose()

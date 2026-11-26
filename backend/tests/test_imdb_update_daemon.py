@@ -78,7 +78,7 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
         "etag": '"known-version"', "last_modified": "", "content_length": "8"
     })
     calls = []
-    def fake_import(path, apply=False):
+    def fake_import(path, apply=False, min_rows=100000):
         calls.append(apply)
         return {"valid": True, "matched": 12, "changed": 2, "applied": apply}
     monkeypatch.setattr(updater, "import_imdb_ratings", fake_import)
@@ -95,4 +95,4 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
         date(2026, 11, 27),
     )
     assert result["status"] == "applied"
-    assert calls == [False, True, False, True]
+    assert calls == [False, False, True, True]

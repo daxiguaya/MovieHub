@@ -50,6 +50,37 @@ cd /volume1/docker/moviehub && docker compose up -d --build moviehub moviehub-we
 
 No Nginx Proxy Manager restart is required.
 
+## Backfill IMDb title IDs from TMDB
+
+MovieHub can use an existing local TMDB ID to retrieve the corresponding
+IMDb title ID from TMDB's `external_ids` endpoint. This is separate from the
+IMDb ratings dataset updater: it fills only the identity field
+`movies.imdb_id`, never copies TMDB ratings into IMDb rating columns.
+
+Run the preview first. It is read-only, validates the returned TMDB ID and
+IMDb `tt...` format, rejects duplicate IMDb IDs, and reports records without
+a TMDB ID separately:
+
+```sh
+cd /volume1/docker/moviehub
+docker compose run --rm --no-deps moviehub python -m scripts.backfill_tmdb_imdb_ids
+```
+
+Review the complete preview before applying. The apply command requires at
+least 10 unique, valid mappings by default, creates and verifies a SQLite
+online backup, rechecks each local TMDB identity, refuses to overwrite an
+existing IMDb ID, and writes field-level `tmdb` provenance in the same
+transaction:
+
+```sh
+cd /volume1/docker/moviehub
+docker compose run --rm --no-deps moviehub python -m scripts.backfill_tmdb_imdb_ids --apply
+```
+
+Records without a TMDB ID, without a valid external IMDb ID, or with
+conflicting mappings remain unchanged for manual review. This process does
+not update ratings and does not require an API or web-service restart.
+
 ## Import ratings
 
 Download the official file directly from IMDb into the host directory configured by

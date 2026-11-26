@@ -26,6 +26,8 @@ def test_search_fetches_only_requested_page(monkeypatch):
 
     async def fake_get_json(endpoint, params=None, ttl=900):
         calls.append((endpoint, params, ttl))
+        if endpoint.endswith("/external_ids"):
+            return {"id": 42, "imdb_id": "tt0000042"}
         return {
             "page": params["page"],
             "total_pages": 999,

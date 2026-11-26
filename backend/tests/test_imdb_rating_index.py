@@ -55,3 +55,24 @@ def test_full_index_rejects_invalid_rating_rows(tmp_path, rating, votes):
     _write_tsv(source, [("tt0111161", rating, votes)])
     with pytest.raises(ValueError):
         import_imdb_rating_index(source, database_path=tmp_path / "index.db", min_rows=1)
+
+
+
+def test_read_only_lookup_uses_exact_imdb_ids(tmp_path, monkeypatch):
+    from app.services.imdb_rating_index import lookup_ratings
+
+    target = tmp_path / "index.sqlite3"
+    connection = sqlite3.connect(target)
+    connection.execute("CREATE TABLE ratings (imdb_id TEXT PRIMARY KEY, rating REAL NOT NULL, vote_count INTEGER NOT NULL)")
+    connection.executemany("INSERT INTO ratings VALUES (?, ?, ?)", [
+        ("tt0111161", 9.3, 3000000),
+        ("tt0068646", 9.2, 2000000),
+    ])
+    connection.commit()
+    connection.close()
+    monkeypatch.setenv("IMDB_RATINGS_INDEX_PATH", str(target))
+
+    assert lookup_ratings(["tt0111161", "tt0068646", "tt9999999", "not-an-id"]) == {
+        "tt0111161": (9.3, 3000000),
+        "tt0068646": (9.2, 2000000),
+    }

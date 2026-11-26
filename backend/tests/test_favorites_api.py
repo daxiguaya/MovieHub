@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 import app.database as database
 import app.main as main_module
-from app.routers import discovery
+from app.routers import discovery, favorites as favorites_router
 from app.config import settings
 from scripts.init_db import initialize
 
@@ -258,5 +258,71 @@ def test_tmdb_favorite_status_and_removal_include_linked_chart_favorites(
         assert removed.status_code == 204
         with TargetSession() as db:
             assert db.scalars(select(database.Favorite)).all() == []
+    finally:
+        engine.dispose()
+
+
+
+def test_external_favorites_endpoint_resolves_imdb_ids_and_attaches_local_ratings(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "moviehub-data" / "movies.db"
+    backend_dir = Path(__file__).resolve().parents[1]
+    initialize(db_path, backend_dir / "migrations" / "001_moviehub_core.sql")
+    engine = database.create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(database, "SessionLocal", TargetSession)
+    monkeypatch.setattr(main_module, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(settings, "api_key", "favorites-test-key")
+    monkeypatch.setattr(main_module.poster_cache_service, "clear_expired_cache", lambda: None)
+    monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
+
+    favorites = [{
+        "provider": "tmdb",
+        "media_type": "movie",
+        "provider_id": 278,
+        "snapshot": {
+            "title": "肖申克的救赎",
+            "imdb_id": None,
+            "imdb_rating": None,
+            "imdb_rating_count": None,
+        },
+        "note": "",
+        "created_at": 1,
+        "updated_at": 1,
+    }]
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "list_favorites",
+        lambda: favorites,
+    )
+
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        assert endpoint == "/movie/278/external_ids"
+        return {"id": 278, "imdb_id": "tt0111161"}
+
+    monkeypatch.setattr(favorites_router.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(
+        favorites_router,
+        "lookup_ratings",
+        lambda ids: {"tt0111161": (9.3, 3000000)},
+    )
+
+    try:
+        with TestClient(main_module.app) as client:
+            response = client.get(
+                "/api/favorites/external",
+                headers={"X-API-Key": "favorites-test-key"},
+            )
+        assert response.status_code == 200
+        item = response.json()[0]
+        assert item["snapshot"]["imdb_id"] == "tt0111161"
+        assert item["snapshot"]["imdb_rating"] == 9.3
+        assert item["snapshot"]["imdb_rating_count"] == 3000000
     finally:
         engine.dispose()

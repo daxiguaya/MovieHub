@@ -301,6 +301,8 @@ async def get_online_detail(
                 Movie.type == media_type,
                 Movie.imdb_id == imdb_id,
             ).first()
+        if not imdb_id and local_movie is not None:
+            imdb_id = local_movie.imdb_id
     indexed_rating = (await asyncio.to_thread(lookup_ratings, [imdb_id])).get(imdb_id) if imdb_id else None
     return {
         "provider": "tmdb",

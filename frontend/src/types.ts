@@ -21,6 +21,8 @@ export interface Movie {
   year: number | null;
   rating: number | null;
   rating_count: number | null;
+  tmdb_rating?: number | null;
+  tmdb_rating_count?: number | null;
   type: "movie" | "tv";
   genres: string[];
   regions: string[];

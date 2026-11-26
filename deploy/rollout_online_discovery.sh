@@ -103,7 +103,7 @@ TARGET=$(git rev-parse --short origin/main)
 echo "[OK] Current code: $CURRENT; target main: $TARGET"
 echo "[OK] Compose valid; TMDB token and API key present (values hidden)."
 echo "[OK] Existing data, backup directory, NPM network, rollback images, and IMDb config found."
-echo "[OK] Deployment installs tracked IMDb config template; scheduler and auto-apply remain disabled."
+echo "[OK] Deployment installs tracked IMDb config template; daily IMDb updates and quality-gated auto-apply are enabled at 00:00 Asia/Shanghai."
 
 if [ "$MODE" = "check" ]; then
   echo "[CHECK ONLY] No files, databases, images, or containers were changed."
@@ -111,7 +111,7 @@ if [ "$MODE" = "check" ]; then
   exit 0
 fi
 
-printf "This will fast-forward main, back up SQLite and IMDb config, migrate the database, update IMDb config, and recreate ONLY MovieHub backend, IMDb updater, and frontend. NPM gets a graceful reload, not a restart. Continue? [y/N] "
+printf "This will fast-forward main, back up SQLite and IMDb config, migrate the database, ENABLE daily IMDb dataset updates and quality-gated automatic rating writes at 00:00 Asia/Shanghai, and recreate ONLY MovieHub backend, IMDb updater, and frontend. NPM gets a graceful reload, not a restart. Continue? [y/N] "
 read ANSWER
 [ "$ANSWER" = "y" ] || [ "$ANSWER" = "Y" ] || { echo "Cancelled; nothing deployed."; exit 0; }
 
@@ -291,12 +291,12 @@ wait_running moviehub-imdb-updater
 docker exec moviehub-imdb-updater python - <<'PY'
 from scripts.imdb_update_daemon import load_config
 config = load_config()
-assert config["enabled"] is False, "IMDb scheduler must remain disabled"
-assert config["auto_apply"] is False, "IMDb auto-apply must remain disabled"
-assert config["run_at"] == "04:30"
-assert config["timezone"] == "Asia/Singapore"
+assert config["enabled"] is True, "IMDb scheduler must be enabled"
+assert config["auto_apply"] is True, "IMDb auto-apply must be enabled"
+assert config["run_at"] == "00:00"
+assert config["timezone"] == "Asia/Shanghai"
 assert config["min_index_rows"] == 100000
-print("IMDb updater config verified: scheduler disabled, auto-apply disabled, Asia/Singapore 04:30.")
+print("IMDb updater config verified: daily schedule and quality-gated auto-apply enabled, Asia/Shanghai 00:00.")
 PY
 
 # NPM caches static proxy_pass hostname resolution until its workers reload.

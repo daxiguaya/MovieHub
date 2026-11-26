@@ -302,9 +302,15 @@ async def get_online_detail(
         DETAIL_TTL,
         include_overview=True,
     )
-    imdb_id = (payload.get("external_ids") or {}).get("imdb_id")
+    external_ids = payload.get("external_ids") or {}
+    if not isinstance(external_ids, dict):
+        external_ids = {}
+    else:
+        external_ids = dict(external_ids)
+    imdb_id = external_ids.get("imdb_id")
     if not is_valid_imdb_id(imdb_id):
         imdb_id = None
+        external_ids["imdb_id"] = None
     local_movie = None
     if db is not None:
         local_movie = db.query(Movie).filter(
@@ -318,14 +324,15 @@ async def get_online_detail(
             ).first()
         if not imdb_id and local_movie is not None and is_valid_imdb_id(local_movie.imdb_id):
             imdb_id = local_movie.imdb_id
+            external_ids["imdb_id"] = imdb_id
     indexed_rating = (await asyncio.to_thread(lookup_ratings, [imdb_id])).get(imdb_id) if imdb_id else None
     return {
         "provider": "tmdb",
         "media_type": media_type,
         "provider_id": provider_id,
         "imdb_id": imdb_id,
-        "imdb_rating": indexed_rating[0] if indexed_rating else (local_movie.imdb_rating if local_movie else None),
-        "imdb_rating_count": indexed_rating[1] if indexed_rating else (local_movie.imdb_rating_count if local_movie else None),
+        "imdb_rating": indexed_rating[0] if indexed_rating else (local_movie.imdb_rating if local_movie and imdb_id else None),
+        "imdb_rating_count": indexed_rating[1] if indexed_rating else (local_movie.imdb_rating_count if local_movie and imdb_id else None),
         "title": payload.get("title") or payload.get("name"),
         "original_title": payload.get("original_title") or payload.get("original_name"),
         "year": int((payload.get("release_date") or payload.get("first_air_date") or "")[:4]) if (payload.get("release_date") or payload.get("first_air_date") or "")[:4].isdigit() else None,
@@ -341,7 +348,7 @@ async def get_online_detail(
         "number_of_seasons": payload.get("number_of_seasons"),
         "number_of_episodes": payload.get("number_of_episodes"),
         "credits": payload.get("credits", {}),
-        "external_ids": payload.get("external_ids", {}),
+        "external_ids": external_ids,
         "attribution": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
     }
 

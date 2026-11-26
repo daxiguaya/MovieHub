@@ -58,13 +58,13 @@ def test_version_five_migration_upgrades_v2_and_is_idempotent(tmp_path):
     _create_v2_database(db_path)
 
     assert execute_migration(db_path, MIGRATION) == 5
-    assert execute_migration(db_path, MIGRATION) == 4
+    assert execute_migration(db_path, MIGRATION) == 5
 
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         tables = {
@@ -323,7 +323,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     finally:
         conn.close()
 
-    assert execute_migration(db_path, MIGRATION) == 4
+    assert execute_migration(db_path, MIGRATION) == 5
 
     backup_path = next(tmp_path.glob("populated-v1.db.pre-migration-*.bak"))
     for candidate in (db_path, backup_path):

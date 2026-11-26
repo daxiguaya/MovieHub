@@ -94,10 +94,22 @@ read-only JSON configuration file, and a small state directory. It does not
 expose a port and does not run inside the API process. The updater image reuses
 the backend image; it adds no cron package or separate database.
 
-The tracked default control file is `deploy/imdb-update.json`. It is mounted
-read-only inside the updater and re-read every 30 seconds, so editing this file
-does not require rebuilding or recreating the container. The safe defaults are
-disabled and dry-run-only:
+The tracked templates are `deploy/imdb-update.json` and
+`deploy/imdb-update.json.example`. For a NAS deployment, keep the editable
+control file outside the Git checkout so future pulls cannot overwrite local
+settings. Create it once and point Compose to it in the ignored `.env` file:
+
+```sh
+cd /volume1/docker/moviehub
+mkdir -p config
+cp -n deploy/imdb-update.json.example config/imdb-update.json
+# Add this line once to .env:
+MOVIEHUB_IMDB_CONFIG_PATH=/volume1/docker/moviehub/config/imdb-update.json
+```
+
+The file is mounted read-only inside the updater and re-read every 30 seconds,
+so editing it does not require rebuilding or recreating the container. The safe
+defaults are disabled and dry-run-only:
 
 ```json
 {

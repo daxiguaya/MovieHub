@@ -475,7 +475,7 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
-function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null }) {
+function MovieCard({ movie, rank, localMatch = false, sourceRating, sourceLabel = "榜单" }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null; sourceLabel?: string }) {
   return (
     <article className="movie-card">
       <MoviePoster movie={movie} rank={rank} />
@@ -484,7 +484,7 @@ function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: M
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
         {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
         {sourceRating !== undefined ? (
-          <div className="movie-rating"><span>★</span> 豆瓣 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
+          <div className="movie-rating"><span>★</span> {sourceLabel}榜单评分 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>(历史快照)</small></div>
         ) : (
           <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
         )}
@@ -526,6 +526,7 @@ function ChartPage() {
   const [snapshotDate, setSnapshotDate] = useState("");
   const [items, setItems] = useState<ChartMovie[]>([]);
   const [chartName, setChartName] = useState("");
+  const [chartSource, setChartSource] = useState("");
   const [total, setTotal] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -544,6 +545,7 @@ function ChartPage() {
     setSnapshots([]);
     setSnapshotDate("");
     setChartName("");
+    setChartSource("");
     setTotal(0);
     setNextCursor(null);
     setCompareFrom("");
@@ -563,6 +565,7 @@ function ChartPage() {
         setCompareTo(history[0]?.snapshot_date ?? "");
         setCompareFrom(history[1]?.snapshot_date ?? "");
         setChartName(latest.chart.name);
+        setChartSource(latest.chart.source);
         setItems(latest.items);
         setTotal(latest.total);
         setNextCursor(latest.next_cursor);
@@ -642,7 +645,7 @@ function ChartPage() {
       ) : (
         <>
           <div className="result-caption"><span>{snapshotDate || "最新快照"}</span><span>{total} 部作品</span></div>
-          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} />)}</div>
+          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} sourceLabel={chartSource === "douban" ? "豆瓣" : chartSource === "imdb" ? "IMDb" : chartSource === "tmdb" ? "TMDB" : chartSource || "榜单"} />)}</div>
           {nextCursor && <button className="secondary-button load-more" onClick={() => void loadMore()}>加载更多</button>}
         </>
       )}

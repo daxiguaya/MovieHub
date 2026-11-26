@@ -1394,3 +1394,98 @@ def test_scout_import_does_not_overwrite_valid_imdb_id_with_malformed_source_val
         assert movie.imdb_id == "tt0111161"
 
     engine.dispose()
+
+
+def test_scout_import_rejects_conflicting_imdb_identity_without_reassigning(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-imdb-conflict.sqlite"
+    target_path = tmp_path / "moviehub-imdb-conflict.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    with TargetSession() as db:
+        db.add(Movie(
+            douban_id="1234567",
+            imdb_id="tt0111161",
+            title="Existing verified title",
+            type="movie",
+        ))
+        db.commit()
+
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+        assert service.status.errors == 1
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.imdb_id == "tt0111161"
+        assert movie.title == "Existing verified title"
+        assert db.query(Movie).count() == 2
+    engine.dispose()
+
+
+def test_scout_import_rejects_imdb_id_owned_by_another_douban_movie(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-imdb-owner-conflict.sqlite"
+    target_path = tmp_path / "moviehub-imdb-owner-conflict.sqlite"
+    _create_scout_fixture(source_path)
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    with TargetSession() as db:
+        db.add(Movie(
+            douban_id="9999999",
+            imdb_id="tt1234567",
+            title="Different local movie",
+            type="movie",
+        ))
+        db.commit()
+
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+        assert service.status.errors == 1
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    with TargetSession() as db:
+        owner = db.scalar(select(Movie).where(Movie.douban_id == "9999999"))
+        assert owner.imdb_id == "tt1234567"
+        assert db.scalar(select(Movie).where(Movie.douban_id == "1234567")) is None
+        assert db.scalar(select(Movie).where(Movie.douban_id == "7654321")) is not None
+        assert db.query(Movie).count() == 2
+    engine.dispose()

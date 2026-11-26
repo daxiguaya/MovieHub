@@ -344,7 +344,7 @@ describe("MovieHub frontend workflows", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("同名电影")).toHaveLength(2);
-      expect(screen.getAllByText(/本地榜单/)).toHaveLength(1);
+      expect(screen.getAllByText(/本地榜单/)).toHaveLength(2);
     });
   });
 

@@ -9,6 +9,7 @@ Compose now defines two application containers: a static React frontend and the 
 - Xiaoya search: set `MOVIEHUB_XIAOYA_SEARCH_URL_TEMPLATE` in `.env` with the `{query}` placeholder. The backend exposes it through `/api/config` as `xiaoyaSearchUrlTemplate`; it is public navigation configuration, never a secret.
 - MovieHub-owned writable data: host path `MOVIEHUB_DATA_PATH` mounted at `/data`.
 - Dedicated backup destination: host path `MOVIEHUB_BACKUP_PATH` mounted at `/backups`.
+- IMDb updater configuration: host directory `MOVIEHUB_IMDB_CONFIG_DIR` mounted read-only at `/config`; use a directory mount so atomic replacement of `imdb-update.json` is visible inside the container.
   - SQLite database: `/data/db/movies.db`.
   - Poster cache: `/data/posters/`.
 - Optional Scout import source: when `MOVIEHUB_IMPORT_PATH` is set, that host directory is mounted at `/imports:ro`; when omitted, Compose mounts the tracked empty directory `./deploy/empty-imports`. MovieHub's own database initialization and normal runtime do not require Scout.
@@ -26,6 +27,7 @@ The source mount is read-only at the container boundary. Keep the MovieHub datab
    ```sh
    mkdir -p /volume1/docker/moviehub/data
    mkdir -p /volume1/docker/moviehub/backup
+   mkdir -p /volume1/docker/moviehub/config
    chown -R 10001:10001 /volume1/docker/moviehub/data /volume1/docker/moviehub/backup
    ```
 6. Ensure the import directory and Scout database are readable by UID/GID 10001. Do not change Scout ownership or permissions broadly just for MovieHub; use a dedicated read-only export/copy directory if required.

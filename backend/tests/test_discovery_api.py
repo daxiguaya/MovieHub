@@ -26,6 +26,8 @@ def test_search_fetches_only_requested_page(monkeypatch):
 
     async def fake_get_json(endpoint, params=None, ttl=900):
         calls.append((endpoint, params, ttl))
+        if endpoint.endswith("/external_ids"):
+            return {"id": 42, "imdb_id": "tt0000042"}
         return {
             "page": params["page"],
             "total_pages": 999,
@@ -130,8 +132,79 @@ def test_local_imdb_rating_is_attached_only_by_exact_tmdb_identity():
             {"provider_id": 999999, "media_type": "movie"},
         ]
         result = _attach_local_imdb_ratings(db, items)
+        assert result[0]["imdb_id"] == "tt0111161"
         assert result[0]["imdb_rating"] == 9.3
         assert result[0]["imdb_rating_count"] == 3000000
         assert result[1]["imdb_rating"] is None
         assert result[1]["imdb_rating_count"] is None
     engine.dispose()
+
+
+
+def test_search_enriches_non_catalogue_results_from_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        if endpoint == "/search/multi":
+            return {
+                "page": 1, "total_pages": 1, "total_results": 1,
+                "results": [{
+                    "id": 999, "media_type": "movie", "title": "New title",
+                    "release_date": "2024-01-01", "vote_average": 7.1, "vote_count": 88,
+                }],
+            }
+        if endpoint == "/movie/999/external_ids":
+            return {"id": 999, "imdb_id": "tt1234567"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt1234567": (8.4, 12345)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/search", params={"q": "New title"})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["imdb_id"] == "tt1234567"
+    assert item["imdb_rating"] == 8.4
+    assert item["imdb_rating_count"] == 12345
+
+
+def test_discover_enriches_results_with_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        if endpoint == "/discover/movie":
+            return {
+                "page": 1, "total_pages": 1, "total_results": 1,
+                "results": [{"id": 777, "title": "Discover title", "release_date": "2020-01-01"}],
+            }
+        if endpoint == "/movie/777/external_ids":
+            return {"id": 777, "imdb_id": "tt7654321"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt7654321": (7.9, 9876)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/discover", params={"media_type": "movie", "min_votes": 0})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["imdb_id"] == "tt7654321"
+    assert item["imdb_rating"] == 7.9
+    assert item["imdb_rating_count"] == 9876
+
+
+
+def test_online_detail_uses_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900, include_overview=False):
+        return {
+            "id": 654,
+            "title": "Online title",
+            "release_date": "2022-01-01",
+            "external_ids": {"imdb_id": "tt7654321"},
+            "genres": [],
+        }
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt7654321": (8.1, 45678)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/movie/654")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["imdb_id"] == "tt7654321"
+    assert body["imdb_rating"] == 8.1
+    assert body["imdb_rating_count"] == 45678

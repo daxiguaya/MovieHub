@@ -18,6 +18,7 @@ services:
       TMDB_API_READ_TOKEN: ${TMDB_API_READ_TOKEN:-}
       MOVIEHUB_CORS_ORIGINS: ${MOVIEHUB_CORS_ORIGINS:-[]}
       MOVIEHUB_LOG_LEVEL: ${MOVIEHUB_LOG_LEVEL:-INFO}
+      IMDB_RATINGS_INDEX_PATH: ${IMDB_RATINGS_INDEX_PATH:-}
       FORWARDED_ALLOW_IPS: ${MOVIEHUB_TRUSTED_PROXY_IPS:-127.0.0.1}
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
@@ -62,10 +63,11 @@ services:
       MOVIEHUB_DATA_DIR: /data
       IMDB_UPDATE_CONFIG: /config/imdb-update.json
       IMDB_UPDATE_STATE: /data/imdb-update-state/state.json
+      IMDB_RATINGS_INDEX_PATH: ${IMDB_RATINGS_INDEX_PATH:-}
       LOG_LEVEL: INFO
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
-      - ${MOVIEHUB_IMDB_CONFIG_PATH:-./deploy/imdb-update.json}:/config/imdb-update.json:ro
+      - ${MOVIEHUB_IMDB_CONFIG_DIR:-./config}:/config:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m,mode=1777
     cap_drop:

@@ -12,12 +12,14 @@ def test_config_is_reloaded_from_mounted_json(tmp_path, monkeypatch):
     monkeypatch.setattr(updater, "CONFIG_PATH", config_path)
     assert updater.load_config()["enabled"] is False
 
-    config_path.write_text(json.dumps({
+    replacement = config_path.with_suffix(".tmp")
+    replacement.write_text(json.dumps({
         "enabled": True,
         "run_at": "03:15",
         "timezone": "Asia/Singapore",
         "auto_apply": False,
     }), encoding="utf-8")
+    replacement.replace(config_path)
     config = updater.load_config()
     assert config["enabled"] is True
     assert config["run_at"] == "03:15"

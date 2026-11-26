@@ -267,7 +267,7 @@ class ProviderResponseCache:
         key. Require corroborating catalogue metadata before removing a
         potentially mis-mapped TMDB favorite.
         """
-        if not imdb_id or len(imdb_id) > 32 or not title or year is None:
+        if not is_valid_imdb_id(imdb_id) or not title or year is None:
             return False
 
         def normalize(value: object) -> str:

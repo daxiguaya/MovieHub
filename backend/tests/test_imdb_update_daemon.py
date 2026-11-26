@@ -134,3 +134,25 @@ def test_old_dry_run_state_builds_missing_full_index_without_new_etag(tmp_path, 
     assert result["status"] == "dry_run_only"
     assert result["dry_run"]["full_index"]["indexed_titles"] == 1500000
     assert calls == [("local", False), ("index", False)]
+
+
+
+def test_updater_checks_configured_index_path_for_unchanged_etag(tmp_path, monkeypatch):
+    custom_index = tmp_path / "custom" / "ratings-index.sqlite3"
+    custom_index.parent.mkdir()
+    custom_index.write_bytes(b"present")
+    monkeypatch.setenv("IMDB_RATINGS_INDEX_PATH", str(custom_index))
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("must not download"))
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "last_result": {"status": "applied", "dry_run": {"full_index": {"indexed_titles": 1000000}}},
+    }
+
+    result = updater.run_update({}, state, date(2026, 11, 27))
+
+    assert result["status"] == "unchanged_dataset"

@@ -338,8 +338,36 @@ async def get_cache_stats(request: Request) -> dict[str, int | float]:
     return {**cache_stats, **tmdb_client.stats()}
 
 
+async def _resolve_favorite_imdb_ids(favorites: list[dict]) -> list[dict]:
+    """Resolve missing IMDb IDs for older online favorites via their TMDB identity."""
+    async def resolve_one(favorite: dict) -> None:
+        snapshot = favorite.get("snapshot")
+        if not isinstance(snapshot, dict) or snapshot.get("imdb_id"):
+            return
+        media_type = favorite.get("media_type")
+        provider_id = favorite.get("provider_id")
+        if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
+            return
+        try:
+            external = await tmdb_client.get_json(
+                f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
+            )
+            imdb_id = (external or {}).get("imdb_id")
+            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+                snapshot["imdb_id"] = imdb_id
+        except Exception as exc:
+            # A missing enrichment must not make the favorites endpoint unavailable.
+            logger.info(
+                "Favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
+                media_type, provider_id, type(exc).__name__,
+            )
+
+    await asyncio.gather(*(resolve_one(favorite) for favorite in favorites))
+    return favorites
+
+
 def _attach_favorite_imdb_ratings(favorites: list[dict]) -> list[dict]:
-    """Refresh IMDb rating fields for saved snapshots using their stable IMDb IDs."""
+    """Refresh IMDb rating fields for saved snapshots using resolved IMDb IDs."""
     imdb_ids = [
         snapshot.get("imdb_id")
         for favorite in favorites
@@ -364,6 +392,7 @@ def _attach_favorite_imdb_ratings(favorites: list[dict]) -> list[dict]:
 @limiter.limit("30/minute")
 async def list_external_favorites(request: Request) -> list[dict]:
     favorites = await asyncio.to_thread(provider_response_cache.list_favorites)
+    await _resolve_favorite_imdb_ids(favorites)
     return await asyncio.to_thread(_attach_favorite_imdb_ratings, favorites)
 
 

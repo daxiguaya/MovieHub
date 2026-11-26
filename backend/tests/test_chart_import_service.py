@@ -546,3 +546,41 @@ def test_chart_import_records_field_level_source_provenance_idempotently():
     finally:
         db.close()
         engine.dispose()
+
+
+
+def test_chart_import_validates_imdb_ids_and_ignores_invalid_raw_values():
+    engine, db = _session()
+    service = ChartImportService()
+    try:
+        with pytest.raises(ValueError, match="canonical IMDb title ID"):
+            ChartMovieImport(
+                douban_id="130001",
+                rank=1,
+                title="Invalid IMDb identity",
+                imdb_id="tt12x4567",
+            )
+
+        raw_snapshot = {
+            "slug": "raw-invalid-imdb-chart",
+            "name": "Raw invalid IMDb chart",
+            "source": "test",
+            "category": "general",
+            "snapshot_date": "2026-11-26",
+            "movies": [
+                {
+                    "douban_id": "130002",
+                    "rank": 1,
+                    "title": "Raw mapping with invalid IMDb ID",
+                    "type": "movie",
+                    "imdb_id": "tt12x4567",
+                }
+            ],
+        }
+        service.import_snapshot(db, raw_snapshot)
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "130002"))
+        assert movie is not None
+        assert movie.imdb_id is None
+    finally:
+        db.close()
+        engine.dispose()

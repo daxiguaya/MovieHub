@@ -49,6 +49,13 @@ class ChartMovieImport(BaseModel):
             raise ValueError("douban_id must contain only digits")
         return value
 
+    @field_validator("imdb_id")
+    @classmethod
+    def validate_imdb_id(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"tt[0-9]{7,12}", value):
+            raise ValueError("imdb_id must be a canonical IMDb title ID")
+        return value
+
     @field_validator(
         "directors",
         "actors",

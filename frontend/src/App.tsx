@@ -1178,7 +1178,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
       .then((data) => {
         if (!active) return;
         setMovie(data);
-        void api.externalFavoriteStatus(validType, id, data.external_ids.imdb_id, {
+        void api.externalFavoriteStatus(validType, id, data.imdb_id ?? data.external_ids.imdb_id, {
           title: data.title,
           original_title: data.original_title,
           year: data.year,
@@ -1196,7 +1196,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
     if (!movie) return;
     setFavoriteError("");
     try {
-      if (isFavorite) await api.removeExternalFavorite(validType, id, movie.external_ids.imdb_id, {
+      if (isFavorite) await api.removeExternalFavorite(validType, id, movie.imdb_id ?? movie.external_ids.imdb_id, {
         title: movie.title,
         original_title: movie.original_title,
         year: movie.year,
@@ -1239,7 +1239,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
-            {movie.external_ids.imdb_id && <a className="secondary-button" href={"https://www.imdb.com/title/" + movie.external_ids.imdb_id + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
+            {(movie.imdb_id ?? movie.external_ids.imdb_id) && <a className="secondary-button" href={"https://www.imdb.com/title/" + (movie.imdb_id ?? movie.external_ids.imdb_id) + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}
@@ -1344,6 +1344,7 @@ function FavoritesPage() {
                     year: favorite.snapshot.year,
                     rating: favorite.snapshot.rating,
                     rating_count: favorite.snapshot.rating_count,
+                    imdb_id: favorite.snapshot.imdb_id ?? null,
                     imdb_rating: favorite.snapshot.imdb_rating ?? null,
                     imdb_rating_count: favorite.snapshot.imdb_rating_count ?? null,
                     poster_path: favorite.snapshot.poster_path,

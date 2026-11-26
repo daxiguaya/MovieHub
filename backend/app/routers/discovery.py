@@ -7,11 +7,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.config import settings
 from app.database import Favorite, Movie, database_is_ready, get_db
 from app.limiter import limiter
 from app.dependencies.auth import verify_api_key
+from app.services.imdb_ids import is_valid_imdb_id
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
 from app.services.imdb_rating_index import lookup_ratings
@@ -52,6 +53,13 @@ class FavoriteSnapshot(BaseModel):
     poster_path: str | None = Field(default=None, max_length=512)
     backdrop_path: str | None = Field(default=None, max_length=512)
     imdb_id: str | None = Field(default=None, max_length=32)
+
+    @field_validator("imdb_id")
+    @classmethod
+    def validate_imdb_id(cls, value: str | None) -> str | None:
+        if value is not None and not is_valid_imdb_id(value):
+            raise ValueError("IMDb ID must be a valid title ID (tt followed by 7 to 12 digits)")
+        return value
 
 
 class ExternalFavoritePayload(BaseModel):
@@ -97,9 +105,10 @@ def _attach_local_imdb_ratings(db: Session | None, items: list[dict]) -> list[di
     by_identity = {(movie.type, movie.tmdb_id): movie for movie in local_movies if movie.tmdb_id}
     for item in items:
         movie = by_identity.get((item.get("media_type"), str(item.get("provider_id"))))
-        item["imdb_id"] = movie.imdb_id if movie else None
-        item["imdb_rating"] = movie.imdb_rating if movie else None
-        item["imdb_rating_count"] = movie.imdb_rating_count if movie else None
+        valid_local_id = movie.imdb_id if movie and is_valid_imdb_id(movie.imdb_id) else None
+        item["imdb_id"] = valid_local_id
+        item["imdb_rating"] = movie.imdb_rating if movie and valid_local_id else None
+        item["imdb_rating_count"] = movie.imdb_rating_count if movie and valid_local_id else None
     return items
 
 
@@ -108,8 +117,10 @@ async def _attach_imdb_ratings(db: Session | None, items: list[dict]) -> list[di
     _attach_local_imdb_ratings(db, items)
 
     async def resolve_external_id(item: dict) -> None:
-        if item.get("imdb_id"):
+        if is_valid_imdb_id(item.get("imdb_id")):
             return
+        if item.get("imdb_id") is not None:
+            item["imdb_id"] = None
         media_type = item.get("media_type")
         provider_id = item.get("provider_id")
         if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
@@ -119,7 +130,7 @@ async def _attach_imdb_ratings(db: Session | None, items: list[dict]) -> list[di
                 f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
             )
             imdb_id = (external or {}).get("imdb_id")
-            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+            if is_valid_imdb_id(imdb_id):
                 item["imdb_id"] = imdb_id
         except Exception as exc:
             # A failed enrichment must not turn a successful TMDB search into an error.
@@ -260,6 +271,8 @@ async def get_favorite_status(
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
     identity_filter = Movie.tmdb_id == str(provider_id)
+    if not is_valid_imdb_id(imdb_id):
+        imdb_id = None
     if imdb_id:
         identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
     local_saved = db.query(Favorite).join(Movie).filter(
@@ -290,6 +303,8 @@ async def get_online_detail(
         include_overview=True,
     )
     imdb_id = (payload.get("external_ids") or {}).get("imdb_id")
+    if not is_valid_imdb_id(imdb_id):
+        imdb_id = None
     local_movie = None
     if db is not None:
         local_movie = db.query(Movie).filter(
@@ -301,7 +316,7 @@ async def get_online_detail(
                 Movie.type == media_type,
                 Movie.imdb_id == imdb_id,
             ).first()
-        if not imdb_id and local_movie is not None:
+        if not imdb_id and local_movie is not None and is_valid_imdb_id(local_movie.imdb_id):
             imdb_id = local_movie.imdb_id
     indexed_rating = (await asyncio.to_thread(lookup_ratings, [imdb_id])).get(imdb_id) if imdb_id else None
     return {
@@ -342,8 +357,13 @@ async def _resolve_favorite_imdb_ids(favorites: list[dict]) -> list[dict]:
     """Resolve missing IMDb IDs for older online favorites via their TMDB identity."""
     async def resolve_one(favorite: dict) -> None:
         snapshot = favorite.get("snapshot")
-        if not isinstance(snapshot, dict) or snapshot.get("imdb_id"):
+        if not isinstance(snapshot, dict):
             return
+        saved_imdb_id = snapshot.get("imdb_id")
+        if is_valid_imdb_id(saved_imdb_id):
+            return
+        if saved_imdb_id is not None:
+            snapshot["imdb_id"] = None
         media_type = favorite.get("media_type")
         provider_id = favorite.get("provider_id")
         if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
@@ -353,7 +373,7 @@ async def _resolve_favorite_imdb_ids(favorites: list[dict]) -> list[dict]:
                 f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
             )
             imdb_id = (external or {}).get("imdb_id")
-            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+            if is_valid_imdb_id(imdb_id):
                 snapshot["imdb_id"] = imdb_id
         except Exception as exc:
             # A missing enrichment must not make the favorites endpoint unavailable.
@@ -372,7 +392,7 @@ def _attach_favorite_imdb_ratings(favorites: list[dict]) -> list[dict]:
         snapshot.get("imdb_id")
         for favorite in favorites
         if isinstance((snapshot := favorite.get("snapshot")), dict)
-        and isinstance(snapshot.get("imdb_id"), str)
+        and is_valid_imdb_id(snapshot.get("imdb_id"))
     ]
     if not imdb_ids:
         return favorites
@@ -446,7 +466,7 @@ async def remove_external_favorite(
     )
     imdb_id = request.query_params.get("imdb_id")
     identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id and len(imdb_id) <= 32:
+    if is_valid_imdb_id(imdb_id):
         identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
     linked = db.query(Favorite).join(Movie).filter(
         Movie.type == media_type,

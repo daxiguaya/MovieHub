@@ -164,3 +164,11 @@ def test_cache_max_age_rejects_an_entry_even_when_its_ttl_is_still_fresh(tmp_pat
     assert cache.get(key) == ({"vote_average": 7.8}, False)
     assert cache.get(key, max_age_seconds=6 * 3600) is None
     assert cache.get(key, allow_stale=True, max_age_seconds=6 * 3600) is None
+
+
+def test_delete_favorite_by_imdb_rejects_malformed_ids_without_deleting(tmp_path):
+    cache = ProviderResponseCache(tmp_path / "provider.sqlite3")
+    cache.save_favorite("movie", 10, {"title": "Film", "imdb_id": "tt1234567"})
+
+    assert not cache.delete_favorite_by_imdb("movie", "tt-not-an-id")
+    assert cache.has_favorite("movie", 10)

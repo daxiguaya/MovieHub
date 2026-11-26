@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.services.imdb_ids import is_valid_imdb_id
 
 logger = logging.getLogger("moviehub.provider_cache")
 
@@ -252,7 +253,7 @@ class ProviderResponseCache:
                 for row in rows]
 
     def delete_favorite_by_imdb(self, media_type: str, imdb_id: str) -> bool:
-        if not imdb_id or len(imdb_id) > 32:
+        if not is_valid_imdb_id(imdb_id):
             return False
         self._init()
         with self._lock, self._connection() as connection:

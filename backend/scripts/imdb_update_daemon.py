@@ -12,6 +12,8 @@ import hashlib
 import json
 import logging
 import os
+import re
+import sqlite3
 import time
 import urllib.request
 from datetime import date, datetime
@@ -127,6 +129,25 @@ def prune_index_backups(index_path: Path, keep: int) -> None:
         stale.unlink(missing_ok=True)
 
 
+def local_catalogue_fingerprint() -> str:
+    """Fingerprint valid local IMDb IDs so new catalogue entries trigger a refresh."""
+    database_path = Path(get_db_path()).expanduser().resolve()
+    digest = hashlib.sha256()
+    connection = sqlite3.connect(database_path.as_uri() + "?mode=ro", uri=True, timeout=30)
+    try:
+        rows = connection.execute(
+            "SELECT imdb_id FROM movies WHERE imdb_id IS NOT NULL ORDER BY imdb_id"
+        )
+        for (imdb_id,) in rows:
+            value = str(imdb_id or "").strip()
+            if re.fullmatch(r"tt[0-9]{7,12}", value):
+                digest.update(value.encode("ascii"))
+                digest.update(b"\\n")
+    finally:
+        connection.close()
+    return digest.hexdigest()
+
+
 def run_update(config: dict, state: dict, today: date) -> dict:
     headers = request_headers()
     fingerprint = headers["etag"] or headers["last_modified"]
@@ -136,24 +157,54 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         saved_snapshot = IMPORT_DIR / "title.ratings.tsv.gz"
         previous_dry_run = previous_result.get("dry_run") or {}
         index_path = index_database_path()
-        # Older updater state only records the local catalogue import. Ensure
-        # the complete index is built even when IMDb's ETag has not changed.
+        # The official dataset can remain unchanged while MovieHub gains new
+        # records or IMDb IDs. Re-run the local matcher against the saved
+        # snapshot whenever the catalogue identity set changes.
+        catalogue_fingerprint = local_catalogue_fingerprint()
+        needs_catalogue_refresh = (
+            catalogue_fingerprint != state.get("local_catalogue_fingerprint")
+        )
         needs_full_index = not index_path.is_file() or "full_index" not in previous_dry_run
         needs_apply = config.get("auto_apply") and previous_result.get("status") == "dry_run_only"
-        if needs_full_index or needs_apply:
+        needs_local_dry_run = (
+            needs_catalogue_refresh
+            or needs_apply
+            or "local" not in previous_dry_run
+        )
+        if needs_full_index or needs_apply or needs_local_dry_run:
             if not saved_snapshot.is_file():
                 saved_snapshot, saved_hash = download_snapshot()
                 state["dataset_sha256"] = saved_hash
-            local_dry_run = import_imdb_ratings(saved_snapshot, apply=False)
-            index_dry_run = import_imdb_rating_index(saved_snapshot, apply=False, min_rows=int(config["min_index_rows"]))
+            local_dry_run = (
+                import_imdb_ratings(saved_snapshot, apply=False)
+                if needs_local_dry_run
+                else previous_dry_run["local"]
+            )
+            index_dry_run = (
+                import_imdb_rating_index(
+                    saved_snapshot, apply=False, min_rows=int(config["min_index_rows"])
+                )
+                if needs_full_index or needs_apply
+                else previous_dry_run["full_index"]
+            )
             if not local_dry_run.get("valid") or int(local_dry_run.get("matched", 0)) < int(config["min_matched"]):
                 raise RuntimeError(f"Local IMDb ratings quality gate failed before apply: {local_dry_run}")
             if not index_dry_run.get("valid") or int(index_dry_run.get("indexed_titles", 0)) < int(config["min_index_rows"]):
                 raise RuntimeError(f"Full IMDb index quality gate failed before apply: {index_dry_run}")
             dry_run = {"local": local_dry_run, "full_index": index_dry_run}
             if config.get("auto_apply"):
-                applied_index = import_imdb_rating_index(saved_snapshot, apply=True, min_rows=int(config["min_index_rows"]))
-                applied_local = import_imdb_ratings(saved_snapshot, apply=True)
+                applied_local = (
+                    import_imdb_ratings(saved_snapshot, apply=True)
+                    if needs_local_dry_run or needs_apply
+                    else {"applied": False, "reason": "local catalogue unchanged"}
+                )
+                applied_index = (
+                    import_imdb_rating_index(
+                        saved_snapshot, apply=True, min_rows=int(config["min_index_rows"])
+                    )
+                    if needs_full_index or needs_apply
+                    else {"applied": False, "reason": "full IMDb index already current"}
+                )
                 prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
                 prune_index_backups(index_path, int(config["backup_keep"]))
                 result = {"status": "applied", "dry_run": dry_run, "applied_result": {"local": applied_local, "full_index": applied_index}}
@@ -167,6 +218,11 @@ def run_update(config: dict, state: dict, today: date) -> dict:
             }
         else:
             result = {"status": "unchanged_dataset", "checked_at": datetime.now().astimezone().isoformat()}
+        if needs_catalogue_refresh or "local_catalogue_fingerprint" not in state:
+            confirmed_fingerprint = local_catalogue_fingerprint()
+            if confirmed_fingerprint != catalogue_fingerprint:
+                raise RuntimeError("Local IMDb catalogue changed during refresh; state was not marked complete")
+            state["local_catalogue_fingerprint"] = confirmed_fingerprint
         state["last_result"] = result
         state["last_successful_date"] = today.isoformat()
         state["last_success_at"] = datetime.now().astimezone().isoformat()
@@ -200,6 +256,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
 
     state["dataset_fingerprint"] = fingerprint or content_hash
     state["dataset_sha256"] = content_hash
+    state["local_catalogue_fingerprint"] = local_catalogue_fingerprint()
     state["last_successful_date"] = today.isoformat()
     state["last_result"] = result
     state["last_success_at"] = datetime.now().astimezone().isoformat()

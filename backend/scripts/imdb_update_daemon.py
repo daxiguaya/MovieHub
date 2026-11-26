@@ -32,10 +32,10 @@ LOG = logging.getLogger("moviehub.imdb_update")
 
 def load_config() -> dict:
     defaults = {
-        "enabled": False,
-        "run_at": "04:30",
-        "timezone": "Asia/Singapore",
-        "auto_apply": False,
+        "enabled": True,
+        "run_at": "00:00",
+        "timezone": "Asia/Shanghai",
+        "auto_apply": True,
         "min_matched": 10,
         "min_index_rows": 100000,
         "backup_keep": 7,

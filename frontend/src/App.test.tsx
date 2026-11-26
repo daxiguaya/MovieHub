@@ -658,6 +658,8 @@ describe("MovieHub frontend workflows", () => {
     expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
     expect(screen.getByText("IMDb · 250 票")).toBeInTheDocument();
     expect(screen.getByText("★ 6.2")).toBeInTheDocument();
+    expect(screen.getByText("★ 8.4")).toBeInTheDocument();
+    expect(screen.getByText("豆瓣 · 暂无评价人数")).toBeInTheDocument();
     expect(screen.queryByText(/TMDB · ★ 7.9/)).not.toBeInTheDocument();
     expect(screen.getByText("来自 TMDB 的临时简介")).toBeInTheDocument();
     expect(screen.getByText("豆瓣导演")).toBeInTheDocument();

@@ -419,7 +419,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small><small>TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} · {item.rating_count.toLocaleString()} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -514,6 +514,7 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
         {localMovie && <div className="movie-subtitle">本地榜单匹配</div>}
         <div className="movie-rating"><span>★</span> IMDb {item.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({item.imdb_rating_count == null ? "暂无投票人数" : item.imdb_rating_count.toLocaleString()})</small></div>
+        <div className="movie-rating secondary-rating">TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()} 票)</small></div>
       </div>
     </article>
   );
@@ -1233,11 +1234,13 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
           <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
+          <div className="detail-rating detail-rating-secondary"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB 目录评分 · {movie.rating_count.toLocaleString()} 票</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {(movie.imdb_id ?? movie.external_ids.imdb_id) && <a className="secondary-button" href={"https://www.imdb.com/title/" + (movie.imdb_id ?? movie.external_ids.imdb_id) + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
+            <a className="secondary-button" href={"https://www.themoviedb.org/" + movie.media_type + "/" + movie.provider_id} target="_blank" rel="noreferrer">TMDB ↗</a>
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}

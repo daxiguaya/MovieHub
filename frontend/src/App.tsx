@@ -720,7 +720,6 @@ function SearchPage() {
   async function runSearch(params: URLSearchParams, appendLocal = false, appendOnline = false) {
     const q = (params.get("search") ?? "").trim();
     const requestedType = (params.get("type") as "all" | "movie" | "tv" | null) ?? "all";
-    const requestedMinRating = params.get("min_rating") ?? "";
     const requestedMinYear = params.get("min_year") ?? "";
     const requestedMaxYear = params.get("max_year") ?? "";
     const requestedSort = params.get("sort") ?? "relevance";

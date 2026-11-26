@@ -238,7 +238,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
         ]
         results = [future.result(timeout=30) for future in futures]
 
-    assert results == [4, 4]
+    assert results == [5, 5]
 
     conn = sqlite3.connect(str(db_path))
     try:
@@ -330,14 +330,22 @@ def test_v5_migration_preserves_existing_catalogue_and_user_data(tmp_path):
         check = sqlite3.connect(str(candidate))
         try:
             assert check.execute(
-                "SELECT title, original_title, overview, imdb_rating, imdb_rating_count FROM movies WHERE id=41"
+                "SELECT title, original_title, overview FROM movies WHERE id=41"
             ).fetchone() == (
                 "肖申克的救赎",
                 "The Shawshank Redemption",
                 "fixture overview",
-                None,
-                None,
             )
+            if candidate == db_path:
+                assert check.execute(
+                    "SELECT imdb_rating, imdb_rating_count FROM movies WHERE id=41"
+                ).fetchone() == (None, None)
+            else:
+                backup_columns = {
+                    row[1] for row in check.execute("PRAGMA table_info(movies)")
+                }
+                assert "imdb_rating" not in backup_columns
+                assert "imdb_rating_count" not in backup_columns
             assert check.execute(
                 "SELECT name FROM genres WHERE id=7"
             ).fetchone() == ("剧情",)

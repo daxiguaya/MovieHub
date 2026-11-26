@@ -245,29 +245,74 @@ def _linked_chart_movie(
 
 
 async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
-    """Resolve missing IMDb IDs and attach ratings before the UI reads favorites."""
-    async def resolve_one(favorite: dict) -> None:
+    """Refresh TMDB catalog scores and attach current IMDb-index scores for favorites."""
+    semaphore = asyncio.Semaphore(4)
+
+    async def enrich_one(favorite: dict) -> None:
         snapshot = favorite.get("snapshot")
-        if not isinstance(snapshot, dict) or snapshot.get("imdb_id"):
-            return
         media_type = favorite.get("media_type")
         provider_id = favorite.get("provider_id")
-        if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
+        if (
+            not isinstance(snapshot, dict)
+            or media_type not in ("movie", "tv")
+            or not isinstance(provider_id, int)
+            or provider_id < 1
+        ):
             return
-        try:
-            external = await tmdb_client.get_json(
-                f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
-            )
-            imdb_id = (external or {}).get("imdb_id")
-            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
-                snapshot["imdb_id"] = imdb_id
-        except Exception as exc:
-            logger.info(
-                "External favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
-                media_type, provider_id, type(exc).__name__,
-            )
 
-    await asyncio.gather(*(resolve_one(favorite) for favorite in favorites))
+        async with semaphore:
+            if not snapshot.get("imdb_id"):
+                try:
+                    external = await tmdb_client.get_json(
+                        f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
+                    )
+                    imdb_id = (external or {}).get("imdb_id")
+                    if isinstance(imdb_id, str) and len(imdb_id) in range(9, 15) and imdb_id.startswith("tt") and imdb_id[2:].isdigit():
+                        snapshot["imdb_id"] = imdb_id
+                except Exception as exc:
+                    logger.info(
+                        "External favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
+                        media_type, provider_id, type(exc).__name__,
+                    )
+
+            try:
+                payload = await tmdb_client.get_json(
+                    f"/{media_type}/{provider_id}",
+                    {"language": "zh-CN"},
+                    DETAIL_TTL,
+                )
+                if not isinstance(payload, dict) or payload.get("id") != provider_id:
+                    return
+                title_keys = ("title", "original_title") if media_type == "movie" else ("name", "original_name")
+                provider_titles = {
+                    _normalize_identity(payload.get(key)) for key in title_keys
+                    if isinstance(payload.get(key), str)
+                } - {""}
+                snapshot_titles = {
+                    _normalize_identity(snapshot.get(key)) for key in ("title", "original_title")
+                    if isinstance(snapshot.get(key), str)
+                } - {""}
+                if not provider_titles.intersection(snapshot_titles):
+                    return
+                vote_count = payload.get("vote_count")
+                if not isinstance(vote_count, int) or isinstance(vote_count, bool) or vote_count < 0:
+                    return
+                vote_average = payload.get("vote_average")
+                snapshot["rating"] = (
+                    float(vote_average)
+                    if isinstance(vote_average, (int, float))
+                    and not isinstance(vote_average, bool)
+                    and 0 <= vote_average <= 10
+                    else None
+                )
+                snapshot["rating_count"] = vote_count
+            except Exception as exc:
+                logger.info(
+                    "External favorite TMDB rating refresh unavailable for TMDB %s/%s: %s",
+                    media_type, provider_id, type(exc).__name__,
+                )
+
+    await asyncio.gather(*(enrich_one(favorite) for favorite in favorites))
     imdb_ids = [
         snapshot.get("imdb_id")
         for favorite in favorites
@@ -283,7 +328,6 @@ async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
         if indexed is not None:
             snapshot["imdb_rating"], snapshot["imdb_rating_count"] = indexed
     return favorites
-
 
 @router.get("/external")
 @limiter.limit("30/minute")

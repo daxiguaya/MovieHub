@@ -28,7 +28,8 @@ def import_imdb_rating_index(input_path, *, database_path=None, apply=False, min
         raise FileNotFoundError(f"IMDb ratings snapshot does not exist: {source}")
     if min_rows < 1:
         raise ValueError("min_rows must be positive")
-    target = Path(database_path or Path(get_db_path()).with_name("imdb-ratings.sqlite3")).expanduser().resolve()
+    configured_path = os.environ.get("IMDB_RATINGS_INDEX_PATH")
+    target = Path(database_path or configured_path or Path(get_db_path()).with_name("imdb-ratings.sqlite3")).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
     with source.open("rb") as raw:

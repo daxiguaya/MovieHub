@@ -156,9 +156,9 @@ describe("MovieHub frontend workflows", () => {
       if (url.startsWith("/api/discovery/search?")) return {
         provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 3,
         items: [
-          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, imdb_rating: 6.1, imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, imdb_rating: null, imdb_rating_count: null, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, imdb_rating: 8.8, imdb_rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
+          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 9.4, rating_count: 500, imdb_rating: 6.1, imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: 8.0, rating_count: 700, imdb_rating: null, imdb_rating_count: null, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 5.2, rating_count: 900, imdb_rating: 8.8, imdb_rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
         ], attribution: "TMDB"
       };
       throw new Error(`Unexpected request: ${url}`);
@@ -172,6 +172,10 @@ describe("MovieHub frontend workflows", () => {
     const cards = Array.from(container.querySelectorAll(".movie-grid .movie-card"));
     expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
       .toEqual(["高分", "低分", "无评分"]);
+    expect(cards[0].textContent).toContain("IMDb 8.8");
+    expect(cards[0].textContent).toContain("TMDB 目录评分 5.2");
+    expect(cards[1].textContent).toContain("IMDb 6.1");
+    expect(cards[1].textContent).toContain("TMDB 目录评分 9.4");
   });
 
   it("does not expose favorite actions on online search result cards", async () => {
@@ -424,6 +428,9 @@ describe("MovieHub frontend workflows", () => {
 
     expect(await screen.findByText("搏击俱乐部")).toBeInTheDocument();
     expect(screen.getByText("一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。")).toBeInTheDocument();
+    expect(screen.getByText(/豆瓣榜单评分 8\.8/)).toBeInTheDocument();
+    expect(screen.getByText("(历史快照)")).toBeInTheDocument();
+    expect(screen.queryByText("(200,000)")).not.toBeInTheDocument();
   });
 
   it("compares historical chart snapshots and renders rank movement", async () => {
@@ -654,6 +661,8 @@ describe("MovieHub frontend workflows", () => {
     expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
     expect(screen.getByText("IMDb · 250 票")).toBeInTheDocument();
     expect(screen.getByText("★ 6.2")).toBeInTheDocument();
+    expect(screen.getByText("★ 8.4")).toBeInTheDocument();
+    expect(screen.getByText("豆瓣 · 暂无评价人数")).toBeInTheDocument();
     expect(screen.queryByText(/TMDB · ★ 7.9/)).not.toBeInTheDocument();
     expect(screen.getByText("来自 TMDB 的临时简介")).toBeInTheDocument();
     expect(screen.getByText("豆瓣导演")).toBeInTheDocument();
@@ -667,8 +676,8 @@ describe("MovieHub frontend workflows", () => {
       if (url === "/api/discovery/movie/900") return {
         provider: "tmdb", media_type: "movie", provider_id: 900,
         title: "Linked Film", original_title: "Linked Film", year: 2024,
-        rating: 7.8, rating_count: 3000, poster_path: null,
-        backdrop_path: null, genre_ids: [], overview: null, genres: [],
+        rating: 7.8, rating_count: 3000, imdb_rating: 8.1, imdb_rating_count: 4200,
+        poster_path: null, backdrop_path: null, genre_ids: [], overview: null, genres: [],
         production_countries: [], runtime: null, number_of_seasons: null,
         number_of_episodes: null, credits: {}, external_ids: { imdb_id: "tt1234567" },
         attribution: "TMDB"
@@ -688,7 +697,58 @@ describe("MovieHub frontend workflows", () => {
     );
 
     expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+    expect(screen.getByText("IMDb · 4,200 票")).toBeInTheDocument();
+    expect(screen.getByText("TMDB 目录评分 · 3,000 票")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "IMDb ↗" })).toHaveAttribute("href", "https://www.imdb.com/title/tt1234567/");
+    expect(screen.getByRole("link", { name: "TMDB ↗" })).toHaveAttribute("href", "https://www.themoviedb.org/movie/900");
     expect(fetchMock).toHaveBeenCalled();
   });
+
+  it("keeps IMDb rating filters local and TMDB page order stable when loading more", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url === "/api/discovery/regions") return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/genres")) return { provider: "tmdb", genres: [] };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      if (url.startsWith("/api/discovery/discover?")) {
+        const params = new URLSearchParams(url.split("?")[1]);
+        const page = Number(params.get("page"));
+        return {
+          provider: "tmdb", media_type: "movie", page, total_pages: 2,
+          total_results: 2,
+          items: [{
+            provider: "tmdb", provider_id: page, media_type: "movie",
+            title: page === 1 ? "First page" : "Second page",
+            original_title: null, year: 2024, rating: 7.5, rating_count: 1000,
+            imdb_rating: page === 1 ? 6.0 : 9.0,
+            imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: []
+          }],
+          attribution: "TMDB"
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?min_rating=7&min_rating_count=20000&sort=rating_desc"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect((await screen.findAllByRole("link", { name: "First page" })).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: "加载更多在线结果" }));
+
+    expect((await screen.findAllByRole("link", { name: "Second page" })).length).toBeGreaterThan(0);
+    const discoverUrls = fetchMock.mock.calls.map(([input]) => String(input))
+      .filter((url) => url.startsWith("/api/discovery/discover?"));
+    expect(discoverUrls).toHaveLength(2);
+    for (const url of discoverUrls) {
+      const params = new URLSearchParams(url.split("?")[1]);
+      expect(params.get("min_rating")).toBeNull();
+      expect(params.get("min_votes")).toBe("0");
+      expect(params.get("sort_by")).toBe("popularity.desc");
+    }
+  });
+
 
 });

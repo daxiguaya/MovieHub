@@ -126,7 +126,7 @@ Useful operator guides:
 - Database creation and schema migrations are explicit operator actions.
 - The API and frontend containers run as non-root users with read-only root filesystems, dropped Linux capabilities, `no-new-privileges`, and resource/PID limits.
 - The optional Scout import directory is mounted read-only and path/symlink boundaries are validated.
-- Protected import and favorite operations require the configured API key. Keep the key private; never commit it or expose it in public client code.
+- Protected import and favorite operations require the configured API key. The favorites UI lets the operator enter the key and stores it in that browser's localStorage for subsequent same-origin API requests; do not use this on a shared/untrusted browser, and never commit the key or hard-code it into the shipped frontend bundle.
 - Poster retrieval validates destinations and redirects to reduce SSRF risk, and validates response type/size before caching.
 - Use the documented backup/restore utility rather than copying a live SQLite database file manually.
 

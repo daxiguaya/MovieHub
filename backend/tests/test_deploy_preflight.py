@@ -129,8 +129,10 @@ class ImdbUpdaterRolloutTests(unittest.TestCase):
         script = script_path.read_text(encoding="utf-8")
         self.assertIn('cp -p "$IMDB_CONFIG_PATH" "$BACKUP_PATH/online-discovery-rollout-$STAMP/imdb-update.json"', script)
         self.assertIn('install -m 0644 "$IMDB_CONFIG_TEMPLATE" "$IMDB_CONFIG_PATH"', script)
-        self.assertIn('config["enabled"] is False', script)
-        self.assertIn('config["auto_apply"] is False', script)
+        self.assertIn('config["enabled"] is True', script)
+        self.assertIn('config["auto_apply"] is True', script)
+        self.assertIn('config["run_at"] == "00:00"', script)
+        self.assertIn('config["timezone"] == "Asia/Shanghai"', script)
 
     def test_rollout_recreates_and_checks_imdb_updater(self):
         script_path = Path(__file__).resolve().parents[2] / "deploy" / "rollout_online_discovery.sh"
@@ -138,3 +140,16 @@ class ImdbUpdaterRolloutTests(unittest.TestCase):
         self.assertIn("docker compose build moviehub moviehub-imdb-updater moviehub-web", script)
         self.assertIn("wait_running moviehub-imdb-updater", script)
         self.assertIn("docker exec moviehub-imdb-updater python", script)
+
+
+class ImdbAutoApplyConfigurationTests(unittest.TestCase):
+    def test_template_enables_daily_shanghai_auto_apply(self):
+        template_path = Path(__file__).resolve().parents[2] / "deploy" / "imdb-update.json.example"
+        import json
+        config = json.loads(template_path.read_text(encoding="utf-8"))
+        self.assertIs(config["enabled"], True)
+        self.assertIs(config["auto_apply"], True)
+        self.assertEqual(config["run_at"], "00:00")
+        self.assertEqual(config["timezone"], "Asia/Shanghai")
+        self.assertGreaterEqual(config["min_matched"], 1)
+        self.assertGreaterEqual(config["min_index_rows"], 100000)

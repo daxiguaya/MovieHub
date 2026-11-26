@@ -10,7 +10,10 @@ from scripts import imdb_update_daemon as updater
 def test_config_is_reloaded_from_mounted_json(tmp_path, monkeypatch):
     config_path = tmp_path / "imdb-update.json"
     monkeypatch.setattr(updater, "CONFIG_PATH", config_path)
-    assert updater.load_config()["enabled"] is False
+    assert updater.load_config()["enabled"] is True
+    assert updater.load_config()["auto_apply"] is True
+    assert updater.load_config()["run_at"] == "00:00"
+    assert updater.load_config()["timezone"] == "Asia/Shanghai"
 
     replacement = config_path.with_suffix(".tmp")
     replacement.write_text(json.dumps({

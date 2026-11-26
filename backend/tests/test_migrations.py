@@ -10,7 +10,7 @@ from scripts.migrate import execute_migration
 MIGRATION = (
     Path(__file__).resolve().parents[1]
     / "migrations"
-    / "004_nullable_douban_vote_count.sql"
+    / "005_imdb_ratings.sql"
 )
 
 
@@ -53,11 +53,11 @@ def test_check_only_does_not_modify_empty_database(tmp_path):
     assert not list(tmp_path.glob("*.pre-migration-*.bak"))
 
 
-def test_version_four_migration_upgrades_v2_and_is_idempotent(tmp_path):
+def test_version_five_migration_upgrades_v2_and_is_idempotent(tmp_path):
     db_path = tmp_path / "movies.db"
     _create_v2_database(db_path)
 
-    assert execute_migration(db_path, MIGRATION) == 4
+    assert execute_migration(db_path, MIGRATION) == 5
     assert execute_migration(db_path, MIGRATION) == 4
 
     conn = sqlite3.connect(str(db_path))
@@ -243,7 +243,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
     conn = sqlite3.connect(str(db_path))
     try:
         assert conn.execute(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version=3"
+            "SELECT COUNT(*) FROM schema_migrations WHERE version=4"
         ).fetchone()[0] == 1
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     finally:

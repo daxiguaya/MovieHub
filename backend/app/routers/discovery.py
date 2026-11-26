@@ -253,10 +253,17 @@ async def get_online_detail(
         include_overview=True,
     )
     imdb_id = (payload.get("external_ids") or {}).get("imdb_id")
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id:
-        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    local_movie = db.query(Movie).filter(Movie.type == media_type, identity_filter).first() if db is not None else None
+    local_movie = None
+    if db is not None:
+        local_movie = db.query(Movie).filter(
+            Movie.type == media_type,
+            Movie.tmdb_id == str(provider_id),
+        ).first()
+        if local_movie is None and imdb_id:
+            local_movie = db.query(Movie).filter(
+                Movie.type == media_type,
+                Movie.imdb_id == imdb_id,
+            ).first()
     return {
         "provider": "tmdb",
         "media_type": media_type,

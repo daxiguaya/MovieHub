@@ -180,7 +180,7 @@ async def discover_online(
     max_votes: int | None = Query(None, ge=0, le=10000000),
     sort_by: Literal["popularity.desc", "vote_average.desc", "vote_average.asc", "primary_release_date.desc", "first_air_date.desc", "vote_count.desc"] = Query("popularity.desc"),
     language: str = Query("zh-CN", min_length=2, max_length=12),
-    db: Session = Depends(get_db),
+    db: Session | None = Depends(get_optional_db),
 ) -> dict:
     params = {
         "page": page,
@@ -217,7 +217,7 @@ async def get_favorite_status(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     imdb_id: str | None = Query(None, max_length=32),
-    db: Session = Depends(get_db),
+    db: Session | None = Depends(get_optional_db),
 ) -> dict[str, bool]:
     """Check one TMDB identity against both online and linked chart favorites."""
     if provider_id < 1:
@@ -242,7 +242,7 @@ async def get_online_detail(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     language: str = Query("zh-CN", min_length=2, max_length=12),
-    db: Session = Depends(get_db),
+    db: Session | None = Depends(get_optional_db),
 ) -> dict:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")

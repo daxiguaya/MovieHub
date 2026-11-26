@@ -120,10 +120,10 @@ def add_favorite(
 
     db.commit()
 
-    # A local catalogue favorite is canonical when the movie already has a
-    # TMDB identity. Clean up that exact external key after the local commit.
-    # If cleanup fails, propagate the error; retrying this idempotent PUT will
-    # attempt the same cleanup again without duplicating the local favorite.
+    # A local catalogue favorite is canonical when its provider identities
+    # can be reconciled. Clean up after the local commit so a failed cleanup
+    # remains visible and can be retried through this idempotent PUT.
+    removed_external = False
     if movie.tmdb_id and movie.tmdb_id.isdigit():
         removed_external = provider_response_cache.delete_favorite(
             movie.type, int(movie.tmdb_id)

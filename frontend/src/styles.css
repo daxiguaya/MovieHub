@@ -326,3 +326,13 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
   font-size: 12px;
   line-height: 1.6;
 }
+
+
+/* Data-source marks are bundled locally to avoid third-party hotlink restrictions. */
+.source-logo-link { display: inline-flex; flex: 0 0 64px; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 12px; background: #f5f6f4; overflow: hidden; }
+.source-logo-link img { display: block; width: 48px; height: 48px; object-fit: contain; }
+.tmdb-source-logo img { width: 52px; height: 52px; }
+.imdb-source-logo { background: #f5c518; }
+.imdb-source-logo img { width: 54px; height: 54px; }
+.douban-source-logo { background: #00b51d; }
+.douban-source-logo img { width: 44px; height: 44px; }

@@ -295,7 +295,7 @@ SessionLocal = sessionmaker(
 def get_db() -> Generator[Session, None, None]:
     """Yield a session only after explicit database initialization."""
     db_path = Path(get_db_path())
-    if not db_path.is_file() or db_path.stat().st_size == 0:
+    if not db_path.is_file():
         raise DatabaseNotInitializedError(
             "MovieHub database is not initialized. "
             "Run 'python -m scripts.init_db' before using the API."

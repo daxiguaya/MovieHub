@@ -208,3 +208,37 @@ def test_online_detail_uses_full_imdb_index(monkeypatch):
     assert body["imdb_id"] == "tt7654321"
     assert body["imdb_rating"] == 8.1
     assert body["imdb_rating_count"] == 45678
+
+
+def test_external_favorites_refresh_imdb_ratings_from_saved_imdb_ids(monkeypatch):
+    favorites = [
+        {"snapshot": {"imdb_id": "tt0111161", "imdb_rating": None, "imdb_rating_count": None}},
+        {"snapshot": {"imdb_id": "tt0068646", "imdb_rating": 8.7, "imdb_rating_count": 1900000}},
+        {"snapshot": {"imdb_id": None, "imdb_rating": None, "imdb_rating_count": None}},
+    ]
+    monkeypatch.setattr(
+        discovery,
+        "lookup_ratings",
+        lambda ids: {"tt0111161": (9.3, 3000000), "tt0068646": (9.2, 2100000)},
+    )
+
+    result = discovery._attach_favorite_imdb_ratings(favorites)
+
+    assert result[0]["snapshot"]["imdb_rating"] == 9.3
+    assert result[0]["snapshot"]["imdb_rating_count"] == 3000000
+    assert result[1]["snapshot"]["imdb_rating"] == 9.2
+    assert result[1]["snapshot"]["imdb_rating_count"] == 2100000
+    assert result[2]["snapshot"]["imdb_rating"] is None
+    assert result[2]["snapshot"]["imdb_rating_count"] is None
+
+
+def test_external_favorites_keep_saved_rating_when_index_has_no_match(monkeypatch):
+    favorites = [
+        {"snapshot": {"imdb_id": "tt9999999", "imdb_rating": 7.2, "imdb_rating_count": 123}},
+    ]
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {})
+
+    result = discovery._attach_favorite_imdb_ratings(favorites)
+
+    assert result[0]["snapshot"]["imdb_rating"] == 7.2
+    assert result[0]["snapshot"]["imdb_rating_count"] == 123

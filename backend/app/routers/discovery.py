@@ -338,10 +338,33 @@ async def get_cache_stats(request: Request) -> dict[str, int | float]:
     return {**cache_stats, **tmdb_client.stats()}
 
 
+def _attach_favorite_imdb_ratings(favorites: list[dict]) -> list[dict]:
+    """Refresh IMDb rating fields for saved snapshots using their stable IMDb IDs."""
+    imdb_ids = [
+        snapshot.get("imdb_id")
+        for favorite in favorites
+        if isinstance((snapshot := favorite.get("snapshot")), dict)
+        and isinstance(snapshot.get("imdb_id"), str)
+    ]
+    if not imdb_ids:
+        return favorites
+
+    ratings = lookup_ratings(imdb_ids)
+    for favorite in favorites:
+        snapshot = favorite.get("snapshot")
+        if not isinstance(snapshot, dict):
+            continue
+        indexed = ratings.get(snapshot.get("imdb_id"))
+        if indexed is not None:
+            snapshot["imdb_rating"], snapshot["imdb_rating_count"] = indexed
+    return favorites
+
+
 @router.get("/favorites", dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 async def list_external_favorites(request: Request) -> list[dict]:
-    return await asyncio.to_thread(provider_response_cache.list_favorites)
+    favorites = await asyncio.to_thread(provider_response_cache.list_favorites)
+    return await asyncio.to_thread(_attach_favorite_imdb_ratings, favorites)
 
 
 @router.put("/favorites/{media_type}/{provider_id}", dependencies=[Depends(verify_api_key)])

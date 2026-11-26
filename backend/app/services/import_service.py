@@ -982,6 +982,33 @@ class ImportService:
             select(Movie).where(Movie.douban_id == douban_id)
         )
 
+        source_imdb_id = self._safe_string(row["imdb_id"])
+        if source_imdb_id and re.fullmatch(r"tt[0-9]{7,12}", source_imdb_id):
+            # Douban ID is the Scout row's primary identity, while IMDb ID is
+            # globally unique in MovieHub. Never silently reassign an IMDb ID
+            # already owned by another movie, or overwrite a different
+            # previously verified IMDb identity on the same Douban record.
+            imdb_owner = db.scalar(
+                select(Movie).where(Movie.imdb_id == source_imdb_id)
+            )
+            if imdb_owner is not None and (
+                movie is None or imdb_owner.id != movie.id
+            ):
+                raise ValueError(
+                    f"IMDb ID {source_imdb_id} is already assigned to another "
+                    f"MovieHub movie (Douban ID {imdb_owner.douban_id})"
+                )
+            if (
+                movie is not None
+                and movie.imdb_id
+                and re.fullmatch(r"tt[0-9]{7,12}", movie.imdb_id)
+                and movie.imdb_id != source_imdb_id
+            ):
+                raise ValueError(
+                    f"Incoming IMDb ID {source_imdb_id} conflicts with the "
+                    f"existing IMDb identity {movie.imdb_id} for Douban ID {douban_id}"
+                )
+
         if movie is not None and not force_full:
             source_updated_at = self._safe_int(row["update_time"])
             if (
@@ -1013,12 +1040,10 @@ class ImportService:
         if rating is not None:
             movie.rating = rating
 
-        imdb_id = self._safe_string(row["imdb_id"])
-        # Scout's IMDb field is external input. Only accept canonical title IDs;
-        # a URL, malformed value, or unrelated text must never overwrite a
-        # previously verified IMDb identity.
-        if imdb_id and re.fullmatch(r"tt[0-9]{7,12}", imdb_id):
-            movie.imdb_id = imdb_id
+        # The source identity was checked against existing local ownership
+        # above before any movie fields were mutated.
+        if source_imdb_id and re.fullmatch(r"tt[0-9]{7,12}", source_imdb_id):
+            movie.imdb_id = source_imdb_id
 
         update_time = self._safe_int(row["update_time"])
         if update_time is not None:

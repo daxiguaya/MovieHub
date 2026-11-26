@@ -173,9 +173,9 @@ describe("MovieHub frontend workflows", () => {
     expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
       .toEqual(["高分", "低分", "无评分"]);
     expect(cards[0].textContent).toContain("IMDb 8.8");
-    expect(cards[0].textContent).toContain("TMDB 目录评分 5.2");
+    expect(cards[0].textContent).not.toContain("TMDB 目录评分");
     expect(cards[1].textContent).toContain("IMDb 6.1");
-    expect(cards[1].textContent).toContain("TMDB 目录评分 9.4");
+    expect(cards[1].textContent).not.toContain("TMDB 目录评分");
   });
 
   it("does not expose favorite actions on online search result cards", async () => {
@@ -698,7 +698,7 @@ describe("MovieHub frontend workflows", () => {
 
     expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
     expect(screen.getByText("IMDb · 4,200 票")).toBeInTheDocument();
-    expect(screen.getByText("TMDB 目录评分 · 3,000 票")).toBeInTheDocument();
+    expect(screen.queryByText(/TMDB 目录评分/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "IMDb ↗" })).toHaveAttribute("href", "https://www.imdb.com/title/tt1234567/");
     expect(screen.getByRole("link", { name: "TMDB ↗" })).toHaveAttribute("href", "https://www.themoviedb.org/movie/900");
     expect(fetchMock).toHaveBeenCalled();

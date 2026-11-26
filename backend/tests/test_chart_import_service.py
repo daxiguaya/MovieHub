@@ -558,7 +558,7 @@ def test_chart_import_validates_imdb_ids_and_ignores_invalid_raw_values():
                 douban_id="130001",
                 rank=1,
                 title="Invalid IMDb identity",
-                imdb_id="https://www.imdb.com/title/tt0111161/",
+                imdb_id="tt12x4567",
             )
 
         raw_snapshot = {

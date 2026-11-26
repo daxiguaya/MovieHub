@@ -671,8 +671,8 @@ describe("MovieHub frontend workflows", () => {
       if (url === "/api/discovery/movie/900") return {
         provider: "tmdb", media_type: "movie", provider_id: 900,
         title: "Linked Film", original_title: "Linked Film", year: 2024,
-        rating: 7.8, rating_count: 3000, poster_path: null,
-        backdrop_path: null, genre_ids: [], overview: null, genres: [],
+        rating: 7.8, rating_count: 3000, imdb_rating: 8.1, imdb_rating_count: 4200,
+        poster_path: null, backdrop_path: null, genre_ids: [], overview: null, genres: [],
         production_countries: [], runtime: null, number_of_seasons: null,
         number_of_episodes: null, credits: {}, external_ids: { imdb_id: "tt1234567" },
         attribution: "TMDB"
@@ -692,6 +692,10 @@ describe("MovieHub frontend workflows", () => {
     );
 
     expect(await screen.findByRole("button", { name: "♥ 已收藏" })).toBeInTheDocument();
+    expect(screen.getByText("IMDb · 4,200 票")).toBeInTheDocument();
+    expect(screen.getByText("TMDB 目录评分 · 3,000 票")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "IMDb ↗" })).toHaveAttribute("href", "https://www.imdb.com/title/tt1234567/");
+    expect(screen.getByRole("link", { name: "TMDB ↗" })).toHaveAttribute("href", "https://www.themoviedb.org/movie/900");
     expect(fetchMock).toHaveBeenCalled();
   });
 

@@ -7,7 +7,8 @@ import unicodedata
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -16,6 +17,7 @@ from app.database import Favorite, Movie, MovieGenre, MovieRegion, get_db
 from app.dependencies.auth import verify_api_key
 from app.limiter import limiter
 from app.schemas import FavoriteResponse, FavoriteUpsert, MovieResponse
+from app.services.imdb_ids import is_valid_imdb_id
 from app.services.imdb_rating_index import lookup_ratings
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, tmdb_client
@@ -173,6 +175,13 @@ class ExternalFavoriteSnapshot(BaseModel):
     imdb_id: str | None = Field(default=None, max_length=32)
     directors: list[str] = Field(default_factory=list, max_length=20)
 
+    @field_validator("imdb_id")
+    @classmethod
+    def validate_imdb_id(cls, value: str | None) -> str | None:
+        if value is not None and not is_valid_imdb_id(value):
+            raise ValueError("IMDb ID must be a valid title ID (tt followed by 7 to 12 digits)")
+        return value
+
 
 class ExternalFavoritePayload(BaseModel):
     snapshot: ExternalFavoriteSnapshot
@@ -194,6 +203,8 @@ def _linked_chart_movie(
     year: int | None = None,
     directors: list[str] | None = None,
 ) -> Movie | None:
+    if not is_valid_imdb_id(imdb_id):
+        imdb_id = None
     identity_filter = Movie.tmdb_id == str(provider_id)
     if imdb_id:
         identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
@@ -248,8 +259,13 @@ async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
     """Resolve missing IMDb IDs and attach ratings before the UI reads favorites."""
     async def resolve_one(favorite: dict) -> None:
         snapshot = favorite.get("snapshot")
-        if not isinstance(snapshot, dict) or snapshot.get("imdb_id"):
+        if not isinstance(snapshot, dict):
             return
+        saved_imdb_id = snapshot.get("imdb_id")
+        if is_valid_imdb_id(saved_imdb_id):
+            return
+        if saved_imdb_id is not None:
+            snapshot["imdb_id"] = None
         media_type = favorite.get("media_type")
         provider_id = favorite.get("provider_id")
         if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
@@ -259,7 +275,7 @@ async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
                 f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
             )
             imdb_id = (external or {}).get("imdb_id")
-            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+            if is_valid_imdb_id(imdb_id):
                 snapshot["imdb_id"] = imdb_id
         except Exception as exc:
             logger.info(
@@ -272,7 +288,7 @@ async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
         snapshot.get("imdb_id")
         for favorite in favorites
         if isinstance((snapshot := favorite.get("snapshot")), dict)
-        and isinstance(snapshot.get("imdb_id"), str)
+        and is_valid_imdb_id(snapshot.get("imdb_id"))
     ]
     ratings = await asyncio.to_thread(lookup_ratings, imdb_ids) if imdb_ids else {}
     for favorite in favorites:

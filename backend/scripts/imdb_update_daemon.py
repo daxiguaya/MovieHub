@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 
 from app.database import get_db_path
 from scripts.import_imdb_ratings import IMDB_RATINGS_URL, import_imdb_ratings
+from scripts.import_imdb_rating_index import import_imdb_rating_index
 
 CONFIG_PATH = Path(os.environ.get("IMDB_UPDATE_CONFIG", "/config/imdb-update.json"))
 STATE_PATH = Path(os.environ.get("IMDB_UPDATE_STATE", "/state/state.json"))
@@ -34,6 +35,7 @@ def load_config() -> dict:
         "timezone": "Asia/Singapore",
         "auto_apply": False,
         "min_matched": 10,
+        "min_index_rows": 100000,
         "backup_keep": 7,
         "retry_minutes": 15,
     }
@@ -49,8 +51,8 @@ def load_config() -> dict:
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise ValueError("run_at must use HH:MM")
     ZoneInfo(config["timezone"])
-    if int(config["min_matched"]) < 1 or int(config["backup_keep"]) < 1:
-        raise ValueError("min_matched and backup_keep must be positive")
+    if int(config["min_matched"]) < 1 or int(config["min_index_rows"]) < 1 or int(config["backup_keep"]) < 1:
+        raise ValueError("min_matched, min_index_rows and backup_keep must be positive")
     return config
 
 
@@ -126,12 +128,16 @@ def run_update(config: dict, state: dict, today: date) -> dict:
             if not saved_snapshot.is_file():
                 saved_snapshot, saved_hash = download_snapshot()
                 state["dataset_sha256"] = saved_hash
-            dry_run = import_imdb_ratings(saved_snapshot, apply=False)
-            if not dry_run.get("valid") or int(dry_run.get("matched", 0)) < int(config["min_matched"]):
-                raise RuntimeError(f"IMDb dry-run quality gate failed before deferred apply: {dry_run}")
-            applied = import_imdb_ratings(saved_snapshot, apply=True)
+            local_dry_run = import_imdb_ratings(saved_snapshot, apply=False)
+            index_dry_run = import_imdb_rating_index(saved_snapshot, apply=False, min_rows=int(config["min_index_rows"]))
+            if not local_dry_run.get("valid") or int(local_dry_run.get("matched", 0)) < int(config["min_matched"]):
+                raise RuntimeError(f"Local IMDb ratings quality gate failed before deferred apply: {local_dry_run}")
+            if not index_dry_run.get("valid") or int(index_dry_run.get("indexed_titles", 0)) < int(config["min_index_rows"]):
+                raise RuntimeError(f"Full IMDb index quality gate failed before deferred apply: {index_dry_run}")
+            applied_index = import_imdb_rating_index(saved_snapshot, apply=True, min_rows=int(config["min_index_rows"]))
+            applied_local = import_imdb_ratings(saved_snapshot, apply=True)
             prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
-            result = {"status": "applied", "dry_run": dry_run, "applied_result": applied}
+            result = {"status": "applied", "dry_run": {"local": local_dry_run, "full_index": index_dry_run}, "applied_result": {"local": applied_local, "full_index": applied_index}}
         elif previous_result.get("status") == "dry_run_only":
             result = {
                 "status": "dry_run_only",
@@ -154,13 +160,18 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         state["last_success_at"] = datetime.now().astimezone().isoformat()
         write_state(state)
         return result
-    dry_run = import_imdb_ratings(snapshot, apply=False)
-    if not dry_run.get("valid") or int(dry_run.get("matched", 0)) < int(config["min_matched"]):
-        raise RuntimeError(f"IMDb dry-run quality gate failed: {dry_run}")
+    local_dry_run = import_imdb_ratings(snapshot, apply=False)
+    index_dry_run = import_imdb_rating_index(snapshot, apply=False, min_rows=int(config["min_index_rows"]))
+    if not local_dry_run.get("valid") or int(local_dry_run.get("matched", 0)) < int(config["min_matched"]):
+        raise RuntimeError(f"Local IMDb ratings quality gate failed: {local_dry_run}")
+    if not index_dry_run.get("valid") or int(index_dry_run.get("indexed_titles", 0)) < int(config["min_index_rows"]):
+        raise RuntimeError(f"Full IMDb index quality gate failed: {index_dry_run}")
+    dry_run = {"local": local_dry_run, "full_index": index_dry_run}
     result = {"status": "dry_run_only", "dry_run": dry_run}
     if config["auto_apply"]:
-        applied = import_imdb_ratings(snapshot, apply=True)
-        result = {"status": "applied", "dry_run": dry_run, "applied_result": applied}
+        applied_index = import_imdb_rating_index(snapshot, apply=True, min_rows=int(config["min_index_rows"]))
+        applied_local = import_imdb_ratings(snapshot, apply=True)
+        result = {"status": "applied", "dry_run": dry_run, "applied_result": {"local": applied_local, "full_index": applied_index}}
         prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
 
     state["dataset_fingerprint"] = fingerprint or content_hash

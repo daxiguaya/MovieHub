@@ -14,6 +14,7 @@ from app.limiter import limiter
 from app.dependencies.auth import verify_api_key
 from app.services.provider_cache import provider_response_cache
 from app.services.tmdb_client import DETAIL_TTL, GENRE_TTL, SEARCH_TTL, tmdb_client
+from app.services.imdb_rating_index import lookup_ratings
 
 def get_optional_db():
     """Provide local rating lookup when the private MovieHub DB is initialized."""
@@ -96,8 +97,42 @@ def _attach_local_imdb_ratings(db: Session | None, items: list[dict]) -> list[di
     by_identity = {(movie.type, movie.tmdb_id): movie for movie in local_movies if movie.tmdb_id}
     for item in items:
         movie = by_identity.get((item.get("media_type"), str(item.get("provider_id"))))
+        item["imdb_id"] = movie.imdb_id if movie else None
         item["imdb_rating"] = movie.imdb_rating if movie else None
         item["imdb_rating_count"] = movie.imdb_rating_count if movie else None
+    return items
+
+
+async def _attach_imdb_ratings(db: Session | None, items: list[dict]) -> list[dict]:
+    """Resolve TMDB identities to IMDb IDs, then query the complete local index."""
+    _attach_local_imdb_ratings(db, items)
+
+    async def resolve_external_id(item: dict) -> None:
+        if item.get("imdb_id"):
+            return
+        media_type = item.get("media_type")
+        provider_id = item.get("provider_id")
+        if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
+            return
+        try:
+            external = await tmdb_client.get_json(
+                f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
+            )
+            imdb_id = (external or {}).get("imdb_id")
+            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+                item["imdb_id"] = imdb_id
+        except Exception as exc:
+            # A failed enrichment must not turn a successful TMDB search into an error.
+            logger.info("IMDb ID enrichment unavailable for TMDB %s/%s: %s", media_type, provider_id, type(exc).__name__)
+
+    await asyncio.gather(*(resolve_external_id(item) for item in items))
+    rating_by_id = await asyncio.to_thread(
+        lookup_ratings, [item.get("imdb_id") for item in items if item.get("imdb_id")]
+    )
+    for item in items:
+        indexed = rating_by_id.get(item.get("imdb_id"))
+        if indexed is not None:
+            item["imdb_rating"], item["imdb_rating_count"] = indexed
     return items
 @router.get("/search")
 @limiter.limit("30/minute")
@@ -125,7 +160,7 @@ async def search_online(
         if kind not in ("movie", "tv") or not isinstance(item.get("id"), int):
             continue
         results.append(_normalize_result(item, kind))
-    _attach_local_imdb_ratings(db, results)
+    await _attach_imdb_ratings(db, results)
     return {
         "provider": "tmdb",
         "query": query,
@@ -266,12 +301,14 @@ async def get_online_detail(
                 Movie.type == media_type,
                 Movie.imdb_id == imdb_id,
             ).first()
+    indexed_rating = (await asyncio.to_thread(lookup_ratings, [imdb_id])).get(imdb_id) if imdb_id else None
     return {
         "provider": "tmdb",
         "media_type": media_type,
         "provider_id": provider_id,
-        "imdb_rating": local_movie.imdb_rating if local_movie else None,
-        "imdb_rating_count": local_movie.imdb_rating_count if local_movie else None,
+        "imdb_id": imdb_id,
+        "imdb_rating": indexed_rating[0] if indexed_rating else (local_movie.imdb_rating if local_movie else None),
+        "imdb_rating_count": indexed_rating[1] if indexed_rating else (local_movie.imdb_rating_count if local_movie else None),
         "title": payload.get("title") or payload.get("name"),
         "original_title": payload.get("original_title") or payload.get("original_name"),
         "year": int((payload.get("release_date") or payload.get("first_air_date") or "")[:4]) if (payload.get("release_date") or payload.get("first_air_date") or "")[:4].isdigit() else None,

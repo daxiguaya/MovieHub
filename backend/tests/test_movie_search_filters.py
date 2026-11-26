@@ -16,6 +16,15 @@ def test_combined_search_filters_apply_all_constraints(tmp_path, monkeypatch):
         connect_args={"check_same_thread": False},
     )
     database.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations "
+            "(version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO schema_migrations (version, name, applied_at) "
+            "VALUES (5, 'test-fixture', '2026-11-26T00:00:00')"
+        )
     TargetSession = sessionmaker(bind=engine, expire_on_commit=False)
 
     monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))

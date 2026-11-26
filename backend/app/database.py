@@ -50,10 +50,11 @@ def get_database_url() -> str:
 def database_is_ready(path: str | Path | None = None) -> bool:
     """Check the required schema through a read-only SQLite connection."""
     database_path = Path(path or get_db_path()).expanduser().resolve()
-    if not database_path.is_file() or database_path.stat().st_size == 0:
-        return False
 
     try:
+        if not database_path.is_file() or database_path.stat().st_size == 0:
+            return False
+
         connection = sqlite3.connect(
             database_path.as_uri() + "?mode=ro",
             uri=True,
@@ -298,6 +299,13 @@ def get_db() -> Generator[Session, None, None]:
         raise DatabaseNotInitializedError(
             "MovieHub database is not initialized. "
             "Run 'python -m scripts.init_db' before using the API."
+        )
+    if not database_is_ready(db_path):
+        raise DatabaseNotInitializedError(
+            f"MovieHub database schema is not ready (expected version "
+            f"{CURRENT_SCHEMA_VERSION}). Verify that this is the MovieHub "
+            "database, take a verified backup, then run "
+            "'python -m scripts.migrate' before using data APIs."
         )
 
     db = SessionLocal()

@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ENV_FILE = ROOT / ".env"
 COMPOSE_FILE = ROOT / "docker-compose.yml"
 EXPECTED_NETWORK = "nginx-proxy-manager_default"
-EXPECTED_CONTAINERS = {"moviehub-backend", "moviehub-web"}
+EXPECTED_CONTAINERS = {"moviehub-backend", "moviehub-imdb-updater", "moviehub-web"}
 
 
 def run(args: list[str]) -> subprocess.CompletedProcess[str]:
@@ -172,7 +172,7 @@ def main() -> int:
         try:
             rendered = json.loads(compose_config.stdout)
             services = rendered.get("services", {})
-            for service_name in ("moviehub", "moviehub-web"):
+            for service_name in ("moviehub", "moviehub-imdb-updater", "moviehub-web"):
                 service = services.get(service_name)
                 if service is None:
                     errors.append(f"Compose service is missing: {service_name}")
@@ -181,7 +181,7 @@ def main() -> int:
                 elif not service.get("read_only"):
                     errors.append(f"{service_name} must use a read-only root filesystem.")
             if not errors:
-                print("[OK] Compose config validates; both app services have no published host ports and use read-only roots.")
+                print("[OK] Compose config validates; all three MovieHub services have no published host ports and use read-only roots.")
         except (json.JSONDecodeError, AttributeError) as exc:
             errors.append(f"Cannot inspect rendered Compose configuration: {exc}")
 

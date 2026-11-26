@@ -150,6 +150,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
                 applied_index = import_imdb_rating_index(saved_snapshot, apply=True, min_rows=int(config["min_index_rows"]))
                 applied_local = import_imdb_ratings(saved_snapshot, apply=True)
                 prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
+                prune_index_backups(index_path, int(config["backup_keep"]))
                 result = {"status": "applied", "dry_run": dry_run, "applied_result": {"local": applied_local, "full_index": applied_index}}
             else:
                 result = {"status": "dry_run_only", "dataset_unchanged": True, "dry_run": dry_run}
@@ -188,6 +189,7 @@ def run_update(config: dict, state: dict, today: date) -> dict:
         applied_local = import_imdb_ratings(snapshot, apply=True)
         result = {"status": "applied", "dry_run": dry_run, "applied_result": {"local": applied_local, "full_index": applied_index}}
         prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
+        prune_index_backups(Path(get_db_path()).resolve().with_name("imdb-ratings.sqlite3"), int(config["backup_keep"]))
 
     state["dataset_fingerprint"] = fingerprint or content_hash
     state["dataset_sha256"] = content_hash

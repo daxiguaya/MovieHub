@@ -156,9 +156,9 @@ describe("MovieHub frontend workflows", () => {
       if (url.startsWith("/api/discovery/search?")) return {
         provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 3,
         items: [
-          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, imdb_rating: 6.1, imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, imdb_rating: null, imdb_rating_count: null, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, imdb_rating: 8.8, imdb_rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
+          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 9.4, rating_count: 500, imdb_rating: 6.1, imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: 8.0, rating_count: 700, imdb_rating: null, imdb_rating_count: null, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 5.2, rating_count: 900, imdb_rating: 8.8, imdb_rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
         ], attribution: "TMDB"
       };
       throw new Error(`Unexpected request: ${url}`);

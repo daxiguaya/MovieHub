@@ -34,8 +34,8 @@ MAX_RATING = 10.0
 MAX_PAGE_SIZE = 50
 
 SORT_COLUMNS = {
-    "rating": Movie.rating,
-    "rating_count": Movie.rating_count,
+    "rating": Movie.imdb_rating,
+    "rating_count": Movie.imdb_rating_count,
     "year": Movie.year,
 }
 
@@ -439,7 +439,7 @@ class MovieService:
 
         if min_rating_count is not None:
             query = query.filter(
-                Movie.rating_count >= min_rating_count
+                Movie.imdb_rating_count >= min_rating_count
             )
 
         query = self._apply_rating_range(
@@ -512,8 +512,8 @@ class MovieService:
 
         if effective_min > 0:
             query = query.filter(
-                Movie.rating.isnot(None),
-                Movie.rating.between(
+                Movie.imdb_rating.isnot(None),
+                Movie.imdb_rating.between(
                     effective_min,
                     effective_max,
                 ),
@@ -524,7 +524,7 @@ class MovieService:
                 (
                     Movie.rating.between(0, effective_max)
                 )
-                | Movie.rating.is_(None)
+                | Movie.imdb_rating.is_(None)
             )
 
         return query
@@ -683,7 +683,7 @@ class MovieService:
         )
 
         average = (
-            db.query(func.avg(Movie.rating))
+            db.query(func.avg(Movie.imdb_rating))
             .scalar()
             or 0.0
         )

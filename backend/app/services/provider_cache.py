@@ -6,6 +6,7 @@ be discarded and rebuilt without affecting favorites or chart snapshots.
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from contextlib import contextmanager
 import json
 import logging
@@ -251,9 +252,33 @@ class ProviderResponseCache:
                  "snapshot": json.loads(row[2]), "note": row[3], "created_at": row[4], "updated_at": row[5]}
                 for row in rows]
 
-    def delete_favorite_by_imdb(self, media_type: str, imdb_id: str) -> bool:
-        if not imdb_id or len(imdb_id) > 32:
+    def delete_favorite_by_imdb(
+        self,
+        media_type: str,
+        imdb_id: str,
+        title: str,
+        original_title: str | None = None,
+        year: int | None = None,
+    ) -> bool:
+        """Delete only IMDb-linked snapshots whose title and year also agree.
+
+        IMDb IDs are cross-provider links, not the external-favorite primary
+        key. Require corroborating catalogue metadata before removing a
+        potentially mis-mapped TMDB favorite.
+        """
+        if not imdb_id or len(imdb_id) > 32 or not title or year is None:
             return False
+
+        def normalize(value: str | None) -> str:
+            normalized = unicodedata.normalize("NFKC", value or "").casefold()
+            return "".join(char for char in normalized if char.isalnum())
+
+        local_titles = {
+            normalize(value) for value in (title, original_title) if normalize(value)
+        }
+        if not local_titles:
+            return False
+
         self._init()
         with self._lock, self._connection() as connection:
             rows = connection.execute(
@@ -267,7 +292,15 @@ class ProviderResponseCache:
                     snapshot = json.loads(snapshot_json)
                 except (TypeError, json.JSONDecodeError):
                     continue
-                if isinstance(snapshot, dict) and snapshot.get("imdb_id") == imdb_id:
+                if not isinstance(snapshot, dict) or snapshot.get("imdb_id") != imdb_id:
+                    continue
+                if snapshot.get("year") != year:
+                    continue
+                snapshot_titles = {
+                    normalize(snapshot.get("title")),
+                    normalize(snapshot.get("original_title")),
+                } - {""}
+                if local_titles.intersection(snapshot_titles):
                     matching_ids.append(int(provider_id))
             for provider_id in matching_ids:
                 connection.execute(

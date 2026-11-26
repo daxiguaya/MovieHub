@@ -1343,3 +1343,54 @@ def test_batch_receipt_and_movie_rows_roll_back_in_the_same_transaction(tmp_path
                 committed_at="2026-11-23T00:00:01",
             ))
     engine.dispose()
+
+
+
+def test_scout_import_does_not_overwrite_valid_imdb_id_with_malformed_source_value(
+    tmp_path,
+    monkeypatch,
+):
+    source_path = tmp_path / "scout-invalid-imdb-id.sqlite"
+    target_path = tmp_path / "moviehub-invalid-imdb-id.sqlite"
+    _create_scout_fixture(source_path)
+    with sqlite3.connect(source_path) as source:
+        source.execute(
+            "UPDATE item SET imdb_id = ?, update_time = ? WHERE douban_id = ?",
+            ("https://www.imdb.com/title/tt7654321/", 1791000000, "1234567"),
+        )
+
+    engine = create_engine(
+        f"sqlite:///{target_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(engine)
+    TargetSession = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+    with TargetSession() as db:
+        db.add(Movie(
+            douban_id="1234567",
+            imdb_id="tt0111161",
+            title="Existing verified identity",
+            type="movie",
+        ))
+        db.commit()
+
+    monkeypatch.setattr(import_service_module, "SessionLocal", TargetSession)
+    monkeypatch.setattr(import_service_module.cache_manager, "clear", lambda: None)
+    service = import_service_module.ImportService()
+    assert service._run_lock.acquire(blocking=False)
+    try:
+        service._run_import(source_path, force_full=True)
+        assert service.status.status == "completed"
+    finally:
+        if service._run_lock.locked():
+            service._run_lock.release()
+
+    with TargetSession() as db:
+        movie = db.scalar(select(Movie).where(Movie.douban_id == "1234567"))
+        assert movie.imdb_id == "tt0111161"
+
+    engine.dispose()

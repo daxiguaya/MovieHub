@@ -156,9 +156,9 @@ describe("MovieHub frontend workflows", () => {
       if (url.startsWith("/api/discovery/search?")) return {
         provider: "tmdb", query: "测试", page: 1, total_pages: 1, total_results: 3,
         items: [
-          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, poster_path: null, backdrop_path: null, genre_ids: [] },
-          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
+          { provider: "tmdb", provider_id: 1, media_type: "movie", title: "低分", original_title: null, year: 2020, rating: 6.1, rating_count: 500, imdb_rating: 6.1, imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 2, media_type: "movie", title: "无评分", original_title: null, year: 2021, rating: null, rating_count: 0, imdb_rating: null, imdb_rating_count: null, poster_path: null, backdrop_path: null, genre_ids: [] },
+          { provider: "tmdb", provider_id: 3, media_type: "movie", title: "高分", original_title: null, year: 2022, rating: 8.8, rating_count: 900, imdb_rating: 8.8, imdb_rating_count: 900, poster_path: null, backdrop_path: null, genre_ids: [] }
         ], attribution: "TMDB"
       };
       throw new Error(`Unexpected request: ${url}`);
@@ -296,7 +296,7 @@ describe("MovieHub frontend workflows", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("肖申克的救赎")).toHaveLength(1);
-      expect(screen.getByText(/本地榜单收录 · 豆瓣 9.7/)).toBeInTheDocument();
+      expect(screen.getByText("本地榜单匹配")).toBeInTheDocument();
     });
   });
 
@@ -344,7 +344,7 @@ describe("MovieHub frontend workflows", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("同名电影")).toHaveLength(2);
-      expect(screen.getAllByText(/本地榜单收录/)).toHaveLength(2);
+      expect(screen.getAllByText(/本地榜单/)).toHaveLength(1);
     });
   });
 
@@ -629,7 +629,8 @@ describe("MovieHub frontend workflows", () => {
       if (url === "/api/movies/id/42") return {
         id: 42, douban_id: "12345", tmdb_id: "900", imdb_id: "tt1234567",
         title: "年度影片", original_title: "Annual Film", year: null,
-        rating: 8.4, rating_count: null, type: "movie", genres: [], regions: [],
+        rating: 8.4, rating_count: null, imdb_rating: 6.2, imdb_rating_count: 250,
+        type: "movie", genres: [], regions: [],
         updated_at: null, directors: ["豆瓣导演"], actors: [], overview: null,
         douban_url: null, posters: [],
         tmdb_metadata: {
@@ -651,8 +652,9 @@ describe("MovieHub frontend workflows", () => {
 
     await screen.findByRole("heading", { name: "年度影片" });
     expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
-    expect(screen.getByText("豆瓣 · 暂无评价人数")).toBeInTheDocument();
-    expect(screen.getByText(/TMDB · ★ 7.9 · 2,500 票/)).toBeInTheDocument();
+    expect(screen.getByText("IMDb · 250 票")).toBeInTheDocument();
+    expect(screen.getByText("★ 6.2")).toBeInTheDocument();
+    expect(screen.queryByText(/TMDB · ★ 7.9/)).not.toBeInTheDocument();
     expect(screen.getByText("来自 TMDB 的临时简介")).toBeInTheDocument();
     expect(screen.getByText("豆瓣导演")).toBeInTheDocument();
     expect(screen.getByText("TMDB Actor")).toBeInTheDocument();

@@ -68,9 +68,12 @@ python -m pip install -r requirements.txt pytest
 python -m pytest -q
 ```
 
-To run the API locally, initialize a **new local development database** explicitly before starting the server:
+To run the API locally, point it at a dedicated development data directory and initialize a **new local development database** explicitly before starting the server:
 
 ```sh
+export MOVIEHUB_DATA_DIR="$PWD/.data"
+export MOVIEHUB_BACKUP_DIR="$PWD/.backups"
+mkdir -p "$MOVIEHUB_DATA_DIR" "$MOVIEHUB_BACKUP_DIR"
 python -m scripts.init_db
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```

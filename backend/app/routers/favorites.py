@@ -127,15 +127,23 @@ def add_favorite(
     if movie.tmdb_id and movie.tmdb_id.isdigit():
         removed_external = provider_response_cache.delete_favorite(
             movie.type, int(movie.tmdb_id)
-        )
-        if removed_external:
-            try:
-                provider_response_cache.backup_daily(
-                    settings.backup_dir / "discovery", 7, True
-                )
-            except Exception:
-                # The favorite operation has committed; backup refresh is best effort.
-                pass
+        ) or removed_external
+    if movie.imdb_id:
+        removed_external = provider_response_cache.delete_favorite_by_imdb(
+            movie.type,
+            movie.imdb_id,
+            movie.title,
+            movie.original_title,
+            movie.year,
+        ) or removed_external
+    if removed_external:
+        try:
+            provider_response_cache.backup_daily(
+                settings.backup_dir / "discovery", 7, True
+            )
+        except Exception:
+            # The favorite operation has committed; backup refresh is best effort.
+            pass
 
     db.refresh(favorite)
     favorite.movie = movie

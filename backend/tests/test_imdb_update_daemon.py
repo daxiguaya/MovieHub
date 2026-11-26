@@ -84,7 +84,7 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
     calls = []
     def fake_import(path, apply=False, min_rows=100000):
         calls.append(apply)
-        return {"valid": True, "matched": 12, "changed": 2, "applied": apply}
+        return {"valid": True, "matched": 12, "indexed_titles": 12, "changed": 2, "applied": apply}
     monkeypatch.setattr(updater, "import_imdb_ratings", fake_import)
     monkeypatch.setattr(updater, "import_imdb_rating_index", fake_import)
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
@@ -100,3 +100,35 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
     )
     assert result["status"] == "applied"
     assert calls == [False, False, True, True]
+
+
+
+def test_old_dry_run_state_builds_missing_full_index_without_new_etag(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    (snapshot_dir / "title.ratings.tsv.gz").write_bytes(b"cached snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(("local", apply)) or {"valid": True, "matched": 263}
+    ))
+    monkeypatch.setattr(updater, "import_imdb_rating_index", lambda path, apply=False, min_rows=100000: (
+        calls.append(("index", apply)) or {"valid": True, "indexed_titles": 1500000}
+    ))
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "last_result": {"status": "dry_run_only", "dry_run": {"matched": 263}},
+    }
+    result = updater.run_update(
+        {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+        state,
+        date(2026, 11, 27),
+    )
+    assert result["status"] == "dry_run_only"
+    assert result["dry_run"]["full_index"]["indexed_titles"] == 1500000
+    assert calls == [("local", False), ("index", False)]

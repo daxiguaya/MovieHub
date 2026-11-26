@@ -117,6 +117,50 @@ and field-level provenance in one transaction, and leaves the source file
 untouched. Re-running the same dataset is idempotent for provenance.
 
 
+## Complete IMDb ratings index for online search
+
+The local-catalogue importer above updates only movies that already have an
+IMDb ID in the MovieHub catalogue. Online TMDB search can return titles that
+are not present in any local chart, so MovieHub also maintains a separate
+full-snapshot index at `/data/db/imdb-ratings.sqlite3`. This index contains
+all rated IMDb title IDs from the official `title.ratings.tsv.gz` snapshot;
+it does not add those titles to the local chart catalogue or change Douban
+ratings.
+
+Build a read-only preview first:
+
+```sh
+cd /volume1/docker/moviehub
+docker compose run --rm --no-deps moviehub python -m scripts.import_imdb_rating_index --input /data/imdb-imports/title.ratings.tsv.gz
+```
+
+The preview streams the complete snapshot into a temporary SQLite database,
+validates IMDb IDs, rating and vote-count ranges, duplicate IDs, the row-count
+quality gate (100,000 by default), and SQLite integrity. It does not publish
+or replace the active index. After reviewing the result, publish it atomically:
+
+```sh
+cd /volume1/docker/moviehub
+docker compose run --rm --no-deps moviehub python -m scripts.import_imdb_rating_index --input /data/imdb-imports/title.ratings.tsv.gz --apply
+```
+
+The importer stages and verifies a new index before atomically replacing the
+active file. If an index already exists, it creates and verifies a timestamped
+backup first. The main MovieHub database schema is unchanged by this index.
+
+For online search and Discover results, MovieHub resolves each TMDB result's
+exact IMDb title ID through TMDB's `external_ids` endpoint, then reads the
+IMDb rating and vote count from this index. TMDB external-ID responses use the
+existing persistent provider-response cache. There is no title-name fuzzy
+matching, and TMDB vote averages are never presented as IMDb ratings. A result
+without a valid IMDb ID or without an IMDb rating remains unrated. Online detail
+pages use the same index and exact IMDb identity.
+
+The complete source dataset and derived index remain private and are subject
+to IMDb's personal, non-commercial-use restrictions above. Do not publish or
+share either file or a service backed by them.
+
+
 ## Optional Docker-managed daily updater
 
 The Compose stack includes an isolated `moviehub-imdb-updater` service. It shares
@@ -135,12 +179,14 @@ cd /volume1/docker/moviehub
 mkdir -p config
 cp -n deploy/imdb-update.json.example config/imdb-update.json
 # Add this line once to .env:
-MOVIEHUB_IMDB_CONFIG_PATH=/volume1/docker/moviehub/config/imdb-update.json
+MOVIEHUB_IMDB_CONFIG_DIR=/volume1/docker/moviehub/config
 ```
 
-The file is mounted read-only inside the updater and re-read every 30 seconds,
-so editing it does not require rebuilding or recreating the container. The safe
-defaults are disabled and dry-run-only:
+The entire directory is mounted read-only inside the updater (not a single file),
+and the daemon re-reads the JSON every 30 seconds. You can atomically replace
+`config/imdb-update.json` without leaving the container attached to an old
+inode; no image rebuild or container recreation is required. The safe defaults
+are disabled and dry-run-only:
 
 ```json
 {
@@ -149,6 +195,7 @@ defaults are disabled and dry-run-only:
   "timezone": "Asia/Singapore",
   "auto_apply": false,
   "min_matched": 10,
+  "min_index_rows": 100000,
   "backup_keep": 7,
   "retry_minutes": 15
 }
@@ -166,7 +213,11 @@ renamed before import.
 
 The updater state and latest result are written under the existing writable
 MovieHub data volume at `/data/imdb-update-state/state.json` (host-side
-`data/imdb-update-state/state.json`). Logs are available with
+`data/imdb-update-state/state.json`). On a changed snapshot, the updater
+quality-checks both local catalogue ratings and the full IMDb index; when
+`auto_apply` is enabled, it refreshes both. It also detects older updater state
+or a missing full index and can build the index from the saved snapshot even
+when IMDb's ETag has not changed. Logs are available with
 `docker compose logs -f moviehub-imdb-updater`. The updater holds a process
 lock to prevent overlapping instances. Backup retention applies only to the
 IMDb importer backup filename pattern; it does not remove migration or general

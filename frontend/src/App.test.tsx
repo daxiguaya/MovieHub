@@ -172,6 +172,10 @@ describe("MovieHub frontend workflows", () => {
     const cards = Array.from(container.querySelectorAll(".movie-grid .movie-card"));
     expect(cards.map((card) => card.querySelector(".movie-title")?.textContent))
       .toEqual(["高分", "低分", "无评分"]);
+    expect(cards[0].textContent).toContain("IMDb 8.8");
+    expect(cards[0].textContent).toContain("TMDB 目录评分 5.2");
+    expect(cards[1].textContent).toContain("IMDb 6.1");
+    expect(cards[1].textContent).toContain("TMDB 目录评分 9.4");
   });
 
   it("does not expose favorite actions on online search result cards", async () => {

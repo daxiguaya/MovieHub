@@ -140,7 +140,7 @@ export const api = {
           imdb_rating_count: item.imdb_rating_count ?? null,
           poster_path: item.poster_path,
           backdrop_path: item.backdrop_path,
-          imdb_id: "external_ids" in item ? item.external_ids.imdb_id ?? null : null,
+          imdb_id: ("external_ids" in item ? item.external_ids.imdb_id : item.imdb_id) ?? null,
           directors: "credits" in item
             ? item.credits.crew?.filter((person) => person.job === "Director").map((person) => person.name) ?? []
             : []

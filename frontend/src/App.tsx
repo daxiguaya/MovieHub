@@ -14,7 +14,6 @@ import {
 import { api, setMovieHubApiKey } from "./api";
 import { appPath } from "./paths";
 import { loadPublicConfig, openXiaoyaSearch } from "./config";
-import { appPath } from "./paths";
 import type {
   Chart,
   ChartCompareResponse,

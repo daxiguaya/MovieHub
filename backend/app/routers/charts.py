@@ -59,7 +59,7 @@ def _extract_tmdb_votes(item, payload: dict) -> tuple[float | None, int] | None:
 async def _enrich_annual_tmdb_votes(result: ChartMoviesListResponse) -> ChartMoviesListResponse:
     """Attach separately labelled TMDB votes to annual chart cards, without changing Douban fields."""
     if result.chart.category != "annual" or not tmdb_client.token:
-        return await _enrich_annual_tmdb_votes(result)
+        return result
     semaphore = asyncio.Semaphore(4)
 
     async def enrich(item):

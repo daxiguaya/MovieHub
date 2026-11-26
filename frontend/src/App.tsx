@@ -351,7 +351,7 @@ function DiscoveryListPage() {
       <PageHeading
         eyebrow="HORROR & THRILLER"
         title={definition.title}
-        description={definition.description + "。按页在线获取，不做全量导入。"}
+        description={definition.description + "。榜单筛选与排序依据 TMDB 评分和投票数；卡片另行展示 IMDb 评分。按页在线获取，不做全量导入。"}
         action={
           <label className="select-wrap">
             上映年份
@@ -406,7 +406,7 @@ function DiscoverySpotlight() {
   return (
     <section className="genre-spotlight">
       <div className="section-heading">
-        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>专门为类型片爱好者精选，按口碑和投票量动态发现作品。</p></div>
+        <div><div className="eyebrow">HORROR & THRILLER</div><h2>恐怖与惊悚专题</h2><p>按 TMDB 评分和投票量筛选；作品卡片同时展示 IMDb 评分，两个来源分别标注。</p></div>
         <Link className="text-link" to="/search">更多类型筛选 <span>→</span></Link>
       </div>
       {loading ? <Loading label="正在加载恐怖与惊悚精选…" /> : lists.length === 0 ? (
@@ -419,7 +419,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small><small>TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} · {item.rating_count.toLocaleString()} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -475,7 +475,7 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
-function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null }) {
+function MovieCard({ movie, rank, localMatch = false, sourceRating, sourceLabel = "榜单" }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null; sourceLabel?: string }) {
   return (
     <article className="movie-card">
       <MoviePoster movie={movie} rank={rank} />
@@ -484,7 +484,7 @@ function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: M
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
         {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
         {sourceRating !== undefined ? (
-          <div className="movie-rating"><span>★</span> 豆瓣 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
+          <div className="movie-rating"><span>★</span> {sourceLabel}榜单评分 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>(历史快照)</small></div>
         ) : (
           <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
         )}
@@ -514,6 +514,7 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
         {localMovie && <div className="movie-subtitle">本地榜单匹配</div>}
         <div className="movie-rating"><span>★</span> IMDb {item.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({item.imdb_rating_count == null ? "暂无投票人数" : item.imdb_rating_count.toLocaleString()})</small></div>
+        <div className="movie-rating secondary-rating">TMDB 目录评分 {item.rating?.toFixed(1) ?? "暂无评分"} <small>({item.rating_count.toLocaleString()} 票)</small></div>
       </div>
     </article>
   );
@@ -525,6 +526,7 @@ function ChartPage() {
   const [snapshotDate, setSnapshotDate] = useState("");
   const [items, setItems] = useState<ChartMovie[]>([]);
   const [chartName, setChartName] = useState("");
+  const [chartSource, setChartSource] = useState("");
   const [total, setTotal] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -543,6 +545,7 @@ function ChartPage() {
     setSnapshots([]);
     setSnapshotDate("");
     setChartName("");
+    setChartSource("");
     setTotal(0);
     setNextCursor(null);
     setCompareFrom("");
@@ -562,6 +565,7 @@ function ChartPage() {
         setCompareTo(history[0]?.snapshot_date ?? "");
         setCompareFrom(history[1]?.snapshot_date ?? "");
         setChartName(latest.chart.name);
+        setChartSource(latest.chart.source);
         setItems(latest.items);
         setTotal(latest.total);
         setNextCursor(latest.next_cursor);
@@ -641,7 +645,7 @@ function ChartPage() {
       ) : (
         <>
           <div className="result-caption"><span>{snapshotDate || "最新快照"}</span><span>{total} 部作品</span></div>
-          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} />)}</div>
+          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} sourceLabel={chartSource === "douban" ? "豆瓣" : chartSource === "imdb" ? "IMDb" : chartSource === "tmdb" ? "TMDB" : chartSource || "榜单"} />)}</div>
           {nextCursor && <button className="secondary-button load-more" onClick={() => void loadMore()}>加载更多</button>}
         </>
       )}
@@ -947,22 +951,20 @@ function SearchPage() {
     const nextPage = onlinePage + 1;
     const q = (searchParams.get("search") ?? "").trim();
     const requestedType = (searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all";
-    const requestedMinRating = searchParams.get("min_rating") ?? "";
     const requestedSort = searchParams.get("sort") ?? "relevance";
     const request = q.length >= 2
       ? api.discoverySearch(q, requestedType, nextPage)
       : api.discoveryDiscover(new URLSearchParams({
           media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(nextPage),
-          min_votes: searchParams.get("min_rating_count") || "100",
-          sort_by: requestedSort === "rating_desc" ? "vote_average.desc"
-            : requestedSort === "rating_asc" ? "vote_average.asc"
-            : requestedSort === "votes_desc" ? "vote_count.desc"
-            : requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
-            : requestedMinRating ? "vote_average.desc" : "popularity.desc",
+          min_votes: "0",
+          // Rating and vote sorting is applied to the loaded results using IMDb data.
+          // Keep TMDB pagination on the same stable order as the initial request.
+          sort_by: requestedSort === "year_desc"
+            ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
+            : "popularity.desc",
           ...(searchParams.get("genre_ids") ? { with_genres: searchParams.get("genre_ids")!.split(/[|,]/).filter(Boolean).join(",") } : {}),
           ...(searchParams.get("region_codes") ? { region: searchParams.get("region_codes")! } : {}),
-          ...(requestedMinRating ? { min_rating: requestedMinRating } : {}),
           ...(searchParams.get("min_year") ? { min_year: searchParams.get("min_year")! } : {}),
           ...(searchParams.get("max_year") ? { max_year: searchParams.get("max_year")! } : {})
         }));
@@ -1138,6 +1140,7 @@ function MoviePage({ config }: { config: PublicConfig }) {
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
           <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
+          {(movie.douban_id || movie.douban_url) && <div className="detail-rating detail-rating-secondary"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>豆瓣 · {movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString() + " 人评价"}</span></div>}
           <div className="tag-row">{(movie.genres.length ? movie.genres : movie.tmdb_metadata?.genres ?? []).map((tag) => <span className="tag" key={tag}>{tag}</span>)}{(movie.regions.length ? movie.regions : movie.tmdb_metadata?.regions ?? []).map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           {movie.tmdb_metadata && <p className="detail-source-note">缺失的年份、类型、地区及演职员资料由 TMDB 补充；评分仅采用 IMDb 数据。</p>}
           <div className="detail-actions">
@@ -1235,11 +1238,13 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           <h1>{movie.title}</h1>
           {movie.original_title && <div className="original-title">{movie.original_title}</div>}
           <div className="detail-rating"><strong>★ {movie.imdb_rating?.toFixed(1) ?? "暂无评分"}</strong><span>IMDb · {movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString() + " 票"}</span></div>
+          <div className="detail-rating detail-rating-secondary"><strong>★ {movie.rating?.toFixed(1) ?? "暂无评分"}</strong><span>TMDB 目录评分 · {movie.rating_count.toLocaleString()} 票</span></div>
           <div className="tag-row">{movie.genres.map((tag) => <span className="tag" key={tag.id}>{tag.name}</span>)}{countries.map((tag) => <span className="tag muted-tag" key={tag}>{tag}</span>)}</div>
           <div className="detail-actions">
             <button className="primary-button" onClick={() => openXiaoyaSearch(config.xiaoyaSearchUrlTemplate, movie.title)} disabled={!config.xiaoyaSearchUrlTemplate}>在小雅中搜索 <span>↗</span></button>
             <button className={"secondary-button " + (isFavorite ? "is-saved" : "")} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ 已收藏" : "♡ 加入收藏"}</button>
             {(movie.imdb_id ?? movie.external_ids.imdb_id) && <a className="secondary-button" href={"https://www.imdb.com/title/" + (movie.imdb_id ?? movie.external_ids.imdb_id) + "/"} target="_blank" rel="noreferrer">IMDb ↗</a>}
+            <a className="secondary-button" href={"https://www.themoviedb.org/" + movie.media_type + "/" + movie.provider_id} target="_blank" rel="noreferrer">TMDB ↗</a>
           </div>
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}

@@ -61,12 +61,11 @@ services:
     environment:
       MOVIEHUB_DATA_DIR: /data
       IMDB_UPDATE_CONFIG: /config/imdb-update.json
-      IMDB_UPDATE_STATE: /state/state.json
+      IMDB_UPDATE_STATE: /data/imdb-update-state/state.json
       LOG_LEVEL: INFO
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
       - ${MOVIEHUB_IMDB_CONFIG_PATH:-./deploy/imdb-update.json}:/config/imdb-update.json:ro
-      - ${MOVIEHUB_IMDB_STATE_PATH:-/volume1/docker/moviehub/imdb-update}:/state:rw
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m,mode=1777
     cap_drop:

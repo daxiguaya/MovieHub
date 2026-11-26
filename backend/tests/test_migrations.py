@@ -254,7 +254,7 @@ def test_concurrent_v2_migrations_are_serialized(tmp_path):
 
 
 
-def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
+def test_v5_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     """A populated v2 database must retain every user-facing relation on v3."""
     db_path = tmp_path / "populated-v1.db"
     _create_v2_database(db_path)
@@ -330,11 +330,13 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
         check = sqlite3.connect(str(candidate))
         try:
             assert check.execute(
-                "SELECT title, original_title, overview FROM movies WHERE id=41"
+                "SELECT title, original_title, overview, imdb_rating, imdb_rating_count FROM movies WHERE id=41"
             ).fetchone() == (
                 "肖申克的救赎",
                 "The Shawshank Redemption",
                 "fixture overview",
+                None,
+                None,
             )
             assert check.execute(
                 "SELECT name FROM genres WHERE id=7"
@@ -372,7 +374,7 @@ def test_v4_migration_preserves_existing_catalogue_and_user_data(tmp_path):
     try:
         assert migrated.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 4
+        ).fetchone()[0] == 5
         assert migrated.execute(
             "SELECT COUNT(*) FROM import_batch_receipts"
         ).fetchone()[0] == 0

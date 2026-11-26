@@ -506,3 +506,85 @@ def test_adding_local_favorite_cleans_exact_external_tmdb_favorite_and_retries(
             assert db.query(database.Favorite).count() == 1
     finally:
         engine.dispose()
+
+
+
+def test_remove_local_favorite_commits_first_and_retries_external_cleanup(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "moviehub-data" / "movies.db"
+    backend_dir = Path(__file__).resolve().parents[1]
+    initialize(db_path, backend_dir / "migrations" / "001_moviehub_core.sql")
+    engine = database.create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    TargetSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with TargetSession() as db:
+        movie = database.Movie(
+            douban_id="123460",
+            tmdb_id="903",
+            imdb_id="tt7654325",
+            title="Local Favorite Delete Retry",
+            year=2023,
+            type="movie",
+            directors="[]",
+            actors="[]",
+        )
+        db.add(movie)
+        db.flush()
+        db.add(database.Favorite(movie_id=movie.id))
+        db.commit()
+        movie_id = movie.id
+
+    monkeypatch.setattr(database, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(database, "SessionLocal", TargetSession)
+    monkeypatch.setattr(main_module, "get_db_path", lambda: str(db_path))
+    monkeypatch.setattr(settings, "api_key", "favorites-test-key")
+    monkeypatch.setattr(main_module.poster_cache_service, "clear_expired_cache", lambda: None)
+    monkeypatch.setattr(main_module.provider_response_cache, "clear_expired", lambda: 0)
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "backup_daily",
+        lambda *args, **kwargs: None,
+    )
+
+    tmdb_cleanup_calls = []
+    def flaky_delete(media_type, provider_id):
+        tmdb_cleanup_calls.append((media_type, provider_id))
+        if len(tmdb_cleanup_calls) == 1:
+            raise OSError("discovery database temporarily unavailable")
+        return True
+
+    imdb_cleanup_calls = []
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache, "delete_favorite", flaky_delete
+    )
+    monkeypatch.setattr(
+        favorites_router.provider_response_cache,
+        "delete_favorite_by_imdb",
+        lambda media_type, imdb_id, title, original_title, year: (
+            imdb_cleanup_calls.append((media_type, imdb_id, title, original_title, year))
+            or False
+        ),
+    )
+
+    headers = {"X-API-Key": "favorites-test-key"}
+    try:
+        with TestClient(main_module.app, raise_server_exceptions=False) as client:
+            first = client.delete(f"/api/favorites/{movie_id}", headers=headers)
+            retry = client.delete(f"/api/favorites/{movie_id}", headers=headers)
+
+        assert first.status_code == 500
+        assert retry.status_code == 204
+        assert tmdb_cleanup_calls == [("movie", 903), ("movie", 903)]
+        assert imdb_cleanup_calls == [
+            ("movie", "tt7654325", "Local Favorite Delete Retry", None, 2023),
+            ("movie", "tt7654325", "Local Favorite Delete Retry", None, 2023),
+        ]
+        with TargetSession() as db:
+            assert db.get(database.Favorite, movie_id) is None
+            assert db.get(database.Movie, movie_id) is not None
+    finally:
+        engine.dispose()

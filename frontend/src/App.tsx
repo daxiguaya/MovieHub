@@ -1311,9 +1311,30 @@ function FavoritesPage() {
     }
   }
 
+  const uniqueExternalFavorites = externalFavorites.filter((item) => !favorites.some((favorite) =>
+    favorite.movie.type === item.media_type && (
+      favorite.movie.tmdb_id === String(item.provider_id) ||
+      Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id)
+    )
+  ));
+  const favoriteEntries = [
+    ...favorites.map((favorite) => ({
+      kind: "local" as const,
+      key: "local:" + favorite.movie.id,
+      timestamp: Date.parse(favorite.created_at) || 0,
+      favorite
+    })),
+    ...uniqueExternalFavorites.map((favorite) => ({
+      kind: "external" as const,
+      key: "external:" + favorite.media_type + ":" + favorite.provider_id,
+      timestamp: favorite.created_at * 1000,
+      favorite
+    }))
+  ].sort((left, right) => right.timestamp - left.timestamp);
+
   return (
     <>
-      <PageHeading eyebrow="YOUR WATCHLIST" title="我的收藏" description="收藏记录长期保留；搜索和详情缓存过期不会影响你的收藏。" />
+      <PageHeading eyebrow="YOUR WATCHLIST" title="我的收藏" description="所有收藏集中展示；同一作品自动合并，移除时同步清理关联记录。" />
       {loading ? <Loading /> : error && (error.toLowerCase().includes("api key") || error.toLowerCase().includes("api_key")) ? (
         <section className="api-key-gate">
           <h2>连接收藏功能</h2>
@@ -1326,15 +1347,23 @@ function FavoritesPage() {
         </section>
       ) : error && favorites.length === 0 && externalFavorites.length === 0 ? <ErrorState message={error} /> : (
         <>
-          {externalFavorites.filter((item) => !favorites.some((favorite) =>
-        favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
-      )).length > 0 && (
+          {favoriteEntries.length > 0 ? (
             <>
-              <div className="section-heading"><div><div className="eyebrow">ONLINE FAVORITES</div><h2>在线收藏</h2></div></div>
+              <div className="result-caption">
+                <span>全部收藏</span>
+                <span>{favoriteEntries.length} 部作品 · 按收藏时间排序</span>
+              </div>
               <div className="movie-grid">
-                {externalFavorites.filter((item) => !favorites.some((favorite) =>
-                  favorite.movie.type === item.media_type && (favorite.movie.tmdb_id === String(item.provider_id) || Boolean(favorite.movie.imdb_id && favorite.movie.imdb_id === item.snapshot.imdb_id))
-                )).map((favorite) => {
+                {favoriteEntries.map((entry) => {
+                  if (entry.kind === "local") {
+                    return (
+                      <div className="favorite-card" key={entry.key}>
+                        <MovieCard movie={entry.favorite.movie} />
+                        <button className="remove-favorite" onClick={() => void removeLocal(entry.favorite.movie.id)}>移出收藏 ×</button>
+                      </div>
+                    );
+                  }
+                  const favorite = entry.favorite;
                   const item: DiscoveryItem = {
                     provider: "tmdb",
                     provider_id: favorite.provider_id,
@@ -1352,7 +1381,7 @@ function FavoritesPage() {
                     genre_ids: []
                   };
                   return (
-                    <div className="favorite-card" key={favorite.media_type + ":" + favorite.provider_id}>
+                    <div className="favorite-card" key={entry.key}>
                       <ExternalMovieCard item={item} />
                       <button className="remove-favorite" onClick={() => void removeExternal(favorite.media_type, favorite.provider_id)}>移出收藏 ×</button>
                     </div>
@@ -1360,22 +1389,8 @@ function FavoritesPage() {
                 })}
               </div>
             </>
-          )}
-          {favorites.length > 0 && (
-            <>
-              <div className="section-heading"><div><div className="eyebrow">CHART FAVORITES</div><h2>榜单收藏</h2></div></div>
-              <div className="movie-grid">
-                {favorites.map((favorite) => (
-                  <div className="favorite-card" key={favorite.movie.id}>
-                    <MovieCard movie={favorite.movie} />
-                    <button className="remove-favorite" onClick={() => void removeLocal(favorite.movie.id)}>移出收藏 ×</button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          {favorites.length === 0 && externalFavorites.length === 0 && (
-            <EmptyState title="收藏夹还是空的" detail="在在线作品或榜单详情页点击“加入收藏”，把想看的作品留在这里。" />
+          ) : (
+            <EmptyState title="收藏夹还是空的" detail="在榜单、搜索结果或作品详情页点击“加入收藏”，把想看的作品留在这里。" />
           )}
         </>
       )}

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -71,6 +72,26 @@ def audit_scout_database(scout_db_path: str | Path) -> dict[str, Any]:
             )
             """
         ).fetchone()
+        duplicate_imdb_rows = conn.execute(
+            """
+            SELECT trim(CAST(imdb_id AS TEXT)) AS imdb_id,
+                   COUNT(*) AS row_count
+            FROM item
+            WHERE type IN ('movie', 'tv')
+              AND imdb_id IS NOT NULL
+              AND trim(CAST(imdb_id AS TEXT)) <> ''
+            GROUP BY trim(CAST(imdb_id AS TEXT))
+            HAVING COUNT(*) > 1
+            """
+        ).fetchall()
+        duplicate_imdb_groups = [
+            row for row in duplicate_imdb_rows
+            if re.fullmatch(r"tt[0-9]{7,12}", row["imdb_id"])
+        ]
+        duplicate_imdb_ids = len(duplicate_imdb_groups)
+        rows_in_duplicate_imdb_groups = sum(
+            row["row_count"] for row in duplicate_imdb_groups
+        )
 
         field_counts = {name: 0 for name in FIELD_NAMES}
         invalid_ratings = 0
@@ -125,6 +146,8 @@ def audit_scout_database(scout_db_path: str | Path) -> dict[str, Any]:
                 "invalid_identity_rows": identity["invalid_rows"] or 0,
                 "duplicate_douban_ids": duplicate["duplicate_ids"],
                 "rows_in_duplicate_groups": duplicate["duplicate_rows"],
+                "duplicate_imdb_ids": duplicate_imdb_ids,
+                "rows_in_duplicate_imdb_groups": rows_in_duplicate_imdb_groups,
                 "invalid_ratings": invalid_ratings,
                 "invalid_years": invalid_years,
                 "malformed_raw_data": malformed_raw_data,
@@ -138,12 +161,17 @@ def audit_scout_database(scout_db_path: str | Path) -> dict[str, Any]:
                 },
             },
             "strict_gate": {
-                "passed": not (identity["invalid_rows"] or duplicate["duplicate_ids"]),
+                "passed": not (
+                    identity["invalid_rows"]
+                    or duplicate["duplicate_ids"]
+                    or duplicate_imdb_ids
+                ),
                 "blocking_issues": {
                     "invalid_identity_rows": identity["invalid_rows"] or 0,
                     "duplicate_douban_ids": duplicate["duplicate_ids"],
+                    "duplicate_imdb_ids": duplicate_imdb_ids,
                 },
-                "note": "Numeric and raw_data anomalies are reported as warnings; identity defects block import.",
+                "note": "Numeric and raw_data anomalies are reported as warnings; duplicate provider identities and invalid Douban identities block import.",
             },
         }
     finally:
@@ -155,7 +183,7 @@ def main() -> int:
         description="Read-only whole-catalogue quality audit for a Scout SQLite database."
     )
     parser.add_argument("--scout-db", required=True, help="Path to a consistent Scout SQLite copy")
-    parser.add_argument("--strict", action="store_true", help="Exit 2 if invalid identities or duplicate Douban IDs exist")
+    parser.add_argument("--strict", action="store_true", help="Exit 2 if invalid identities or duplicate Douban/IMDb IDs exist")
     args = parser.parse_args()
     try:
         report = audit_scout_database(args.scout_db)

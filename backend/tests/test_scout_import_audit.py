@@ -101,3 +101,46 @@ def test_import_preflight_can_reject_identity_and_duplicate_ids(tmp_path):
             ImportService._validate_source(conn, reject_invalid_identity=True)
     finally:
         conn.close()
+
+
+def test_audit_reports_duplicate_valid_imdb_ids_as_a_blocking_identity_issue(tmp_path):
+    source = tmp_path / "scout-duplicate-imdb.sqlite"
+    _source(source)
+    with sqlite3.connect(source) as db:
+        db.execute(
+            "UPDATE item SET imdb_id = 'tt1234567' WHERE douban_id IN ('10001', '10002')"
+        )
+        db.commit()
+    before = _hash(source)
+
+    report = audit_scout_database(source)
+
+    assert report["summary"]["duplicate_imdb_ids"] == 1
+    assert report["summary"]["rows_in_duplicate_imdb_groups"] == 2
+    assert report["strict_gate"]["passed"] is False
+    assert report["strict_gate"]["blocking_issues"]["duplicate_imdb_ids"] == 1
+    assert _hash(source) == before
+
+
+def test_import_preflight_rejects_duplicate_valid_imdb_ids_before_writes(tmp_path):
+    from app.services.import_service import ImportService
+
+    source = tmp_path / "scout-duplicate-imdb.sqlite"
+    _source(source)
+    with sqlite3.connect(source) as db:
+        db.execute(
+            "UPDATE item SET imdb_id = 'tt1234567' WHERE douban_id IN ('10001', '10002')"
+        )
+        db.commit()
+
+    conn = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        with pytest.raises(ValueError, match="duplicate IMDb IDs"):
+            ImportService._validate_source(
+                conn,
+                reject_duplicate_ids=True,
+                reject_invalid_identity=True,
+            )
+    finally:
+        conn.close()

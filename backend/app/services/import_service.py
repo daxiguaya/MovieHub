@@ -689,6 +689,31 @@ class ImportService:
                 f"{duplicate['douban_id']} ({duplicate['row_count']} rows)"
             )
 
+        duplicate_imdb_rows = conn.execute(
+            """
+            SELECT trim(CAST(imdb_id AS TEXT)) AS imdb_id,
+                   COUNT(*) AS row_count
+            FROM item
+            WHERE type IN ('movie', 'tv')
+              AND imdb_id IS NOT NULL
+              AND trim(CAST(imdb_id AS TEXT)) <> ''
+            GROUP BY trim(CAST(imdb_id AS TEXT))
+            HAVING COUNT(*) > 1
+            """
+        ).fetchall()
+        duplicate_imdb = next(
+            (
+                row for row in duplicate_imdb_rows
+                if re.fullmatch(r"tt[0-9]{7,12}", row["imdb_id"])
+            ),
+            None,
+        )
+        if duplicate_imdb is not None:
+            raise ValueError(
+                "Source database contains duplicate IMDb IDs: "
+                f"{duplicate_imdb['imdb_id']} ({duplicate_imdb['row_count']} rows)"
+            )
+
     @staticmethod
     def _parse_json(value: Any) -> dict[str, Any]:
         if not value:

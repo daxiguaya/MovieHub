@@ -119,6 +119,8 @@ class ChartMovieResponse(MovieResponse):
     """Movie card as it appears inside a chart."""
 
     overview: str | None = None
+    tmdb_rating: float | None = None
+    tmdb_rating_count: int | None = None
     rank: int
     source_rating: float | None = None
     snapshot_date: str

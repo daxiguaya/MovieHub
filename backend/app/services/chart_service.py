@@ -102,6 +102,8 @@ class ChartService:
             year=movie.year,
             rating=movie.rating,
             rating_count=movie.rating_count,
+            imdb_rating=movie.imdb_rating,
+            imdb_rating_count=movie.imdb_rating_count,
             type=movie.type,
             genres=genres,
             regions=regions,

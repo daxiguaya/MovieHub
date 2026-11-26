@@ -428,6 +428,9 @@ describe("MovieHub frontend workflows", () => {
 
     expect(await screen.findByText("搏击俱乐部")).toBeInTheDocument();
     expect(screen.getByText("一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。")).toBeInTheDocument();
+    expect(screen.getByText(/豆瓣榜单评分 8\.8/)).toBeInTheDocument();
+    expect(screen.getByText("(历史快照)")).toBeInTheDocument();
+    expect(screen.queryByText("(200,000)")).not.toBeInTheDocument();
   });
 
   it("compares historical chart snapshots and renders rank movement", async () => {

@@ -121,6 +121,32 @@ def add_favorite(
         favorite.note = payload.note
 
     db.commit()
+
+    # A local catalogue favorite is canonical when its provider identities
+    # can be reconciled. Clean up after the local commit so a failed cleanup
+    # remains visible and can be retried through this idempotent PUT.
+    removed_external = False
+    if movie.tmdb_id and movie.tmdb_id.isdigit():
+        removed_external = provider_response_cache.delete_favorite(
+            movie.type, int(movie.tmdb_id)
+        ) or removed_external
+    if movie.imdb_id:
+        removed_external = provider_response_cache.delete_favorite_by_imdb(
+            movie.type,
+            movie.imdb_id,
+            movie.title,
+            movie.original_title,
+            movie.year,
+        ) or removed_external
+    if removed_external:
+        try:
+            provider_response_cache.backup_daily(
+                settings.backup_dir / "discovery", 7, True
+            )
+        except Exception:
+            # The favorite operation has committed; backup refresh is best effort.
+            pass
+
     db.refresh(favorite)
     favorite.movie = movie
     return _response(favorite)
@@ -135,10 +161,20 @@ def remove_favorite(
 ) -> Response:
     """Remove one favorite using the MovieHub internal movie ID."""
     favorite = db.get(Favorite, movie_id)
-    if favorite is None:
+    movie = db.get(Movie, movie_id)
+    has_external_identity = movie is not None and (
+        (movie.tmdb_id and movie.tmdb_id.isdigit()) or bool(movie.imdb_id)
+    )
+    if favorite is None and not has_external_identity:
         raise HTTPException(status_code=404, detail="Favorite not found")
 
-    movie = db.get(Movie, movie_id)
+    # Commit the canonical local deletion first. If the external-cache cleanup
+    # then fails, a repeated DELETE can retry it using the still-present movie
+    # identity even though the local Favorite row is already gone.
+    if favorite is not None:
+        db.delete(favorite)
+        db.commit()
+
     removed_external = False
     if movie is not None:
         if movie.tmdb_id and movie.tmdb_id.isdigit():
@@ -147,11 +183,13 @@ def remove_favorite(
             ) or removed_external
         if movie.imdb_id:
             removed_external = provider_response_cache.delete_favorite_by_imdb(
-                movie.type, movie.imdb_id
+                movie.type,
+                movie.imdb_id,
+                movie.title,
+                movie.original_title,
+                movie.year,
             ) or removed_external
 
-    db.delete(favorite)
-    db.commit()
     if removed_external:
         try:
             provider_response_cache.backup_daily(
@@ -203,17 +241,33 @@ def _linked_chart_movie(
     year: int | None = None,
     directors: list[str] | None = None,
 ) -> Movie | None:
-    if not is_valid_imdb_id(imdb_id):
-        imdb_id = None
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id:
-        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    linked = db.query(Movie).filter(
+    # Resolve each provider identity independently. Combining them with OR
+    # and taking the first row can silently link a TMDB item to the wrong local
+    # movie when the two identifiers point at different catalogue records.
+    tmdb_matches = db.query(Movie).filter(
         Movie.type == media_type,
-        identity_filter,
-    ).first()
-    if linked is not None:
-        return linked
+        Movie.tmdb_id == str(provider_id),
+    ).all()
+    imdb_matches = (
+        db.query(Movie).filter(
+            Movie.type == media_type,
+            Movie.imdb_id == imdb_id,
+        ).all()
+        if imdb_id
+        else []
+    )
+    matched_movies = {movie.id: movie for movie in (*tmdb_matches, *imdb_matches)}
+    if len(matched_movies) > 1 or len(tmdb_matches) > 1 or len(imdb_matches) > 1:
+        logger.warning(
+            "Conflicting favorite identities for TMDB %s/%s and IMDb %s: local movie IDs %s",
+            media_type, provider_id, imdb_id, sorted(matched_movies),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="TMDB and IMDb identifiers resolve to different local movies",
+        )
+    if matched_movies:
+        return next(iter(matched_movies.values()))
 
     # Fallback is intentionally strict: title + exact year + at least one
     # matching director, and exactly one local candidate must satisfy all.
@@ -255,40 +309,81 @@ def _linked_chart_movie(
     return matches[0] if len(matches) == 1 else None
 
 
+
 async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
-    """Resolve missing IMDb IDs and attach ratings before the UI reads favorites."""
-    async def resolve_one(favorite: dict) -> None:
+    """Refresh TMDB catalog scores and attach current IMDb-index scores for favorites."""
+    semaphore = asyncio.Semaphore(4)
+
+    async def enrich_one(favorite: dict) -> None:
         snapshot = favorite.get("snapshot")
-        if not isinstance(snapshot, dict):
-            return
-        saved_imdb_id = snapshot.get("imdb_id")
-        if is_valid_imdb_id(saved_imdb_id):
-            return
-        if saved_imdb_id is not None:
-            snapshot["imdb_id"] = None
         media_type = favorite.get("media_type")
         provider_id = favorite.get("provider_id")
-        if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
+        if (
+            not isinstance(snapshot, dict)
+            or media_type not in ("movie", "tv")
+            or not isinstance(provider_id, int)
+            or provider_id < 1
+        ):
             return
-        try:
-            external = await tmdb_client.get_json(
-                f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
-            )
-            imdb_id = (external or {}).get("imdb_id")
-            if is_valid_imdb_id(imdb_id):
-                snapshot["imdb_id"] = imdb_id
-        except Exception as exc:
-            logger.info(
-                "External favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
-                media_type, provider_id, type(exc).__name__,
-            )
 
-    await asyncio.gather(*(resolve_one(favorite) for favorite in favorites))
+        async with semaphore:
+            if not snapshot.get("imdb_id"):
+                try:
+                    external = await tmdb_client.get_json(
+                        f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
+                    )
+                    imdb_id = (external or {}).get("imdb_id")
+                    if isinstance(imdb_id, str) and len(imdb_id) in range(9, 15) and imdb_id.startswith("tt") and imdb_id[2:].isdigit():
+                        snapshot["imdb_id"] = imdb_id
+                except Exception as exc:
+                    logger.info(
+                        "External favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
+                        media_type, provider_id, type(exc).__name__,
+                    )
+
+            try:
+                payload = await tmdb_client.get_json(
+                    f"/{media_type}/{provider_id}",
+                    {"language": "zh-CN"},
+                    DETAIL_TTL,
+                )
+                if not isinstance(payload, dict) or payload.get("id") != provider_id:
+                    return
+                title_keys = ("title", "original_title") if media_type == "movie" else ("name", "original_name")
+                provider_titles = {
+                    _normalize_identity(payload.get(key)) for key in title_keys
+                    if isinstance(payload.get(key), str)
+                } - {""}
+                snapshot_titles = {
+                    _normalize_identity(snapshot.get(key)) for key in ("title", "original_title")
+                    if isinstance(snapshot.get(key), str)
+                } - {""}
+                if not provider_titles.intersection(snapshot_titles):
+                    return
+                vote_count = payload.get("vote_count")
+                if not isinstance(vote_count, int) or isinstance(vote_count, bool) or vote_count < 0:
+                    return
+                vote_average = payload.get("vote_average")
+                snapshot["rating"] = (
+                    float(vote_average)
+                    if isinstance(vote_average, (int, float))
+                    and not isinstance(vote_average, bool)
+                    and 0 <= vote_average <= 10
+                    else None
+                )
+                snapshot["rating_count"] = vote_count
+            except Exception as exc:
+                logger.info(
+                    "External favorite TMDB rating refresh unavailable for TMDB %s/%s: %s",
+                    media_type, provider_id, type(exc).__name__,
+                )
+
+    await asyncio.gather(*(enrich_one(favorite) for favorite in favorites))
     imdb_ids = [
         snapshot.get("imdb_id")
         for favorite in favorites
         if isinstance((snapshot := favorite.get("snapshot")), dict)
-        and is_valid_imdb_id(snapshot.get("imdb_id"))
+        and isinstance(snapshot.get("imdb_id"), str)
     ]
     ratings = await asyncio.to_thread(lookup_ratings, imdb_ids) if imdb_ids else {}
     for favorite in favorites:
@@ -299,6 +394,7 @@ async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
         if indexed is not None:
             snapshot["imdb_rating"], snapshot["imdb_rating_count"] = indexed
     return favorites
+
 
 
 @router.get("/external")
@@ -363,10 +459,10 @@ def save_external_favorite(
             db.commit()
         # A chart-backed movie has one canonical Favorite row; do not create
         # a second provider-cache favorite for the same work.
-        try:
-            provider_response_cache.delete_favorite(media_type, provider_id)
-        except Exception:
-            pass
+        # The local Favorite row is already committed. If external cleanup
+        # fails, propagate the error so the caller can retry this idempotent
+        # operation; silently reporting success would leave duplicate favorites.
+        provider_response_cache.delete_favorite(media_type, provider_id)
         return {"linked_movie_id": linked_movie.id, "is_favorite": True}
     saved = provider_response_cache.save_favorite(
         media_type, provider_id, snapshot, payload.note

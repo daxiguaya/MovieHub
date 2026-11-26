@@ -345,3 +345,31 @@ def test_search_ignores_malformed_tmdb_imdb_ids_before_rating_lookup(monkeypatch
     assert response.status_code == 200
     assert response.json()["items"][0]["imdb_id"] is None
     assert rating_lookups == [[]]
+
+
+def test_detail_sanitizes_malformed_nested_imdb_id(monkeypatch):
+    rating_lookups = []
+
+    async def fake_get_json(endpoint, params=None, ttl=900, include_overview=False):
+        return {
+            "id": 4322,
+            "title": "Malformed detail fixture",
+            "external_ids": {"imdb_id": "tt123"},
+            "genres": [],
+        }
+
+    def fake_lookup_ratings(imdb_ids):
+        rating_lookups.append(list(imdb_ids))
+        return {}
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", fake_lookup_ratings)
+
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/movie/4322")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["imdb_id"] is None
+    assert body["external_ids"]["imdb_id"] is None
+    assert rating_lookups == []

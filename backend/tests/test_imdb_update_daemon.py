@@ -38,7 +38,11 @@ def test_unchanged_etag_skips_download_and_marks_day_complete(tmp_path, monkeypa
         "etag": '"same-version"', "last_modified": "", "content_length": "123"
     })
     monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("must not download"))
-    state = {"dataset_fingerprint": '"same-version"'}
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
+    state = {"dataset_fingerprint": '"same-version"', "last_result": {
+        "status": "applied", "dry_run": {"full_index": {"indexed_titles": 1000000}}
+    }}
     result = updater.run_update({}, state, date(2026, 11, 26))
     assert result["status"] == "unchanged_dataset"
     assert state["last_successful_date"] == "2026-11-26"

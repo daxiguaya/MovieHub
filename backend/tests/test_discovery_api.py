@@ -135,3 +135,51 @@ def test_local_imdb_rating_is_attached_only_by_exact_tmdb_identity():
         assert result[1]["imdb_rating"] is None
         assert result[1]["imdb_rating_count"] is None
     engine.dispose()
+
+
+
+def test_search_enriches_non_catalogue_results_from_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        if endpoint == "/search/multi":
+            return {
+                "page": 1, "total_pages": 1, "total_results": 1,
+                "results": [{
+                    "id": 999, "media_type": "movie", "title": "New title",
+                    "release_date": "2024-01-01", "vote_average": 7.1, "vote_count": 88,
+                }],
+            }
+        if endpoint == "/movie/999/external_ids":
+            return {"id": 999, "imdb_id": "tt1234567"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt1234567": (8.4, 12345)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/search", params={"q": "New title"})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["imdb_id"] == "tt1234567"
+    assert item["imdb_rating"] == 8.4
+    assert item["imdb_rating_count"] == 12345
+
+
+def test_discover_enriches_results_with_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        if endpoint == "/discover/movie":
+            return {
+                "page": 1, "total_pages": 1, "total_results": 1,
+                "results": [{"id": 777, "title": "Discover title", "release_date": "2020-01-01"}],
+            }
+        if endpoint == "/movie/777/external_ids":
+            return {"id": 777, "imdb_id": "tt7654321"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt7654321": (7.9, 9876)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/discover", params={"media_type": "movie", "min_votes": 0})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["imdb_id"] == "tt7654321"
+    assert item["imdb_rating"] == 7.9
+    assert item["imdb_rating_count"] == 9876

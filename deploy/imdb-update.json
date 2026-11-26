@@ -4,6 +4,7 @@
   "timezone": "Asia/Singapore",
   "auto_apply": false,
   "min_matched": 10,
+  "min_index_rows": 100000,
   "backup_keep": 7,
   "retry_minutes": 15
 }

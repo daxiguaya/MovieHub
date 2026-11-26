@@ -235,7 +235,7 @@ async def discover_online(
     }
     payload = await tmdb_client.get_json(f"/discover/{media_type}", params, SEARCH_TTL)
     results = [_normalize_result(item, media_type) for item in payload.get("results", []) if isinstance(item.get("id"), int)]
-    _attach_local_imdb_ratings(db, results)
+    await _attach_imdb_ratings(db, results)
     return {
         "provider": "tmdb",
         "media_type": media_type,

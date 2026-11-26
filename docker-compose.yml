@@ -65,7 +65,7 @@ services:
       LOG_LEVEL: INFO
     volumes:
       - ${MOVIEHUB_DATA_PATH:-/volume1/docker/moviehub/data}:/data
-      - ${MOVIEHUB_IMDB_CONFIG_DIR:-./config}:/config:ro
+      - ${MOVIEHUB_IMDB_CONFIG_PATH:-./deploy/imdb-update.json}:/config/imdb-update.json:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m,mode=1777
     cap_drop:

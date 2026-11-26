@@ -55,12 +55,15 @@ def test_new_snapshot_runs_dry_run_without_auto_applying(tmp_path, monkeypatch):
     monkeypatch.setattr(updater, "download_snapshot", lambda: (snapshot, "sha256"))
     calls = []
     monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
-        calls.append(apply) or {"valid": True, "matched": 12, "changed": 3}
+        calls.append(("local", apply)) or {"valid": True, "matched": 12, "changed": 3}
+    ))
+    monkeypatch.setattr(updater, "import_imdb_rating_index", lambda path, apply=False, min_rows=100000: (
+        calls.append(("index", apply)) or {"valid": True, "indexed_titles": 1500000}
     ))
     state = {}
-    result = updater.run_update({"auto_apply": False, "min_matched": 1}, state, date(2026, 11, 26))
+    result = updater.run_update({"auto_apply": False, "min_matched": 1, "min_index_rows": 100}, state, date(2026, 11, 26))
     assert result["status"] == "dry_run_only"
-    assert calls == [False]
+    assert calls == [("local", False), ("index", False)]
     assert state["dataset_fingerprint"] == '"new-version"'
 
 
@@ -79,6 +82,7 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
         calls.append(apply)
         return {"valid": True, "matched": 12, "changed": 2, "applied": apply}
     monkeypatch.setattr(updater, "import_imdb_ratings", fake_import)
+    monkeypatch.setattr(updater, "import_imdb_rating_index", fake_import)
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
     monkeypatch.setattr(updater, "prune_backups", lambda path, keep: None)
     state = {
@@ -86,9 +90,9 @@ def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatc
         "last_result": {"status": "dry_run_only"},
     }
     result = updater.run_update(
-        {"auto_apply": True, "min_matched": 10, "backup_keep": 7},
+        {"auto_apply": True, "min_matched": 10, "min_index_rows": 10, "backup_keep": 7},
         state,
         date(2026, 11, 27),
     )
     assert result["status"] == "applied"
-    assert calls == [False, True]
+    assert calls == [False, True, False, True]

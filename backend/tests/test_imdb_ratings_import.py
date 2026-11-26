@@ -11,7 +11,7 @@ from scripts.import_imdb_ratings import iter_matching_ratings
 def _write_ratings(path: Path, rows: list[tuple[str, str, str]]):
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "wt", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle, delimiter="\\t")
+        writer = csv.writer(handle, delimiter="\t")
         writer.writerow(["tconst", "averageRating", "numVotes"])
         writer.writerows(rows)
 
@@ -49,6 +49,6 @@ def test_rejects_invalid_matching_rating_rows(tmp_path, rating, votes):
 
 def test_requires_official_dataset_columns(tmp_path):
     source = tmp_path / "ratings.tsv"
-    source.write_text("id\\taverageRating\\n", encoding="utf-8")
+    source.write_text("id\taverageRating\\n", encoding="utf-8")
     with pytest.raises(ValueError, match="must contain"):
         list(iter_matching_ratings(source, {"tt0111161"}))

@@ -130,6 +130,11 @@ select:focus, input:focus { border-color: rgba(196,227,107,.6); }
 .movie-rating { color: #e8d08c; font-size: 11px; margin-top: 7px; font-weight: 700; }
 .movie-rating span { color: #e9c35e; }
 .movie-rating small { color: #7f8a83; font-weight: 400; font-size: 9px; }
+.movie-rating.secondary-rating { color: var(--muted); font-weight: 500; }
+.movie-rating.secondary-rating span { color: var(--muted); }
+.detail-rating-secondary { margin-top: -12px; margin-bottom: 20px; }
+.detail-rating-secondary strong { color: var(--muted); font-size: 15px; }
+.detail-rating-secondary span { font-size: 10px; }
 .movie-overview { color: var(--muted); font-size: 11px; line-height: 1.55; margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .search-panel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 16px; border: 1px solid var(--line); background: var(--panel); border-radius: 12px; align-items: end; }

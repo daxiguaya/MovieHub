@@ -10,11 +10,13 @@ import argparse
 import hashlib
 import json
 import re
+import sqlite3
 import sys
 import time
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.robotparser import RobotFileParser
 
@@ -23,9 +25,8 @@ from sqlalchemy import select
 
 from app.database import (
     Chart, ChartItem, ChartSnapshot, Movie, MovieMetadataProvenance,
-    SessionLocal,
+    SessionLocal, get_db_path,
 )
-from scripts.db_backup import create_backup
 
 ANNUAL_SLUGS = (
     "annual-2025-chinese-movies",
@@ -244,6 +245,33 @@ def _apply(records: list[dict[str, Any]], apply: bool) -> int:
     return changed
 
 
+def _create_backup() -> Path:
+    """Create a verified one-off backup without pruning or deleting prior backups."""
+    source_path = Path(get_db_path()).expanduser().resolve()
+    backup_root = Path("/backups")
+    backup_root.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    target_path = backup_root / f"movies-before-douban-rating-counts-{stamp}.sqlite3"
+    if target_path.exists():
+        raise FileExistsError(f"Refusing to overwrite backup: {target_path}")
+    source = sqlite3.connect(source_path.as_uri() + "?mode=ro", uri=True, timeout=30)
+    target = sqlite3.connect(str(target_path), timeout=30)
+    try:
+        source.backup(target)
+        target.commit()
+        integrity = target.execute("PRAGMA integrity_check").fetchone()
+        if not integrity or integrity[0] != "ok":
+            raise RuntimeError("Backup integrity_check failed")
+    except Exception:
+        target.close()
+        source.close()
+        target_path.unlink(missing_ok=True)
+        raise
+    target.close()
+    source.close()
+    return target_path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Identity-checked annual-chart Douban rating-count enrichment"
@@ -265,7 +293,7 @@ def main() -> int:
             1 for row in accepted
             if row["target"]["rating_count"] is None
         )
-        backup = create_backup() if apply and planned else None
+        backup = _create_backup() if apply and planned else None
         changed = _apply(accepted, apply)
     except Exception as exc:
         print(json.dumps({

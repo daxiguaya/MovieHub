@@ -154,7 +154,10 @@ IMDb rating and vote count from this index. TMDB external-ID responses use the
 existing persistent provider-response cache. There is no title-name fuzzy
 matching, and TMDB vote averages are never presented as IMDb ratings. A result
 without a valid IMDb ID or without an IMDb rating remains unrated. Online detail
-pages use the same index and exact IMDb identity.
+pages use the same index and exact IMDb identity. By default the index lives at
+`/data/db/imdb-ratings.sqlite3`; an alternate absolute path can be supplied
+through `IMDB_RATINGS_INDEX_PATH` in the project `.env`, which Compose passes
+to both the API and updater containers.
 
 The complete source dataset and derived index remain private and are subject
 to IMDb's personal, non-commercial-use restrictions above. Do not publish or

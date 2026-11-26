@@ -1,6 +1,8 @@
 """Single-user favorites API, keyed by MovieHub's internal movie ID."""
 
+import asyncio
 import json
+import logging
 import unicodedata
 from typing import Literal
 
@@ -14,7 +16,12 @@ from app.database import Favorite, Movie, MovieGenre, MovieRegion, get_db
 from app.dependencies.auth import verify_api_key
 from app.limiter import limiter
 from app.schemas import FavoriteResponse, FavoriteUpsert, MovieResponse
+from app.services.imdb_rating_index import lookup_ratings
 from app.services.provider_cache import provider_response_cache
+from app.services.tmdb_client import DETAIL_TTL, tmdb_client
+
+logger = logging.getLogger("moviehub.favorites")
+
 
 router = APIRouter(
     prefix="/favorites",
@@ -237,11 +244,53 @@ def _linked_chart_movie(
     return matches[0] if len(matches) == 1 else None
 
 
+async def _enrich_external_favorites(favorites: list[dict]) -> list[dict]:
+    """Resolve missing IMDb IDs and attach ratings before the UI reads favorites."""
+    async def resolve_one(favorite: dict) -> None:
+        snapshot = favorite.get("snapshot")
+        if not isinstance(snapshot, dict) or snapshot.get("imdb_id"):
+            return
+        media_type = favorite.get("media_type")
+        provider_id = favorite.get("provider_id")
+        if media_type not in ("movie", "tv") or not isinstance(provider_id, int):
+            return
+        try:
+            external = await tmdb_client.get_json(
+                f"/{media_type}/{provider_id}/external_ids", {}, DETAIL_TTL
+            )
+            imdb_id = (external or {}).get("imdb_id")
+            if isinstance(imdb_id, str) and imdb_id.startswith("tt") and len(imdb_id) <= 32:
+                snapshot["imdb_id"] = imdb_id
+        except Exception as exc:
+            logger.info(
+                "External favorite IMDb ID enrichment unavailable for TMDB %s/%s: %s",
+                media_type, provider_id, type(exc).__name__,
+            )
+
+    await asyncio.gather(*(resolve_one(favorite) for favorite in favorites))
+    imdb_ids = [
+        snapshot.get("imdb_id")
+        for favorite in favorites
+        if isinstance((snapshot := favorite.get("snapshot")), dict)
+        and isinstance(snapshot.get("imdb_id"), str)
+    ]
+    ratings = await asyncio.to_thread(lookup_ratings, imdb_ids) if imdb_ids else {}
+    for favorite in favorites:
+        snapshot = favorite.get("snapshot")
+        if not isinstance(snapshot, dict):
+            continue
+        indexed = ratings.get(snapshot.get("imdb_id"))
+        if indexed is not None:
+            snapshot["imdb_rating"], snapshot["imdb_rating_count"] = indexed
+    return favorites
+
+
 @router.get("/external")
 @limiter.limit("30/minute")
-def list_external_favorites(request: Request) -> list[dict]:
-    """List TMDB favorites through the same protected /favorites route family."""
-    return provider_response_cache.list_favorites()
+async def list_external_favorites(request: Request) -> list[dict]:
+    """List TMDB favorites enriched with the same local IMDb index as details."""
+    favorites = await asyncio.to_thread(provider_response_cache.list_favorites)
+    return await _enrich_external_favorites(favorites)
 
 
 @router.get("/external/status/{media_type}/{provider_id}")

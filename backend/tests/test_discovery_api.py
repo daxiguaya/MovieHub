@@ -1,4 +1,5 @@
 """TMDB response normalization and discovery endpoint guardrails."""
+import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
@@ -242,3 +243,70 @@ def test_external_favorites_keep_saved_rating_when_index_has_no_match(monkeypatc
 
     assert result[0]["snapshot"]["imdb_rating"] == 7.2
     assert result[0]["snapshot"]["imdb_rating_count"] == 123
+
+
+def test_external_favorites_resolve_missing_imdb_ids_before_rating_lookup(monkeypatch):
+    favorites = [
+        {
+            "media_type": "movie",
+            "provider_id": 278,
+            "snapshot": {"title": "肖申克的救赎", "imdb_id": None,
+                         "imdb_rating": None, "imdb_rating_count": None},
+        },
+        {
+            "media_type": "tv",
+            "provider_id": 999,
+            "snapshot": {"title": "Example show", "imdb_id": "tt7654321",
+                         "imdb_rating": None, "imdb_rating_count": None},
+        },
+    ]
+    external_calls = []
+
+    async def fake_get_json(endpoint, params=None, ttl=900):
+        external_calls.append(endpoint)
+        if endpoint == "/movie/278/external_ids":
+            return {"id": 278, "imdb_id": "tt0111161"}
+        raise AssertionError(f"Unexpected TMDB endpoint: {endpoint}")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(
+        discovery,
+        "lookup_ratings",
+        lambda ids: {
+            "tt0111161": (9.3, 3000000),
+            "tt7654321": (8.8, 456789),
+        },
+    )
+
+    asyncio.run(discovery._resolve_favorite_imdb_ids(favorites))
+    result = discovery._attach_favorite_imdb_ratings(favorites)
+
+    assert external_calls == ["/movie/278/external_ids"]
+    assert result[0]["snapshot"]["imdb_id"] == "tt0111161"
+    assert result[0]["snapshot"]["imdb_rating"] == 9.3
+    assert result[0]["snapshot"]["imdb_rating_count"] == 3000000
+    assert result[1]["snapshot"]["imdb_rating"] == 8.8
+    assert result[1]["snapshot"]["imdb_rating_count"] == 456789
+
+
+def test_external_favorite_missing_tmdb_imdb_id_does_not_break_listing(monkeypatch):
+    favorites = [
+        {
+            "media_type": "movie",
+            "provider_id": 12345,
+            "snapshot": {"imdb_id": None, "imdb_rating": None, "imdb_rating_count": None},
+        },
+    ]
+
+    async def failing_get_json(endpoint, params=None, ttl=900):
+        raise RuntimeError("TMDB temporarily unavailable")
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", failing_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {})
+
+    asyncio.run(discovery._resolve_favorite_imdb_ids(favorites))
+    result = discovery._attach_favorite_imdb_ratings(favorites)
+
+    assert result[0]["snapshot"]["imdb_id"] is None
+    assert result[0]["snapshot"]["imdb_rating"] is None
+    assert result[0]["snapshot"]["imdb_rating_count"] is None

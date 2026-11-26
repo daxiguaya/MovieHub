@@ -579,8 +579,9 @@ def test_remove_local_favorite_commits_first_and_retries_external_cleanup(
         assert first.status_code == 500
         assert retry.status_code == 204
         assert tmdb_cleanup_calls == [("movie", 903), ("movie", 903)]
+        # The first attempt stops at the failing TMDB cleanup; the retry
+        # then completes both TMDB and corroborated IMDb cleanup.
         assert imdb_cleanup_calls == [
-            ("movie", "tt7654325", "Local Favorite Delete Retry", None, 2023),
             ("movie", "tt7654325", "Local Favorite Delete Retry", None, 2023),
         ]
         with TargetSession() as db:

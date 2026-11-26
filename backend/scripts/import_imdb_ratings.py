@@ -117,6 +117,7 @@ def import_imdb_ratings(
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     try:
         with Session() as db:
+            total_local_movies = db.query(Movie).count()
             movies = db.scalars(
                 select(Movie).where(Movie.imdb_id.is_not(None))
             ).all()
@@ -129,7 +130,9 @@ def import_imdb_ratings(
                 return {
                     "valid": True,
                     "applied": False,
+                    "total_local_movies": total_local_movies,
                     "local_movies_with_imdb_id": 0,
+                    "imdb_id_coverage_percent": 0.0,
                     "matched": 0,
                     "unmatched": 0,
                     "message": "No local Movie records have a valid IMDb title ID.",
@@ -141,7 +144,9 @@ def import_imdb_ratings(
                 "valid": True,
                 "applied": False,
                 "dataset": IMDB_RATINGS_URL,
+                "total_local_movies": total_local_movies,
                 "local_movies_with_imdb_id": len(movie_by_imdb),
+                "imdb_id_coverage_percent": round(len(movie_by_imdb) * 100 / total_local_movies, 2) if total_local_movies else 0.0,
                 "matched": len(ratings),
                 "unmatched": len(movie_by_imdb) - len(matched_ids),
                 "matched_examples": sorted(matched_ids)[:10],

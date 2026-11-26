@@ -773,16 +773,11 @@ function SearchPage() {
         const discoverParams = new URLSearchParams({
           media_type: requestedType === "tv" ? "tv" : "movie",
           page: String(requestedPage),
-          min_votes: params.get("min_rating_count") || "100",
-          sort_by: requestedSort === "rating_desc" ? "vote_average.desc"
-            : requestedSort === "rating_asc" ? "vote_average.asc"
-            : requestedSort === "votes_desc" ? "vote_count.desc"
-            : requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc")
-            : requestedMinRating ? "vote_average.desc" : "popularity.desc"
+          min_votes: "0",
+          sort_by: requestedSort === "year_desc" ? (requestedType === "tv" ? "first_air_date.desc" : "primary_release_date.desc") : "popularity.desc"
         });
         if (genreIds) discoverParams.set("with_genres", genreIds);
         if (selectedRegionCodes.length) discoverParams.set("region", selectedRegionCodes.join("|"));
-        if (requestedMinRating) discoverParams.set("min_rating", requestedMinRating);
         if (requestedMinYear) discoverParams.set("min_year", requestedMinYear);
         if (requestedMaxYear) discoverParams.set("max_year", requestedMaxYear);
         onlinePromise = api.discoveryDiscover(discoverParams);
@@ -1011,8 +1006,8 @@ function SearchPage() {
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
-        <label>最低 IMDb 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
-        <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
+        <label>最低 IMDb 评分（本地匹配）<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
+        <label>最低 IMDb 投票数（本地匹配）<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
         <div className="search-filter">
@@ -1035,7 +1030,7 @@ function SearchPage() {
         </div>
         <button className="primary-button" type="submit">搜索 / 筛选 <span>→</span></button>
       </form>
-      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
+      <p className="search-hint">排序方式在结果栏右侧，切换后立即生效并同步到网址。类型和制作国家/地区支持直接勾选及关键词查找，无需按住 Ctrl。多个类型必须同时符合（AND）；关键词搜索按片名匹配，组合筛选请清空关键词后使用。IMDb 评分和投票数筛选仅作用于本地匹配记录；在线发现按 TMDB 目录分页，评分展示仍只使用 IMDb。{keyword.trim().length >= 2 && sortBy !== "relevance" ? "关键词搜索按当前已加载的结果排序；加载更多后会重新排列全部已加载结果。" : "无关键词的条件发现使用 TMDB 服务端排序。"}</p>
       <div className="result-caption"><span>在线搜索结果 · {onlineTotal.toLocaleString()} 部 · 本地匹配 {total.toLocaleString()} 部 · 当前第 {onlinePage || 1} 页</span><label className="result-sort">排序方式<select aria-label="排序方式" value={sortBy} onChange={(e) => changeSort(e.target.value)}><option value="relevance">综合 / 相关度</option><option value="rating_desc">评分从高到低</option><option value="rating_asc">评分从低到高</option><option value="votes_desc">投票人数从多到少</option><option value="year_desc">上映 / 首播时间从新到旧</option></select></label></div>
       {onlineError && <div className="inline-error">{onlineError}</div>}
       {error && <div className="inline-error">{error}</div>}

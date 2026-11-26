@@ -194,15 +194,33 @@ def _linked_chart_movie(
     year: int | None = None,
     directors: list[str] | None = None,
 ) -> Movie | None:
-    identity_filter = Movie.tmdb_id == str(provider_id)
-    if imdb_id:
-        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
-    linked = db.query(Movie).filter(
+    # Resolve each provider identity independently. Combining them with OR
+    # and taking the first row can silently link a TMDB item to the wrong local
+    # movie when the two identifiers point at different catalogue records.
+    tmdb_matches = db.query(Movie).filter(
         Movie.type == media_type,
-        identity_filter,
-    ).first()
-    if linked is not None:
-        return linked
+        Movie.tmdb_id == str(provider_id),
+    ).all()
+    imdb_matches = (
+        db.query(Movie).filter(
+            Movie.type == media_type,
+            Movie.imdb_id == imdb_id,
+        ).all()
+        if imdb_id
+        else []
+    )
+    matched_movies = {movie.id: movie for movie in (*tmdb_matches, *imdb_matches)}
+    if len(matched_movies) > 1 or len(tmdb_matches) > 1 or len(imdb_matches) > 1:
+        logger.warning(
+            "Conflicting favorite identities for TMDB %s/%s and IMDb %s: local movie IDs %s",
+            media_type, provider_id, imdb_id, sorted(matched_movies),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="TMDB and IMDb identifiers resolve to different local movies",
+        )
+    if matched_movies:
+        return next(iter(matched_movies.values()))
 
     # Fallback is intentionally strict: title + exact year + at least one
     # matching director, and exactly one local candidate must satisfy all.

@@ -219,9 +219,9 @@ quality-checks both local catalogue ratings and the full IMDb index; when
 or a missing full index and can build the index from the saved snapshot even
 when IMDb's ETag has not changed. Logs are available with
 `docker compose logs -f moviehub-imdb-updater`. The updater holds a process
-lock to prevent overlapping instances. Backup retention applies only to the
-IMDb importer backup filename pattern; it does not remove migration or general
-MovieHub backups.
+lock to prevent overlapping instances. Backup retention applies only to the two IMDb importer backup filename
+patterns (local catalogue database and full index); it does not remove migration
+or general MovieHub backups.
 
 Example deployment after the v5 migration has been reviewed and completed:
 

@@ -475,7 +475,7 @@ function MoviePoster({ movie, rank }: { movie: Movie; rank?: number }) {
   );
 }
 
-function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: Movie; rank?: number; localMatch?: boolean; sourceRating?: number | null }) {
+function MovieCard({ movie, rank, localMatch = false }: { movie: Movie; rank?: number; localMatch?: boolean }) {
   return (
     <article className="movie-card">
       <MoviePoster movie={movie} rank={rank} />
@@ -483,11 +483,7 @@ function MovieCard({ movie, rank, localMatch = false, sourceRating }: { movie: M
         <Link to={`/movies/${movie.id}`} className="movie-title">{movie.title}</Link>
         <div className="movie-subtitle">{movie.year ?? "年份未知"} · {movie.type === "tv" ? "剧集" : "电影"}</div>
         {localMatch && <div className="movie-subtitle">本地榜单收录</div>}
-        {sourceRating !== undefined ? (
-          <div className="movie-rating"><span>★</span> 豆瓣 {sourceRating?.toFixed(1) ?? "暂无评分"} <small>({movie.rating_count == null ? "暂无评价人数" : movie.rating_count.toLocaleString()})</small></div>
-        ) : (
-          <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
-        )}
+        <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
         {movie.overview && <p className="movie-overview">{movie.overview}</p>}
       </div>
     </article>
@@ -641,7 +637,7 @@ function ChartPage() {
       ) : (
         <>
           <div className="result-caption"><span>{snapshotDate || "最新快照"}</span><span>{total} 部作品</span></div>
-          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} sourceRating={movie.source_rating} />)}</div>
+          <div className="movie-grid">{items.map((movie) => <MovieCard key={movie.id} movie={movie} rank={movie.rank} />)}</div>
           {nextCursor && <button className="secondary-button load-more" onClick={() => void loadMore()}>加载更多</button>}
         </>
       )}

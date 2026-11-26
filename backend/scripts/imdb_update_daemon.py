@@ -115,6 +115,11 @@ def prune_backups(database_path: Path, keep: int) -> None:
         stale.unlink(missing_ok=True)
 
 
+def index_database_path() -> Path:
+    configured = os.environ.get("IMDB_RATINGS_INDEX_PATH")
+    return Path(configured).expanduser().resolve() if configured else index_database_path()
+
+
 def prune_index_backups(index_path: Path, keep: int) -> None:
     pattern = f"{index_path.stem}.pre-full-imdb-index-*.sqlite3"
     backups = sorted(index_path.parent.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)

@@ -419,7 +419,7 @@ function DiscoverySpotlight() {
               {list.items.map((item) => (
                 <Link className="spotlight-item" key={item.media_type + ":" + item.provider_id} to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
                   {item.poster_path ? <img src={"https://image.tmdb.org/t/p/w92" + item.poster_path} alt="" loading="lazy" /> : <span className="spotlight-placeholder">MH</span>}
-                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · TMDB ★ {item.rating?.toFixed(1) ?? "—"} · {item.rating_count.toLocaleString()} 票</small></span>
+                  <span className="spotlight-item-copy"><strong>{item.title}</strong><small>{item.year ?? "年份未知"} · IMDb ★ {item.imdb_rating?.toFixed(1) ?? "暂无评分"} · {item.imdb_rating_count?.toLocaleString() ?? "暂无投票人数"} 票</small></span>
                 </Link>
               ))}
               {list.items.length === 0 && <p className="spotlight-empty">暂无符合条件的作品</p>}
@@ -512,7 +512,7 @@ function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMov
       <div className="movie-card-info">
         <Link to={"/tmdb/" + item.media_type + "/" + item.provider_id} className="movie-title">{item.title}</Link>
         <div className="movie-subtitle">{item.year ?? "年份未知"} · {item.media_type === "tv" ? "剧集" : "电影"}</div>
-        {localMovie && <div className="movie-subtitle">本地榜单收录 · 豆瓣 {localMovie.rating?.toFixed(1) ?? "暂无评分"}</div>}
+        {localMovie && <div className="movie-subtitle">本地榜单匹配</div>}
         <div className="movie-rating"><span>★</span> IMDb {item.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({item.imdb_rating_count == null ? "暂无投票人数" : item.imdb_rating_count.toLocaleString()})</small></div>
       </div>
     </article>

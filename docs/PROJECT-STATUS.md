@@ -1,5 +1,8 @@
 # MovieHub 项目总进度与交付清单
 
+
+> **Repository baseline correction — 2026-11-26:** The current `main` head is `a901db55d4ad16e2a28530d4a2de51de96212edb`, and the repository code now targets **schema v5** (migration 005 adds separate IMDb rating columns). The production facts below are the last recorded verification from 2026-11-25: deployed code `c2ffdd8` and production schema v4. A production v5 migration has **not** been confirmed in the available deployment record. Check the live database version before any schema-dependent rollout. The “90%” figure and later checklist entries below are historical planning notes, not a current audited completion percentage. PR [#45](https://github.com/daxiguaya/MovieHub/pull/45) is still open and is not part of `main`.
+
 > **更新基线：2026-11-25（生产数据库与功能验收更新）**  
 > 仓库：`daxiguaya/MovieHub`  
 > 工作分支：`main`  

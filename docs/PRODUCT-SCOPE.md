@@ -1,5 +1,7 @@
 # MovieHub Product Scope and Architecture
 
+> **Document status — 2026-11-26:** This file records the original first-release product scope agreed during the database-foundation phase. Its historical implementation table, branch label, dated CI counts, and remaining-delivery order are not a current status report and must not be used as the live completion checklist. For current repository capabilities, schema version, last recorded production baseline, and known gaps, use [README](../README.md) and [PROJECT-STATUS.md](PROJECT-STATUS.md). The current `main` code is schema v5; the last recorded production verification remains schema v4 until a live v5 migration is confirmed.
+
 Status: agreed first-release product baseline
 Branch: phase4/database-foundation
 Last updated: 2026-11-23

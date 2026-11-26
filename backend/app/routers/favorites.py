@@ -119,6 +119,24 @@ def add_favorite(
         favorite.note = payload.note
 
     db.commit()
+
+    # A local catalogue favorite is canonical when the movie already has a
+    # TMDB identity. Clean up that exact external key after the local commit.
+    # If cleanup fails, propagate the error; retrying this idempotent PUT will
+    # attempt the same cleanup again without duplicating the local favorite.
+    if movie.tmdb_id and movie.tmdb_id.isdigit():
+        removed_external = provider_response_cache.delete_favorite(
+            movie.type, int(movie.tmdb_id)
+        )
+        if removed_external:
+            try:
+                provider_response_cache.backup_daily(
+                    settings.backup_dir / "discovery", 7, True
+                )
+            except Exception:
+                # The favorite operation has committed; backup refresh is best effort.
+                pass
+
     db.refresh(favorite)
     favorite.movie = movie
     return _response(favorite)

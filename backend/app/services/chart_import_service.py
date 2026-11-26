@@ -235,7 +235,11 @@ class ChartImportService:
         imdb_id = ChartImportService._clean_string(
             ChartImportService._value(item, "imdb_id")
         )
-        if imdb_id and not movie.imdb_id:
+        if (
+            imdb_id
+            and re.fullmatch(r"tt[0-9]{7,12}", imdb_id)
+            and not movie.imdb_id
+        ):
             movie.imdb_id = imdb_id
 
         tmdb_id = ChartImportService._clean_string(

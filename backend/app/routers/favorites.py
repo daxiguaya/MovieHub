@@ -163,7 +163,11 @@ def remove_favorite(
             ) or removed_external
         if movie.imdb_id:
             removed_external = provider_response_cache.delete_favorite_by_imdb(
-                movie.type, movie.imdb_id
+                movie.type,
+                movie.imdb_id,
+                movie.title,
+                movie.original_title,
+                movie.year,
             ) or removed_external
 
     db.delete(favorite)

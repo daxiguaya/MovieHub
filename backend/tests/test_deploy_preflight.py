@@ -101,3 +101,23 @@ class RolloutMigrationSafetyTests(unittest.TestCase):
         self.assertIn("nginx -s reload", script)
         self.assertNotIn("docker restart nginx-proxy-manager", script)
         self.assertNotIn("docker compose restart nginx-proxy-manager", script)
+
+
+class ComposeServiceCoverageTests(unittest.TestCase):
+    def test_preflight_covers_every_fixed_moviehub_container_name(self):
+        compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yml"
+        compose = compose_path.read_text(encoding="utf-8")
+        for container_name in (
+            "moviehub-backend",
+            "moviehub-imdb-updater",
+            "moviehub-web",
+        ):
+            with self.subTest(container_name=container_name):
+                self.assertIn(f"container_name: {container_name}", compose)
+                self.assertIn(container_name, PREFLIGHT.EXPECTED_CONTAINERS)
+
+    def test_preflight_validates_all_three_compose_services(self):
+        source = PREFLIGHT_PATH.read_text(encoding="utf-8")
+        for service_name in ("moviehub", "moviehub-imdb-updater", "moviehub-web"):
+            with self.subTest(service_name=service_name):
+                self.assertIn(f'for service_name in ("moviehub", "moviehub-imdb-updater", "moviehub-web")', source)

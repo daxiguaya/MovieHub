@@ -45,8 +45,9 @@ services:
       retries: 3
       start_period: 20s
     networks:
-      - default
-      - npm_proxy
+      default: {}
+      npm_proxy:
+        ipv4_address: 172.20.0.3
 
   moviehub-imdb-updater:
     build:
@@ -112,7 +113,8 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - npm_proxy
+      npm_proxy:
+        ipv4_address: 172.20.0.4
 
 networks:
   default:

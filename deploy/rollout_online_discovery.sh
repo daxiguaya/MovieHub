@@ -43,9 +43,12 @@ if ! git diff --quiet HEAD -- . ':(exclude)docker-compose.yml'; then
   git status --short >&2
   exit 1
 fi
-if ! git diff --quiet origin/main -- docker-compose.yml; then
-  echo "[FAIL] Local docker-compose.yml does not exactly match origin/main." >&2
-  echo "Review the Compose difference before retrying." >&2
+# Production may intentionally keep a local Compose override (for example,
+# fixed NPM-network IPs). Preserve it, but stop if upstream itself changed
+# docker-compose.yml since this checkout; that requires an explicit review.
+if ! git diff --quiet HEAD origin/main -- docker-compose.yml; then
+  echo "[FAIL] origin/main changed docker-compose.yml since this production checkout." >&2
+  echo "Review the upstream Compose change against the production override before retrying." >&2
   exit 1
 fi
 if ! git merge-base --is-ancestor HEAD origin/main; then
@@ -158,10 +161,8 @@ echo "Backed up current IMDb updater config."
 echo "[3/6] Saving current images and fast-forwarding production checkout..."
 docker tag moviehub-backend:local "$ROLLBACK_BACKEND"
 docker tag moviehub-frontend:local "$ROLLBACK_FRONTEND"
-# The NAS may have an unstaged Compose override that now exactly matches
-# origin/main (for example, the TMDB token mapping). Stage only that verified
-# file so Git can fast-forward without rejecting the local worktree change.
-git add docker-compose.yml
+# Keep the NAS-local Compose override unstaged and untouched. The preflight
+# already verified that origin/main has no Compose change to merge over it.
 git merge --ff-only origin/main
 
 echo "[4/6] Building the MovieHub backend, IMDb updater, and frontend images..."

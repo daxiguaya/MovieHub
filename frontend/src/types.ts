@@ -21,6 +21,8 @@ export interface Movie {
   year: number | null;
   rating: number | null;
   rating_count: number | null;
+  imdb_rating?: number | null;
+  imdb_rating_count?: number | null;
   tmdb_rating?: number | null;
   tmdb_rating_count?: number | null;
   type: "movie" | "tv";
@@ -121,6 +123,8 @@ export interface DiscoveryItem {
   backdrop_path: string | null;
   genre_ids: number[];
   imdb_id?: string | null;
+  imdb_rating?: number | null;
+  imdb_rating_count?: number | null;
 }
 
 export interface DiscoverySearchResponse {

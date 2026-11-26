@@ -998,9 +998,9 @@ function SearchPage() {
   const sortedLocalOnly = [...localOnly].sort((left, right) => {
     const compare = (x: number | null, y: number | null, direction: 1 | -1) =>
       x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
-    const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1)
-      : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1)
-      : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1)
+    const result = sortBy === "rating_desc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, -1)
+      : sortBy === "rating_asc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, 1)
+      : sortBy === "votes_desc" ? compare(left.imdb_rating_count ?? null, right.imdb_rating_count ?? null, -1)
       : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
     return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
   });
@@ -1011,7 +1011,7 @@ function SearchPage() {
       <form className="search-panel" onSubmit={submit}>
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
-        <label>最低 TMDB 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
+        <label>最低 IMDb 评分<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
         <label>最低投票数<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
@@ -1044,7 +1044,7 @@ function SearchPage() {
           <div className="movie-grid">
             {[...onlineResults].sort((left, right) => {
               const compare = (x: number | null, y: number | null, direction: 1 | -1) => x == null ? (y == null ? 0 : 1) : y == null ? -1 : (x - y) * direction;
-              const result = sortBy === "rating_desc" ? compare(left.rating, right.rating, -1) : sortBy === "rating_asc" ? compare(left.rating, right.rating, 1) : sortBy === "votes_desc" ? compare(left.rating_count, right.rating_count, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
+              const result = sortBy === "rating_desc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, -1) : sortBy === "rating_asc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, 1) : sortBy === "votes_desc" ? compare(left.imdb_rating_count ?? null, right.imdb_rating_count ?? null, -1) : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
               return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
             }).map((item) => <ExternalMovieCard key={item.media_type + ":" + item.provider_id} item={item} localMovie={findLinkedLocalMovie(item)} />)}
             {sortedLocalOnly.map((movie) => <MovieCard key={"local:" + movie.id} movie={movie} localMatch />)}

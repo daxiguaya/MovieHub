@@ -682,7 +682,7 @@ function SearchPage() {
   const [keyword, setKeyword] = useState(searchParams.get("search") ?? "");
   const [type, setType] = useState<"all" | "movie" | "tv">((searchParams.get("type") as "all" | "movie" | "tv" | null) ?? "all");
   const [minRating, setMinRating] = useState(searchParams.get("min_rating") ?? "");
-  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "100");
+  const [minRatingCount, setMinRatingCount] = useState(searchParams.get("min_rating_count") ?? "");
   const [minYear, setMinYear] = useState(searchParams.get("min_year") ?? "");
   const [maxYear, setMaxYear] = useState(searchParams.get("max_year") ?? "");
   const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "relevance");
@@ -1006,7 +1006,7 @@ function SearchPage() {
         <label className="search-input"><span>⌕</span><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="输入片名，例如：异形、蝙蝠侠…" /></label>
         <label>影视类型<select value={type} onChange={(e) => setType(e.target.value as "all" | "movie" | "tv")}><option value="all">全部（关键词搜索）</option><option value="movie">电影</option><option value="tv">剧集</option></select></label>
         <label>最低 IMDb 评分（本地匹配）<select value={minRating} onChange={(e) => setMinRating(e.target.value)}><option value="">不限</option><option value="5">5.0+</option><option value="6">6.0+</option><option value="7">7.0+</option><option value="8">8.0+</option></select></label>
-        <label>最低 IMDb 投票数（本地匹配）<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="默认 100" /></label>
+        <label>最低 IMDb 投票数（本地匹配）<input type="number" min="0" max="10000000" value={minRatingCount} onChange={(e) => setMinRatingCount(e.target.value)} placeholder="不限" /></label>
         <label>起始年份<input type="number" min="1870" max="2100" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="例如 2000" /></label>
         <label>结束年份<input type="number" min="1870" max="2100" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="例如 2026" /></label>
         <div className="search-filter">

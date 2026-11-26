@@ -1486,5 +1486,6 @@ def test_scout_import_rejects_imdb_id_owned_by_another_douban_movie(
         owner = db.scalar(select(Movie).where(Movie.douban_id == "9999999"))
         assert owner.imdb_id == "tt1234567"
         assert db.scalar(select(Movie).where(Movie.douban_id == "1234567")) is None
-        assert db.query(Movie).count() == 1
+        assert db.scalar(select(Movie).where(Movie.douban_id == "7654321")) is not None
+        assert db.query(Movie).count() == 2
     engine.dispose()

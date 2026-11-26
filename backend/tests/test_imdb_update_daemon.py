@@ -62,3 +62,33 @@ def test_new_snapshot_runs_dry_run_without_auto_applying(tmp_path, monkeypatch):
     assert result["status"] == "dry_run_only"
     assert calls == [False]
     assert state["dataset_fingerprint"] == '"new-version"'
+
+
+
+def test_enabling_auto_apply_applies_saved_dry_run_snapshot(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb"
+    snapshot_dir.mkdir()
+    (snapshot_dir / "title.ratings.tsv.gz").write_bytes(b"snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"known-version"', "last_modified": "", "content_length": "8"
+    })
+    calls = []
+    def fake_import(path, apply=False):
+        calls.append(apply)
+        return {"valid": True, "matched": 12, "changed": 2, "applied": apply}
+    monkeypatch.setattr(updater, "import_imdb_ratings", fake_import)
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "prune_backups", lambda path, keep: None)
+    state = {
+        "dataset_fingerprint": '"known-version"',
+        "last_result": {"status": "dry_run_only"},
+    }
+    result = updater.run_update(
+        {"auto_apply": True, "min_matched": 10, "backup_keep": 7},
+        state,
+        date(2026, 11, 27),
+    )
+    assert result["status"] == "applied"
+    assert calls == [False, True]

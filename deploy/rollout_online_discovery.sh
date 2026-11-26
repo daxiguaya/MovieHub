@@ -73,7 +73,7 @@ IMDB_CONFIG_TEMPLATE="$ROOT/deploy/imdb-update.json.example"
 python3 - "$IMDB_CONFIG_PATH" "$IMDB_CONFIG_TEMPLATE" <<'PY'
 import json
 import sys
-from zoneinfo import ZoneInfo
+from pathlib import Path
 
 for filename in sys.argv[1:]:
     with open(filename, encoding="utf-8") as source:
@@ -85,7 +85,9 @@ for filename in sys.argv[1:]:
     hour, minute = (int(part) for part in config["run_at"].split(":"))
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise SystemExit("Invalid IMDb updater run_at: " + filename)
-    ZoneInfo(config["timezone"])
+    zone = Path("/usr/share/zoneinfo") / str(config["timezone"])
+    if not zone.is_file():
+        raise SystemExit("Unknown IMDb updater timezone: " + filename)
     if int(config.get("min_matched", 10)) < 1 or int(config.get("min_index_rows", 100000)) < 1:
         raise SystemExit("Invalid IMDb updater quality thresholds: " + filename)
 print("IMDb updater config and template are valid.")

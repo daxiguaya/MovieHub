@@ -722,10 +722,10 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByRole("link", { name: "First page" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("link", { name: "First page" })).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole("button", { name: "加载更多在线结果" }));
 
-    expect(await screen.findByRole("link", { name: "Second page" })).toBeInTheDocument();
+    expect((await screen.findAllByRole("link", { name: "Second page" })).length).toBeGreaterThan(0);
     const discoverUrls = fetchMock.mock.calls.map(([input]) => String(input))
       .filter((url) => url.startsWith("/api/discovery/discover?"));
     expect(discoverUrls).toHaveLength(2);

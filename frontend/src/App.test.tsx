@@ -691,4 +691,50 @@ describe("MovieHub frontend workflows", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("keeps IMDb rating filters local and TMDB page order stable when loading more", async () => {
+    const fetchMock = installFetchMock((url) => {
+      if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
+      if (url === "/api/discovery/regions") return { provider: "tmdb", regions: [] };
+      if (url.startsWith("/api/discovery/genres")) return { provider: "tmdb", genres: [] };
+      if (url.startsWith("/api/movies?")) return { items: [], next_cursor: null, total: 0 };
+      if (url.startsWith("/api/discovery/discover?")) {
+        const params = new URLSearchParams(url.split("?")[1]);
+        const page = Number(params.get("page"));
+        return {
+          provider: "tmdb", media_type: "movie", page, total_pages: 2,
+          total_results: 2,
+          items: [{
+            provider: "tmdb", provider_id: page, media_type: "movie",
+            title: page === 1 ? "First page" : "Second page",
+            original_title: null, year: 2024, rating: 7.5, rating_count: 1000,
+            imdb_rating: page === 1 ? 6.0 : 9.0,
+            imdb_rating_count: 500, poster_path: null, backdrop_path: null, genre_ids: []
+          }],
+          attribution: "TMDB"
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?min_rating=7&sort=rating_desc"]}>
+        <App />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("link", { name: "First page" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "加载更多在线结果" }));
+
+    expect(await screen.findByRole("link", { name: "Second page" })).toBeInTheDocument();
+    const discoverUrls = fetchMock.mock.calls.map(([input]) => String(input))
+      .filter((url) => url.startsWith("/api/discovery/discover?"));
+    expect(discoverUrls).toHaveLength(2);
+    for (const url of discoverUrls) {
+      const params = new URLSearchParams(url.split("?")[1]);
+      expect(params.get("min_rating")).toBeNull();
+      expect(params.get("sort_by")).toBe("popularity.desc");
+    }
+  });
+
+
 });

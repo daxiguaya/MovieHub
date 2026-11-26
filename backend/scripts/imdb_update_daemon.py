@@ -118,10 +118,19 @@ def run_update(config: dict, state: dict, today: date) -> dict:
     if fingerprint and fingerprint == previous:
         result = {"status": "unchanged_dataset", "checked_at": datetime.now().astimezone().isoformat()}
         state["last_result"] = result
+        state["last_successful_date"] = today.isoformat()
+        state["last_success_at"] = datetime.now().astimezone().isoformat()
         write_state(state)
         return result
 
     snapshot, content_hash = download_snapshot()
+    if not fingerprint and content_hash == previous:
+        result = {"status": "unchanged_dataset", "sha256": content_hash}
+        state["last_result"] = result
+        state["last_successful_date"] = today.isoformat()
+        state["last_success_at"] = datetime.now().astimezone().isoformat()
+        write_state(state)
+        return result
     dry_run = import_imdb_ratings(snapshot, apply=False)
     if not dry_run.get("valid") or int(dry_run.get("matched", 0)) < int(config["min_matched"]):
         raise RuntimeError(f"IMDb dry-run quality gate failed: {dry_run}")

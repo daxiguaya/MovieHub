@@ -1404,11 +1404,8 @@ function CreditsPage() {
     <>
       <PageHeading eyebrow="ABOUT & CREDITS" title="关于与数据来源" description="MovieHub 使用公开数据服务辅助电影与剧集发现；各数据来源保持独立标注。" />
       <section className="credits-panel">
-        <a className="tmdb-logo-link" href="https://www.themoviedb.org" target="_blank" rel="noreferrer">
-          <img
-            src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.svg"
-            alt="The Movie Database (TMDB)"
-          />
+        <a className="source-logo-link tmdb-source-logo" href="https://www.themoviedb.org" target="_blank" rel="noreferrer" aria-label="访问 TMDB">
+          <img src="/tmdb.svg" alt="TMDB 标志" />
         </a>
         <div className="credits-copy">
           <h2>The Movie Database (TMDB)</h2>
@@ -1417,6 +1414,9 @@ function CreditsPage() {
         </div>
       </section>
       <section className="credits-panel">
+        <a className="source-logo-link imdb-source-logo" href="https://www.imdb.com" target="_blank" rel="noreferrer" aria-label="访问 IMDb">
+          <img src="/imdb.svg" alt="IMDb 标志" />
+        </a>
         <div className="credits-copy">
           <h2>IMDb</h2>
           <p>Information courtesy of IMDb (https://www.imdb.com). Used with permission. IMDb ratings are used for personal, non-commercial use only.</p>
@@ -1424,6 +1424,9 @@ function CreditsPage() {
         </div>
       </section>
       <section className="credits-panel">
+        <a className="source-logo-link douban-source-logo" href="https://movie.douban.com" target="_blank" rel="noreferrer" aria-label="访问豆瓣电影">
+          <img src="/douban.svg" alt="豆瓣标志" />
+        </a>
         <div className="credits-copy">
           <h2>豆瓣</h2>
           <p>现有豆瓣榜单数据按榜单来源单独展示。MovieHub 不代表豆瓣官方，也不将豆瓣评分与 TMDB 评分合并。</p>

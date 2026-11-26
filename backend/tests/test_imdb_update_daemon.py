@@ -42,12 +42,22 @@ def test_unchanged_etag_skips_download_and_marks_day_complete(tmp_path, monkeypa
     monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("must not download"))
     monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
     (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
-    state = {"dataset_fingerprint": '"same-version"', "last_result": {
-        "status": "applied", "dry_run": {"full_index": {"indexed_titles": 1000000}}
-    }}
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: "same-catalogue")
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "same-catalogue",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 20},
+                "full_index": {"valid": True, "indexed_titles": 1000000},
+            },
+        },
+    }
     result = updater.run_update({}, state, date(2026, 11, 26))
     assert result["status"] == "unchanged_dataset"
     assert state["last_successful_date"] == "2026-11-26"
+    assert state["local_catalogue_fingerprint"] == "same-catalogue"
     assert json.loads(state_path.read_text())["last_successful_date"] == "2026-11-26"
 
 
@@ -156,3 +166,93 @@ def test_updater_checks_configured_index_path_for_unchanged_etag(tmp_path, monke
     result = updater.run_update({}, state, date(2026, 11, 27))
 
     assert result["status"] == "unchanged_dataset"
+
+
+
+def test_unchanged_etag_refreshes_local_ratings_when_catalogue_changes(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    snapshot = snapshot_dir / "title.ratings.tsv.gz"
+    snapshot.write_bytes(b"saved official snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    monkeypatch.setattr(updater, "download_snapshot", lambda: pytest.fail("saved snapshot should be reused"))
+    fingerprints = iter(["catalogue-v2", "catalogue-v2"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(("local", apply)) or {"valid": True, "matched": 275, "changed": 12}
+    ))
+    monkeypatch.setattr(updater, "import_imdb_rating_index", lambda *args, **kwargs: (
+        calls.append(("index", kwargs.get("apply", False)))
+        or {"valid": True, "indexed_titles": 1500000}
+    ))
+    monkeypatch.setattr(updater, "index_database_path", lambda: tmp_path / "imdb-ratings.sqlite3")
+    (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    result = updater.run_update(
+        {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+        state,
+        date(2026, 11, 28),
+    )
+
+    assert result["status"] == "dry_run_only"
+    assert result["dry_run"]["local"]["matched"] == 275
+    assert calls == [("local", False)]
+    saved_state = json.loads((tmp_path / "state.json").read_text())
+    assert saved_state["local_catalogue_fingerprint"] == "catalogue-v2"
+
+
+def test_catalogue_change_during_refresh_does_not_mark_day_complete(tmp_path, monkeypatch):
+    snapshot_dir = tmp_path / "imdb-imports"
+    snapshot_dir.mkdir()
+    (snapshot_dir / "title.ratings.tsv.gz").write_bytes(b"saved official snapshot")
+    monkeypatch.setattr(updater, "IMPORT_DIR", snapshot_dir)
+    monkeypatch.setattr(updater, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(updater, "get_db_path", lambda: tmp_path / "movies.db")
+    monkeypatch.setattr(updater, "request_headers", lambda: {
+        "etag": '"same-version"', "last_modified": "", "content_length": "123"
+    })
+    fingerprints = iter(["catalogue-v2", "catalogue-v3"])
+    monkeypatch.setattr(updater, "local_catalogue_fingerprint", lambda: next(fingerprints))
+    monkeypatch.setattr(updater, "index_database_path", lambda: tmp_path / "imdb-ratings.sqlite3")
+    (tmp_path / "imdb-ratings.sqlite3").write_bytes(b"present")
+    calls = []
+    monkeypatch.setattr(updater, "import_imdb_ratings", lambda path, apply=False: (
+        calls.append(apply) or {"valid": True, "matched": 275}
+    ))
+    state = {
+        "dataset_fingerprint": '"same-version"',
+        "local_catalogue_fingerprint": "catalogue-v1",
+        "last_result": {
+            "status": "applied",
+            "dry_run": {
+                "local": {"valid": True, "matched": 263},
+                "full_index": {"valid": True, "indexed_titles": 1500000},
+            },
+        },
+    }
+
+    with pytest.raises(RuntimeError, match="catalogue changed during refresh"):
+        updater.run_update(
+            {"auto_apply": False, "min_matched": 10, "min_index_rows": 100000},
+            state,
+            date(2026, 11, 28),
+        )
+
+    assert not (tmp_path / "state.json").exists()

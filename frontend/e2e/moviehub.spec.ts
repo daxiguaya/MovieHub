@@ -394,6 +394,9 @@ test("shows TMDB attribution and source credits in the dedicated credits section
   await expect(page.getByRole("img", { name: "TMDB 标志" })).toBeVisible();
   await expect(page.getByRole("img", { name: "IMDb 标志" })).toBeVisible();
   await expect(page.getByRole("img", { name: "豆瓣标志" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "TMDB 标志" })).toHaveAttribute("src", /(?:^|\/)tmdb\.svg$/);
+  await expect(page.getByRole("img", { name: "IMDb 标志" })).toHaveAttribute("src", /(?:^|\/)imdb\.svg$/);
+  await expect(page.getByRole("img", { name: "豆瓣标志" })).toHaveAttribute("src", /(?:^|\/)douban\.svg$/);
   await expect(page.getByText("This product uses the TMDB API but is not endorsed or certified by TMDB.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Visit The Movie Database" })).toHaveAttribute("href", "https://www.themoviedb.org");
 });

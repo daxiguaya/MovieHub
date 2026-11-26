@@ -132,6 +132,7 @@ def test_local_imdb_rating_is_attached_only_by_exact_tmdb_identity():
             {"provider_id": 999999, "media_type": "movie"},
         ]
         result = _attach_local_imdb_ratings(db, items)
+        assert result[0]["imdb_id"] == "tt0111161"
         assert result[0]["imdb_rating"] == 9.3
         assert result[0]["imdb_rating_count"] == 3000000
         assert result[1]["imdb_rating"] is None
@@ -185,3 +186,25 @@ def test_discover_enriches_results_with_full_imdb_index(monkeypatch):
     assert item["imdb_id"] == "tt7654321"
     assert item["imdb_rating"] == 7.9
     assert item["imdb_rating_count"] == 9876
+
+
+
+def test_online_detail_uses_full_imdb_index(monkeypatch):
+    async def fake_get_json(endpoint, params=None, ttl=900, include_overview=False):
+        return {
+            "id": 654,
+            "title": "Online title",
+            "release_date": "2022-01-01",
+            "external_ids": {"imdb_id": "tt7654321"},
+            "genres": [],
+        }
+
+    monkeypatch.setattr(discovery.tmdb_client, "get_json", fake_get_json)
+    monkeypatch.setattr(discovery, "lookup_ratings", lambda ids: {"tt7654321": (8.1, 45678)})
+    with _client(monkeypatch) as client:
+        response = client.get("/api/discovery/movie/654")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["imdb_id"] == "tt7654321"
+    assert body["imdb_rating"] == 8.1
+    assert body["imdb_rating_count"] == 45678

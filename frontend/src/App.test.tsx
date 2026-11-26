@@ -717,7 +717,7 @@ describe("MovieHub frontend workflows", () => {
     });
 
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?min_rating=7&sort=rating_desc"]}>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={["/search?min_rating=7&min_rating_count=20000&sort=rating_desc"]}>
         <App />
       </MemoryRouter>
     );
@@ -732,6 +732,7 @@ describe("MovieHub frontend workflows", () => {
     for (const url of discoverUrls) {
       const params = new URLSearchParams(url.split("?")[1]);
       expect(params.get("min_rating")).toBeNull();
+      expect(params.get("min_votes")).toBe("0");
       expect(params.get("sort_by")).toBe("popularity.desc");
     }
   });

@@ -68,6 +68,22 @@ def _normalize_result(item: dict, media_type: str) -> dict:
     }
 
 
+def _attach_local_imdb_ratings(db: Session, items: list[dict]) -> list[dict]:
+    """Attach ratings only through an exact local TMDB-ID identity match."""
+    provider_ids = {str(item["provider_id"]) for item in items if isinstance(item.get("provider_id"), int)}
+    media_types = {item.get("media_type") for item in items}
+    if not provider_ids or not media_types:
+        return items
+    local_movies = db.query(Movie).filter(
+        Movie.tmdb_id.in_(provider_ids),
+        Movie.type.in_(media_types),
+    ).all()
+    by_identity = {(movie.type, movie.tmdb_id): movie for movie in local_movies if movie.tmdb_id}
+    for item in items:
+        movie = by_identity.get((item.get("media_type"), str(item.get("provider_id"))))
+        item["imdb_rating"] = movie.imdb_rating if movie else None
+        item["imdb_rating_count"] = movie.imdb_rating_count if movie else None
+    return items
 @router.get("/search")
 @limiter.limit("30/minute")
 async def search_online(
@@ -76,6 +92,7 @@ async def search_online(
     media_type: Literal["all", "movie", "tv"] = Query("all"),
     page: int = Query(1, ge=1, le=500),
     language: str = Query("zh-CN", min_length=2, max_length=12),
+    db: Session = Depends(get_db),
 ) -> dict:
     """Search one requested page only; never crawl subsequent pages."""
     query = " ".join(q.split())
@@ -93,6 +110,7 @@ async def search_online(
         if kind not in ("movie", "tv") or not isinstance(item.get("id"), int):
             continue
         results.append(_normalize_result(item, kind))
+    _attach_local_imdb_ratings(db, results)
     return {
         "provider": "tmdb",
         "query": query,
@@ -149,6 +167,7 @@ async def discover_online(
     max_votes: int | None = Query(None, ge=0, le=10000000),
     sort_by: Literal["popularity.desc", "vote_average.desc", "vote_average.asc", "primary_release_date.desc", "first_air_date.desc", "vote_count.desc"] = Query("popularity.desc"),
     language: str = Query("zh-CN", min_length=2, max_length=12),
+    db: Session = Depends(get_db),
 ) -> dict:
     params = {
         "page": page,
@@ -165,17 +184,15 @@ async def discover_online(
         "include_adult": "false",
     }
     payload = await tmdb_client.get_json(f"/discover/{media_type}", params, SEARCH_TTL)
+    results = [_normalize_result(item, media_type) for item in payload.get("results", []) if isinstance(item.get("id"), int)]
+    _attach_local_imdb_ratings(db, results)
     return {
         "provider": "tmdb",
         "media_type": media_type,
         "page": page,
         "total_pages": min(int(payload.get("total_pages") or 0), 500),
         "total_results": int(payload.get("total_results") or 0),
-        "items": [
-            _normalize_result(item, media_type)
-            for item in payload.get("results", [])
-            if isinstance(item.get("id"), int)
-        ],
+        "items": results,
         "attribution": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
     }
 
@@ -212,6 +229,7 @@ async def get_online_detail(
     media_type: Literal["movie", "tv"],
     provider_id: int,
     language: str = Query("zh-CN", min_length=2, max_length=12),
+    db: Session = Depends(get_db),
 ) -> dict:
     if provider_id < 1:
         raise HTTPException(status_code=422, detail="Invalid TMDB ID")
@@ -221,10 +239,17 @@ async def get_online_detail(
         DETAIL_TTL,
         include_overview=True,
     )
+    imdb_id = (payload.get("external_ids") or {}).get("imdb_id")
+    identity_filter = Movie.tmdb_id == str(provider_id)
+    if imdb_id:
+        identity_filter = identity_filter | (Movie.imdb_id == imdb_id)
+    local_movie = db.query(Movie).filter(Movie.type == media_type, identity_filter).first()
     return {
         "provider": "tmdb",
         "media_type": media_type,
         "provider_id": provider_id,
+        "imdb_rating": local_movie.imdb_rating if local_movie else None,
+        "imdb_rating_count": local_movie.imdb_rating_count if local_movie else None,
         "title": payload.get("title") or payload.get("name"),
         "original_title": payload.get("original_title") or payload.get("original_name"),
         "year": int((payload.get("release_date") or payload.get("first_air_date") or "")[:4]) if (payload.get("release_date") or payload.get("first_air_date") or "")[:4].isdigit() else None,

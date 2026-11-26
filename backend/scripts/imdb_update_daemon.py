@@ -132,6 +132,12 @@ def run_update(config: dict, state: dict, today: date) -> dict:
             applied = import_imdb_ratings(saved_snapshot, apply=True)
             prune_backups(Path(get_db_path()).resolve(), int(config["backup_keep"]))
             result = {"status": "applied", "dry_run": dry_run, "applied_result": applied}
+        elif previous_result.get("status") == "dry_run_only":
+            result = {
+                "status": "dry_run_only",
+                "dataset_unchanged": True,
+                "dry_run": previous_result.get("dry_run"),
+            }
         else:
             result = {"status": "unchanged_dataset", "checked_at": datetime.now().astimezone().isoformat()}
         state["last_result"] = result

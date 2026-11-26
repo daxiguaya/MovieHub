@@ -89,7 +89,7 @@ untouched. Re-running the same dataset is idempotent for provenance.
 ## Optional Docker-managed daily updater
 
 The Compose stack includes an isolated `moviehub-imdb-updater` service. It shares
-only the MovieHub data directory, the configured import staging directory, a
+only the MovieHub data directory, a private subdirectory under the MovieHub data directory, a
 read-only JSON configuration file, and a small state directory. It does not
 expose a port and does not run inside the API process. The updater image reuses
 the backend image; it adds no cron package or separate database.
@@ -105,7 +105,7 @@ disabled and dry-run-only:
   "run_at": "04:30",
   "timezone": "Asia/Singapore",
   "auto_apply": false,
-  "min_matched": 1,
+  "min_matched": 10,
   "backup_keep": 7,
   "retry_minutes": 15
 }

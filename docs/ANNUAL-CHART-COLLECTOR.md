@@ -73,3 +73,8 @@ typed as `movie`.
 This collector is a manual, one-shot adapter for an undocumented page layout,
 not a scheduled scraper or a supported Douban API. If robots.txt or page
 markup changes, it stops and requires review. Do not bypass access controls.
+
+
+## Production status
+
+The four 2025 annual lists described here have since been imported into the production MovieHub database and confirmed by the production audit: four snapshots and 38 entries total (8/10/10/10). This runbook remains for reproducible manual collection/validation when needed; it does not imply that scheduled collection is enabled or that a new import should be performed. Do not re-import into production without a separate backup, preflight, and explicit operational decision.

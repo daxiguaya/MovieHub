@@ -1,85 +1,87 @@
 # Chart data sources and acquisition policy
 
-Last reviewed: 2026-11-23
+Last reviewed: 2026-11-27
 
-## Current state
+## Current production state
 
-MovieHub has a normalized chart snapshot model, date-scoped replacement semantics, local/Cinephile-format adapters, a dry-run import CLI, one-shot Top 250 and popular/high-rated collectors, and a one-shot collector for the official 2025 annual roundup.
+The production database contains:
 
-**It does not run scheduled chart collection.** Top 250, popular and high-rated charts have opt-in, one-shot manual collectors that run only when robots.txt permits. The 2025 annual taxonomy is represented as four separate built-in lists. The manual collector has successfully fetched the official roundup and produced four normalized snapshots (8/10/10/10 entries); all four passed dry-run validation in CI and were retained as a 14-day Actions artifact. No annual data is committed to Git or imported into a database. Built-in chart definitions are display metadata only; they are not evidence that chart data has been fetched.
+| Chart | Snapshots | Items |
+|---|---:|---:|
+| Douban Top 250 | 1 | 250 |
+| 2025 Chinese films | 1 | 8 |
+| 2025 international films | 1 | 10 |
+| 2025 hidden gems | 1 | 10 |
+| 2025 Chinese TV | 1 | 10 |
+| **2025 annual total** | **4** | **38** |
 
+The four annual charts are separate lists under period `2025`. The Chinese-film source explicitly leaves ranks 9 and 10 empty; MovieHub does not synthesize entries or renumber the remaining ranks.
 
-## Annual chart taxonomy
+**Douban real-time popular and Douban high-rated are retired and are not current product charts.** Their former `/j/search_subjects` collection path was disallowed by Douban's `robots.txt`. Collection was stopped and the UI entries were removed. Empty legacy chart-definition rows in an existing database are historical leftovers, not supported charts or evidence of collected data.
 
-Douban's official 2025 annual book/film/music roundup, published on 2026-01-15, explicitly lists four film/television categories:
+## Supported chart sources
+
+### Douban Top 250
+
+- The one-shot collector reads public `/top250` HTML pages.
+- It checks `robots.txt` before requesting chart pages.
+- It uses sequential requests with conservative pacing and respects a longer published crawl-delay.
+- It does not use cookies, login sessions, proxy rotation, retries, or challenge bypass.
+- It stops on access denial, rate limiting, unexpected redirects, oversized responses, missing ranks, or changed markup.
+- It writes a normalized JSON snapshot; importing remains a separate explicit operation.
+
+### Official 2025 annual lists
+
+Douban's official 2025 annual roundup lists four film/television categories:
 
 1. 2025 评分最高华语电影
 2. 2025 评分最高外语电影
 3. 2025 年度冷门佳片
 4. 2025 评分最高华语剧集
 
-Source: [Douban official 2025 annual roundup](https://blog.douban.com/douban/2026/01/15/4382/) and its [2025 annual movie page](https://movie.douban.com/annual/2025/).
+Sources: [Douban official annual roundup](https://blog.douban.com/douban/2026/01/15/4382/) and [2025 annual movie page](https://movie.douban.com/annual/2025/).
 
-MovieHub models these as four independent chart slugs under the `annual` category and period `2025`. They must not be merged into a single ranking: the source categories have different scopes, and the TV list is not a movie list. The official ranking data has now been collected and dry-run validated. It remains a CI artifact rather than a committed dataset, and has not been imported into a MovieHub database.
+The collector is a manual, one-shot adapter for the official roundup page. It checks the source's robots.txt, fails closed when access is disallowed, and emits four normalized JSON files without opening or modifying a MovieHub database. The production database has since received the four validated lists (38 entries total). See [ANNUAL-CHART-COLLECTOR.md](ANNUAL-CHART-COLLECTOR.md) for the reproducible collection and import procedure, and [ANNUAL-2025-ARTIFACT-REVIEW.md](ANNUAL-2025-ARTIFACT-REVIEW.md) for the original artifact review and later import note.
 
-As of the 2026-11-23 review, a 2026 annual movie/TV taxonomy and published ranking data had not been verified. MovieHub therefore does not expose a blank `annual-2026` placeholder. Add 2026 chart definitions only after the official categories are published and reviewed; import normalized data separately. The 2025 collector is manual and one-shot; no scheduled refresh is enabled.
+A 2026 annual taxonomy and published ranking data must be verified against an official source before adding definitions or importing snapshots. Do not infer that a new annual list exists from the calendar year alone.
 
-## Reference projects
+## Retired sources: real-time popular and high-rated
 
-### Cinéphile / Top Movies List
+The former popular and high-rated collectors targeted Douban's undocumented `/j/search_subjects` endpoint for the `热门` and `豆瓣高分` tags. That endpoint is disallowed by the applicable robots.txt policy. The project stopped collection and removed both chart entries from the user-facing product.
 
-The public `dataxiv/movies` project describes scheduled collection and refresh of Top 250, popular, annual and other movie lists. MovieHub uses this only as a reference for chart taxonomy, snapshot cadence and the idea of keeping chart sources behind adapters.
+- Do not run `deploy/refresh_douban_popular.sh` or `deploy/refresh_douban_high_rated.sh`.
+- Do not list those scripts as operator workflows or restore the corresponding UI entries.
+- Do not bypass robots.txt, access controls, rate limits, or use alternate identities/proxies to reach the retired endpoint.
+- Reconsider only after a separately documented, authorized source and policy review.
 
-- Reference: https://github.com/dataxiv/movies
-- Do not copy its code or redistribute its collected datasets as part of MovieHub unless the exact source repository, file-level license and data rights have been checked. The top-level aggregator's license does not automatically license every linked dataset or upstream site's content.
+The legacy scripts may remain in the repository for historical traceability; their presence does not make the source supported.
 
-### Douban iDatabase
-
-The project describes multi-source metadata aggregation and ID translation across Douban, IMDb, TMDb and TVDB. These are useful architectural concepts, but MovieHub keeps its own schema, import pipeline and provider-ID mapping.
-
-- Reference: https://github.com/kfstorm/douban-idatabase
-- The repository did not expose a recognized license in the metadata reviewed for this milestone. Treat its source code as unavailable for reuse unless a clear license is confirmed. No code is copied into MovieHub.
+## Other source boundaries
 
 ### Douban Scout
 
-Scout remains MovieHub's current detailed metadata source. MovieHub opens Scout SQLite read-only and imports into its own database. It is not a chart acquisition source, and MovieHub must not modify Scout.
+Scout is an optional, external detailed-metadata source. MovieHub opens a staged Scout SQLite database read-only and imports selected records into its own database. Scout is not MovieHub's database and is not a chart-acquisition source. Never modify the Scout source.
 
-## One-shot Top 250 collector
+### Reference projects
 
-- Reads only the public `/top250` HTML pages.
-- Checks `robots.txt` before requesting chart pages.
-- Makes ten sequential page requests, with at least two seconds between requests, or the longer crawl-delay declared in robots.txt.
-- Does not use cookies, login sessions, proxy rotation, redirects, retries or challenge bypass.
-- Stops on 401/403, 429, unexpected redirects, oversized responses, missing ranks or changed markup.
-- Writes a normalized JSON file only; it does not write directly to the database or run on a schedule.
-
-## Popular and high-rated collectors
-
-- Use Douban's undocumented `/j/search_subjects` web endpoint for the `热门` and `豆瓣高分` tags.
-- Bound each run to at most 100 results by default (hard maximum 500).
-- Use sequential pacing of at least two seconds (or the longer robots.txt crawl-delay), robots.txt checks, no cookies, no proxy rotation, no redirects and no retries.
-- The endpoint returns only list-level fields; Scout remains the metadata enrichment source.
-- Treat this as a fragile web endpoint, not a supported official API. It may stop working or be disallowed at any time.
+- [dataxiv/movies](https://github.com/dataxiv/movies) is a reference for chart taxonomy and adapter concepts only. Do not copy code or redistribute datasets without checking the exact source and data licenses.
+- [kfstorm/douban-idatabase](https://github.com/kfstorm/douban-idatabase) is a reference for multi-provider identity mapping only. Do not reuse source code unless a clear license is confirmed.
 
 ## Acquisition constraints
 
 - Do not depend on historical embedded Douban API keys or assume legacy `api.douban.com/v2` endpoints are anonymously usable.
-- Do not add an external paid API provider or third-party hosted proxy as a mandatory dependency.
+- Do not add a paid API provider or third-party hosted proxy as a mandatory dependency.
 - Do not scrape at high frequency, bypass login/challenges, rotate identities, or evade rate limits.
-- Do not commit scraped chart dumps or copyrighted poster/data archives to Git.
-- If an authorized provider or user-controlled export becomes available, implement it as a separate `ChartSourceAdapter` that emits the existing `ChartSnapshotImport` schema.
-- Existing web collectors are opt-in/manual only; they check robots.txt, apply conservative pacing and stop on access denial/rate limiting. They do not use retries, login, proxy rotation or challenge bypass.
-- Any expansion to new chart types or scheduled collection requires a separate source/permission review. It must have conservative request pacing, bounded retries only where permitted, conditional caching, clear source attribution and a kill switch. It must not run as an unbounded background loop.
+- Do not commit scraped chart dumps, production databases, or copyrighted poster/data archives to Git.
+- New chart sources require a separate source/permission review, conservative pacing, clear attribution, validation, and a kill switch.
+- Chart collection is not scheduled by MovieHub. Collection, validation, and database import are separate deliberate operations.
 
-## Current operator workflow
+## Import workflow
 
-- Douban high-rated: `sh deploy/refresh_douban_high_rated.sh [YYYY-MM-DD]`.
-- Douban real-time popular: `sh deploy/refresh_douban_popular.sh [YYYY-MM-DD]`.
-- Both scripts are operator-invoked only. They stop when robots.txt disallows the endpoint or Douban returns 401/403/429; they do not bypass access controls, and they do not restart containers.
-- Each script writes a temporary normalized snapshot, dry-run validates it, creates a database backup, imports the dated snapshot, and removes the temporary file only after success.
+For an authorized, manually prepared UTF-8 JSON snapshot, validate it with the dry-run option and import it using [CHART-IMPORT.md](CHART-IMPORT.md). Re-importing the same chart/date replaces only that snapshot; other dates remain intact.
 
-For a manually prepared UTF-8 JSON snapshot, validate it with `--dry-run`, then import it using [CHART-IMPORT.md](CHART-IMPORT.md). Re-importing the same chart/date replaces only that snapshot; other dates remain intact.
+The retired popular/high-rated scripts are explicitly excluded from this workflow.
 
 ## Decision
 
-Keep scheduled chart acquisition as an explicit pending milestone until the data source, authorization, reliability and request policy are settled. The current one-shot collectors are experimental, operator-invoked tools around public pages/endpoints, not a guarantee of stable or officially supported access.
+Keep the current source set limited to the imported Top 250 and official 2025 annual lists. Do not resume the retired Douban endpoints. New sources and 2026 annual charts require evidence of publication and a separate policy review.

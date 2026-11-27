@@ -1,134 +1,83 @@
 # MovieHub Product Scope and Architecture
 
-> **Document status — 2026-11-26:** This file records the original first-release product scope agreed during the database-foundation phase. Its historical implementation table, branch label, dated CI counts, and remaining-delivery order are not a current status report and must not be used as the live completion checklist. For current repository capabilities, schema version, last recorded production baseline, and known gaps, use [README](../README.md) and [PROJECT-STATUS.md](PROJECT-STATUS.md). The current `main` code is schema v5; the last recorded production verification remains schema v4 until a live v5 migration is confirmed.
+> **Document status — 2026-11-27:** This document preserves the original first-release scope for historical context, but the old implementation table and remaining-delivery list have been superseded. The shipped product is in maintenance mode. Current production facts are maintained in [PROJECT-STATUS.md](PROJECT-STATUS.md).
 
-Status: agreed first-release product baseline
-Branch: phase4/database-foundation
-Last updated: 2026-11-23
+## Current shipped scope
 
-## Product definition
+MovieHub is a self-hosted, single-user movie discovery and chart-history application. Its primary journey is:
 
-MovieHub is a self-hosted movie discovery and chart-history application. Its primary journey is:
+**Open a supported chart → discover a title → view details → open Xiaoya search.**
 
-**Open a chart → discover a movie → view its details → open Xiaoya search.**
+Current production charts are Douban Top 250 and the four imported 2025 annual lists. Douban real-time popular and high-rated were part of the early proposal but were retired after the target endpoint was found disallowed by robots.txt; they are not current product commitments.
+
+Current functionality includes chart snapshots/history and rank comparison, local catalogue search/filtering, title details, posters, favorites, TMDB-backed online discovery, and a configurable Xiaoya handoff. The current rating display uses IMDb ratings where available; TMDB remains a discovery and metadata provider. See [PROJECT-STATUS.md](PROJECT-STATUS.md) for exact production coverage.
 
 MovieHub is not a download client, media server, media-library manager, or video player. Existing Xiaoya, Jellyfin and SmartStrm services keep those responsibilities. MovieHub must not duplicate or interfere with them.
 
-## First-release features
+## Original first-release scope (historical)
+
+The following records the original planning baseline. Items superseded by the current shipped scope above are historical requirements, not a promise that every proposed source or feature was delivered.
 
 ### 1. Chart discovery
 
-Initial chart groups:
+The original proposal listed:
 
 - Douban Top 250
 - Douban real-time popular
 - Douban high-rated
 - Annual charts, including 2025 and 2026 as seeded definitions
 
-Requirements:
-
-- Chart landing page with clear chart grouping and poster-led cards.
-- Chart detail page with rank, title, year, rating, genres and poster.
-- Latest snapshot by default.
-- Historical snapshot date selector.
-- Stable chart slugs and date-specific snapshots; importing one date must not erase other dates.
+**Scope correction:** only Top 250 and the four verified/imported 2025 annual lists are current supported chart data. Popular/high-rated were retired for source-policy reasons. A 2026 chart definition or dataset must wait for official publication and verification.
 
 ### 2. Movie search and filters
 
-- Search display title and original title.
-- Filter movie/TV type, rating range, rating count, year range, genres, excluded genres and regions.
-- Sort by rating, rating count or year.
-- Cursor pagination.
-- Start with the existing SQLite LIKE-based title/original-title search and benchmark it against realistic catalogue sizes.
-- FTS5 is optional, not a hard runtime dependency: add it only if measured search latency or relevance justifies the added schema/index complexity, with a tested LIKE fallback.
-- Do not add Redis, MySQL or Elasticsearch.
+The intended catalogue search covers display/original title and filters for media type, rating, rating count, year, genres and regions. Search uses the application-owned SQLite database; external search infrastructure is not required.
 
 ### 3. Movie detail
 
-Show available metadata without inventing missing values:
-
-- Display/original title, year, movie or TV type.
-- Douban rating and rating count.
-- Genres and regions.
-- Directors, actors and overview.
-- External identifiers and Douban detail link when present.
-- Poster gallery backed by MovieHub's local poster cache.
+Show available metadata without inventing missing values, including display/original title, year, media type, source-specific ratings, genres, regions, directors, actors, overview, external identifiers, source links and cached posters where available.
 
 ### 4. Favorites
 
-- Single-user self-hosted favorites; no account/user system in the first release.
-- Add/remove a movie and list saved movies.
-- Optional user note may be supported by the existing favorites.note column.
-- Favorite writes must use MovieHub internal movies.id, never a provider ID.
+Single-user self-hosted favorites; no account/user system is required. Favorite writes use MovieHub internal movie IDs, never provider IDs.
 
 ### 5. Xiaoya handoff
 
-- Provide a clear “Search in Xiaoya” action on movie detail and movie cards where useful.
-- Open the existing Xiaoya web search page in a new browser tab/window, passing the movie title through the existing box query parameter with proper URL encoding.
-- Make the Xiaoya base/search URL configurable. Do not hardcode the user's NAS hostname into application source or expose credentials.
-- This is a handoff to Xiaoya's existing search UI, not a MovieHub resource search, download, playback or media-library integration.
+Provide a configurable link to the existing Xiaoya search UI, passing the title through the configured query parameter. This is a handoff, not a MovieHub download, playback, or media-library integration.
 
 ## Explicit exclusions
 
-Do not implement these in MovieHub first release:
+Do not implement these as part of MovieHub's current scope:
 
-- Downloading, download queue, torrent/BT or cloud-drive transfer.
-- Media-library scanning, organization, renaming or metadata management for playback libraries.
+- Downloading, download queues, torrent/BT or cloud-drive transfer.
+- Media-library scanning, organization, renaming or playback metadata management.
 - Video playback, transcoding, subtitle management or streaming.
 - Replacing Xiaoya, Jellyfin or SmartStrm.
 - User accounts, multi-user roles or public social features.
-- Redis, MySQL, PostgreSQL or Elasticsearch.
+- Redis, MySQL, PostgreSQL or Elasticsearch merely to expand infrastructure.
 
-## Technology and deployment architecture
+## Architecture
 
 - Frontend: React + TypeScript + Vite, built and served as a separate frontend container.
 - Backend: FastAPI in its own container.
 - Database: one MovieHub-owned SQLite database; internal foreign keys use MovieHub IDs.
-- Search: SQLite LIKE by default; optional FTS5 only if benchmarks justify it, with no external search service.
+- Search: SQLite-backed local catalogue search; no external search service is required.
 - Posters: MovieHub-managed local cache on the persistent data volume.
-- Import: Douban Scout is an external, read-only import source. The MovieHub container receives its export/source directory read-only.
-- Reverse proxy: existing Nginx Proxy Manager; prefer one same-origin MovieHub host with frontend routes and an /api reverse-proxy route, avoiding broad CORS.
-- Keep frontend and backend on the existing Docker network boundary. Do not publish an unnecessary NAS/LAN host port.
-- Do not introduce extra always-on infrastructure beyond the two application containers and SQLite.
+- Import: Douban Scout is an external, read-only import source. The MovieHub container receives its staged source directory read-only.
+- Reverse proxy: existing Nginx Proxy Manager; use same-origin routing for frontend/API where configured.
+- Keep frontend and backend on the existing Docker network boundary. Do not publish unnecessary NAS/LAN host ports.
+- Do not introduce extra always-on infrastructure beyond the application containers and SQLite.
 
-## Current implementation coverage (as of 2026-11-24)
+## Data-source and safety policy
 
-| Capability | Current state | Remaining work |
-|---|---|---|
-| Independent SQLite schema | Complete, 11 core tables; schema v2 includes durable import-batch receipts; latest backend CI passes | Validate v1 → v2 migration against an isolated copy of a real v1 MovieHub database before production use |
-| Chart definitions and dated snapshots | Backend API, date-scoped snapshots, normalized JSON CLI import, dry-run, rank comparison API/UI, robots-aware Top 250/popular/high-rated collectors and official 2025 annual collector exist | Review/import actual 2025 snapshots into an isolated MovieHub DB; verify 2026 categories and publication data; decide whether a refresh mechanism is warranted |
-| Movie search/filter API | Implemented with SQL LIKE and cursor pagination | Run opt-in realistic 10k/100k latency benchmarks; add FTS5 only if measured results justify it |
-| Movie detail API | Implemented; internal MovieHub IDs are used for relations | Real-data visual/UX validation |
-| Poster cache/API | Implemented with source-host allowlist, redirect/DNS validation, response-size and image-signature checks | Visual QA of loading, missing and failed poster states |
-| Favorites | Protected list/add/update-note/remove API uses MovieHub internal IDs; frontend UI and browser flow implemented | Verify protected key injection through an isolated NPM test host |
-| Scout import | Read-only source boundary, identity/numeric gates, 500-record transactions, per-record SAVEPOINT isolation, merge/partial retry, durable receipts, journal, error manifest, preview/reconciliation and readiness CLI; latest backend CI passes | Audit a consistent staged Scout copy, reconcile its preview, then validate throughput on controlled hardware |
-| React frontend | Chart discovery/history/comparison, search/filter, detail, favorites and configurable Xiaoya handoff; 5 frontend tests and 4 Playwright E2E tests pass | Visual/responsive QA and review against representative real catalogue data |
-| Frontend/backend Compose topology | Separate frontend/backend services, same-origin routing documented; both images build in CI | Verify actual NPM locations, TLS/access controls and server-side favorites-key injection during authorized rollout |
-| Backup/restore | SQLite online backup, integrity/foreign-key checks, manifest, retention, guarded restore and rollback utility/runbook implemented | Rehearse against an isolated test database and verify the intended NAS backup destination during authorized rollout |
-| Production rollout | Not deployed; no production DB, NPM or NAS service modified | Separate approval, deployment checklist, staged smoke test and rollback plan |
+- Use only chart sources that pass source/permission and robots.txt review.
+- Do not run the retired popular/high-rated collectors or attempt to bypass their access restrictions.
+- Keep source-specific ratings and metadata separate; never treat ratings from different providers as interchangeable.
+- Preserve field-level provenance and leave missing or ambiguous values missing.
+- Never use the Douban Scout database as MovieHub's database or write to the Scout source.
+- Do not change, restart or reconfigure Xiaoya, Jellyfin, SmartStrm, NPM or NAS services as part of ordinary code development.
+- Do not commit secrets, production databases, backup archives, or private environment files.
 
-Latest full CI: [run #45212034805](https://github.com/daxiguaya/MovieHub/actions/runs/45212034805) — backend 224 passed / 4 skipped, frontend 5 passed, browser E2E 4 passed. Annual collection and performance benchmark jobs were skipped by workflow conditions and remain unverified.
-## Chart acquisition policy
+## Historical delivery plan
 
-- Use normalized snapshot imports until an authorized and reliable chart provider is selected.
-- Do not rely on deprecated public API keys, mandatory paid proxies, or high-frequency scraping.
-- Keep source adapters isolated and preserve source attribution, pacing, cache and retry boundaries.
-
-## Remaining delivery order
-
-1. Validate the schema-v1 migration using a consistent, isolated copy of a real v1 MovieHub database; do not use the live NAS database as a test fixture.
-2. Run the read-only Scout whole-catalogue audit and chart-coverage gate against a consistent staged Scout copy, then generate and reconcile an import preview.
-3. Review the official 2025 four-chart snapshots and import them only into a fresh isolated MovieHub database before considering any production data operation.
-4. Verify 2026 chart definitions against official publication sources and decide whether scheduled refresh is actually required for the first release.
-5. Complete visual/responsive QA and realistic-data UX review for charts, search, details, posters and favorites.
-6. Validate same-origin NPM routing, TLS/access controls and favorites-only server-side API-key injection in an isolated test host.
-7. Run opt-in 10k/100k search/import benchmarks and an isolated backup/restore rehearsal; record results separately from CI.
-8. Only after the above review, prepare a deployment checklist and rollback plan. Production initialization, Scout import, NPM changes and service restarts remain separate operator actions requiring explicit approval.
-
-## Safety and compatibility
-
-- Never use the Douban Scout database as MovieHub's database.
-- Never write to the live Scout source. Keep Scout mounts read-only and import tests fixture-based.
-- Do not change, restart or reconfigure Xiaoya, Jellyfin, SmartStrm, NPM or NAS services as part of code development.
-- Do not deploy or initialize a production database without a separate explicit authorization.
-- Do not commit secrets, real database files, backup archives or private environment files.
+The earlier phase-by-phase implementation table, CI counts, migration checklist and delivery order were removed from this document because they became stale as the project evolved. Consult [DEVELOPMENT-PROGRESS.md](DEVELOPMENT-PROGRESS.md) for historical milestones and [PROJECT-STATUS.md](PROJECT-STATUS.md) for the current verified state.

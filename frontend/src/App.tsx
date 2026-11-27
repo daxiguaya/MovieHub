@@ -247,8 +247,7 @@ const DISCOVERY_LISTS: Record<string, {
   "horror-high": {
     title: "恐怖片高分榜",
     description: "投票量充足、口碑稳定的恐怖电影",
-    genre: "27",
-    minVotes: 500,
+    genre: "27",    minVotes: 500,
     minRating: 7
   },
   "horror-gems": {
@@ -488,7 +487,7 @@ function MovieCard({ movie, rank, localMatch = false, sourceRating, sourceLabel 
         ) : (
           <div className="movie-rating"><span>★</span> IMDb {movie.imdb_rating?.toFixed(1) ?? "暂无评分"} <small>({movie.imdb_rating_count == null ? "暂无投票人数" : movie.imdb_rating_count.toLocaleString()})</small></div>
         )}
-        {movie.overview && <p className="movie-overview">{movie.overview}</p>}
+        
       </div>
     </article>
   );
@@ -498,7 +497,6 @@ function MovieCard({ movie, rank, localMatch = false, sourceRating, sourceLabel 
 function ExternalMovieCard({ item, localMovie }: { item: DiscoveryItem; localMovie?: Movie }) {
   const [failed, setFailed] = useState(false);
   const poster = item.poster_path ? "https://image.tmdb.org/t/p/w342" + item.poster_path : "";
-
   return (
     <article className="movie-card">
       <Link className="movie-poster" to={"/tmdb/" + item.media_type + "/" + item.provider_id}>
@@ -747,8 +745,7 @@ function SearchPage() {
       if (params.get("min_rating")) localParams.set("min_rating", params.get("min_rating")!);
       if (params.get("min_rating_count")) localParams.set("min_rating_count", params.get("min_rating_count")!);
       if (params.get("min_year")) localParams.set("min_year", params.get("min_year")!);
-      if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);
-      const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
+      if (params.get("max_year")) localParams.set("max_year", params.get("max_year")!);      const [resolvedGenreOptions, resolvedRegionOptions] = await Promise.all([
         selectedGenreIds.length
           ? api.discoveryGenres(requestedType === "tv" ? "tv" : "movie").then((data) => data.genres)
           : Promise.resolve(genreOptions),
@@ -997,8 +994,7 @@ function SearchPage() {
       : sortBy === "rating_asc" ? compare(left.imdb_rating ?? null, right.imdb_rating ?? null, 1)
       : sortBy === "votes_desc" ? compare(left.imdb_rating_count ?? null, right.imdb_rating_count ?? null, -1)
       : sortBy === "year_desc" ? compare(left.year, right.year, -1) : 0;
-    return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");
-  });
+    return sortBy === "relevance" ? 0 : result || left.title.localeCompare(right.title, "zh-CN");  });
 
   return (
     <>
@@ -1247,8 +1243,7 @@ function ExternalMoviePage({ config }: { config: PublicConfig }) {
           {favoriteError && <div className="inline-error">{favoriteError} · <Link to="/favorites">前往收藏页连接 API Key</Link></div>}
           {movie.overview && <section className="detail-section"><h3>剧情简介</h3><p>{movie.overview}</p></section>}
           {directors.length > 0 && <section className="detail-section"><h3>导演</h3><p>{directors.join(" / ")}</p></section>}
-          {actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{actors.join(" / ")}</p></section>}
-          {movie.runtime && <section className="detail-section"><h3>片长</h3><p>{movie.runtime} 分钟</p></section>}
+          {actors.length > 0 && <section className="detail-section"><h3>主演</h3><p>{actors.join(" / ")}</p></section>}          {movie.runtime && <section className="detail-section"><h3>片长</h3><p>{movie.runtime} 分钟</p></section>}
           {movie.number_of_seasons && <section className="detail-section"><h3>剧集信息</h3><p>{movie.number_of_seasons} 季 · {movie.number_of_episodes ?? "—"} 集</p></section>}
           <p className="tmdb-attribution">{movie.attribution}</p>
         </div>

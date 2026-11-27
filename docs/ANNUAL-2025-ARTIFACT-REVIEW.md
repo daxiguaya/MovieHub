@@ -41,3 +41,8 @@ This review is a structural and cross-list consistency check. It does not indepe
 - No Scout database was opened or modified.
 - No annual snapshot was imported.
 - The next data-quality step is to run the existing read-only Scout coverage audit against a separately staged, consistent Scout copy. Any later snapshot import remains a separate deliberate operation after the independent MovieHub database is explicitly initialized.
+
+
+## Production follow-up — 2026-11-26
+
+The statements above that no annual snapshot had been imported describe the state at the time of this artifact review (2026-11-23). They are historical, not the current production state. The four lists were subsequently imported into the production MovieHub database and confirmed by the production audit: four annual snapshots, 38 entries total (8/10/10/10). The imported data remains separate from this temporary Actions artifact; the artifact itself was not committed to Git.

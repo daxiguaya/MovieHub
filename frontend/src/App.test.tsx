@@ -217,8 +217,7 @@ describe("MovieHub frontend workflows", () => {
       if (url.startsWith("/api/discovery/discover?")) {
         return {
           provider: "tmdb", media_type: "tv", page: 1, total_pages: 1,
-          total_results: 0, items: [], attribution: "TMDB"
-        };
+          total_results: 0, items: [], attribution: "TMDB"        };
       }
       if (url.startsWith("/api/movies?")) {
         return { items: [], next_cursor: null, total: 0 };
@@ -401,7 +400,7 @@ describe("MovieHub frontend workflows", () => {
     expect(openSpy.mock.calls[0][1]).toBe("_blank");
   });
 
-  it("renders the stored synopsis on chart movie cards", async () => {
+  it("keeps chart cards compact and reserves synopses for the detail page", async () => {
     installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/charts/top250/snapshots") return [];
@@ -427,7 +426,7 @@ describe("MovieHub frontend workflows", () => {
     );
 
     expect(await screen.findByText("搏击俱乐部")).toBeInTheDocument();
-    expect(screen.getByText("一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。")).toBeInTheDocument();
+    expect(screen.queryByText("一个失眠的上班族遇见神秘的泰勒，逐渐卷入地下拳击俱乐部。")).not.toBeInTheDocument();
     expect(screen.getByText(/豆瓣榜单评分 8\.8/)).toBeInTheDocument();
     expect(screen.getByText("(历史快照)")).toBeInTheDocument();
     expect(screen.queryByText("(200,000)")).not.toBeInTheDocument();
@@ -437,8 +436,7 @@ describe("MovieHub frontend workflows", () => {
     const fetchMock = installFetchMock((url) => {
       if (url === "/api/config") return { xiaoyaSearchUrlTemplate: "" };
       if (url === "/api/charts/top250/snapshots") {
-        return [
-          { snapshot_date: "2026-11-23", item_count: 2 },
+        return [          { snapshot_date: "2026-11-23", item_count: 2 },
           { snapshot_date: "2026-11-22", item_count: 2 }
         ];
       }
@@ -657,8 +655,7 @@ describe("MovieHub frontend workflows", () => {
       </MemoryRouter>
     );
 
-    await screen.findByRole("heading", { name: "年度影片" });
-    expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "年度影片" });    expect(screen.getByText(/FEATURE FILM · 2025/)).toBeInTheDocument();
     expect(screen.getByText("IMDb · 250 票")).toBeInTheDocument();
     expect(screen.getByText("★ 6.2")).toBeInTheDocument();
     expect(screen.getByText("★ 8.4")).toBeInTheDocument();
